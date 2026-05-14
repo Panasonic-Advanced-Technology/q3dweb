@@ -453,7 +453,16 @@ export class Viewer {
         );
         const hits = raycaster.intersectObjects(intersectables, false);
         if (hits.length > 0) {
-            const p = hits[0].point.clone();
+            let best = hits[0] as any;
+            for (let i = 1; i < hits.length; i++) {
+                const h = hits[i] as any;
+                const bestRay = Number.isFinite(best.distanceToRay) ? best.distanceToRay : Infinity;
+                const hRay = Number.isFinite(h.distanceToRay) ? h.distanceToRay : Infinity;
+                if (hRay < bestRay || (hRay === bestRay && h.distance < best.distance)) {
+                    best = h;
+                }
+            }
+            const p = best.point.clone();
             this.selectedPoints.push(p);
             this.updateMeasurementMarker();
         }
