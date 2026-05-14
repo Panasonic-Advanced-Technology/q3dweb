@@ -296,14 +296,25 @@ export class Viewer {
         this.camera.up.copy(up);
         this.camera.lookAt(this.cameraCenter);
 
-        // Dynamic near/far like q3dviewer
-        const near = this.cameraDist * 0.001;
-        const far = this.cameraDist * 10000;
-        this.camera.near = Math.max(near, 0.01);
-        this.camera.far = far;
-        this.camera.updateProjectionMatrix();
+        this.updateProjectionMatrixLikeQ3DViewer();
 
         this.requestRender();
+    }
+
+    private updateProjectionMatrixLikeQ3DViewer(): void {
+        const w = Math.max(this.container.clientWidth, 1);
+        const h = Math.max(this.container.clientHeight, 1);
+        const dist = 40;
+        const near = dist * 0.001;
+        const far = dist * 10000;
+        const fovRad = THREE.MathUtils.degToRad(this.camera.fov);
+        const r = near * Math.tan(0.5 * fovRad);
+        const t = r * h / Math.max(w, 1);
+
+        this.camera.near = near;
+        this.camera.far = far;
+        this.camera.projectionMatrix.makePerspective(-r, r, t, -t, near, far);
+        this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
     }
 
     rotateCam(rx: number, ry: number, rz: number) {
@@ -2901,7 +2912,7 @@ export class Viewer {
     onWindowResize() {
         if (!this.container) return;
         this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
-        this.camera.updateProjectionMatrix();
+        this.updateProjectionMatrixLikeQ3DViewer();
         this.renderer.setPixelRatio(this.rendererPixelRatio);
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
         this.syncAllCloudItemViewports();
