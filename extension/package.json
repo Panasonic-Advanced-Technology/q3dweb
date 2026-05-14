@@ -2,7 +2,7 @@
   "name": "q3dviewer",
   "displayName": "q3dviewer",
   "description": "Point Cloud Viewer for VS Code (PCD, PLY, LAS, LAZ, E57)",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "panasonic-ad",
   "icon": "media/at-logo-color-128x128.jpg",
   "license": "MIT",
