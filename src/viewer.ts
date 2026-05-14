@@ -153,6 +153,7 @@ export class Viewer {
 
     // Visualization Buffers
     MAX_POINTS_VISUAL = 15_000_000;
+    realtimeMaxPoints: number = 5_000_000;
     posBuffer: Float32Array | null = null;
     valBuffer: Float32Array | null = null;
     rgbBuffer: Uint8Array | null = null;
@@ -2865,6 +2866,104 @@ export class Viewer {
         if (this.statusElement) this.statusElement.textContent = `${count.toLocaleString()} points`;
         if (this.loadingOverlay) this.loadingOverlay.style.display = 'none';
 
+        this.requestRender();
+    }
+
+    /** Reset the current cloud so a realtime producer can start from an empty buffer. */
+    resetRealtimeCloud(): void {
+        this.removeItem('cloud');
+        if (this.statusElement) this.statusElement.textContent = '0 points';
+        this.requestRender();
+    }
+
+    /**
+     * Append a realtime point chunk into an existing CloudItem without rebuilding geometry.
+     * Oldest points are dropped when maxPoints is reached.
+     */
+    appendRealtimePoints(
+        positions: Float32Array,
+        values: Float32Array,
+        rgbColors?: Uint8Array,
+        maxPoints?: number,
+        autoFitOnFirstChunk: boolean = false,
+    ): void {
+        if (positions.length !== values.length * 3) {
+            console.warn('appendRealtimePoints skipped: positions length must equal values length * 3');
+            return;
+        }
+        if (rgbColors && rgbColors.length !== values.length * 3) {
+            console.warn('appendRealtimePoints skipped: rgb length must equal values length * 3');
+            return;
+        }
+        if (values.length === 0) return;
+
+        let cloud = this.items['cloud'];
+        if (!(cloud instanceof CloudItem)) {
+            const initColorMode: 'I' | 'RGB' = rgbColors ? 'RGB' : 'I';
+            cloud = new CloudItem(
+                new Float32Array(0),
+                new Float32Array(0),
+                {
+                    size: 1.0 * window.devicePixelRatio,
+                    alpha: 0.1,
+                    colorMode: initColorMode,
+                },
+            );
+            cloud.name = 'cloud';
+            cloud.frustumCulled = false;
+            this.addItem('cloud', cloud);
+        }
+
+        const cloudItem = cloud as CloudItem;
+        const beforeCount = cloudItem.getPointCount();
+        const effectiveMaxPoints = Math.max(1, maxPoints ?? this.realtimeMaxPoints);
+        const count = cloudItem.appendPoints(positions, values, rgbColors, effectiveMaxPoints);
+
+        const material = cloudItem.material as CloudShaderMaterial;
+        if (rgbColors) {
+            material.uniforms.colorMode.value = 1;
+        }
+
+        let chunkMin = Infinity;
+        let chunkMax = -Infinity;
+        for (let i = 0; i < values.length; i++) {
+            const v = values[i];
+            if (v < chunkMin) chunkMin = v;
+            if (v > chunkMax) chunkMax = v;
+        }
+        if (beforeCount === 0 || this.dataMin > this.dataMax) {
+            this.dataMin = chunkMin;
+            this.dataMax = chunkMax;
+        } else {
+            if (chunkMin < this.dataMin) this.dataMin = chunkMin;
+            if (chunkMax > this.dataMax) this.dataMax = chunkMax;
+        }
+        if (this.dataMin === this.dataMax) {
+            this.dataMin -= 1;
+            this.dataMax += 1;
+        }
+        material.uniforms.vmin.value = this.dataMin;
+        material.uniforms.vmax.value = this.dataMax;
+        material.needsUpdate = true;
+
+        if (autoFitOnFirstChunk && beforeCount === 0) {
+            cloudItem.geometry.computeBoundingBox();
+            if (cloudItem.geometry.boundingBox) {
+                const center = new THREE.Vector3();
+                cloudItem.geometry.boundingBox.getCenter(center);
+                this.cameraCenter.copy(center);
+                const size = new THREE.Vector3();
+                cloudItem.geometry.boundingBox.getSize(size);
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const fov = this.camera.fov * (Math.PI / 180);
+                this.cameraDist = (maxDim / (2 * Math.tan(fov / 2))) * 1.5;
+                this.euler = [Math.PI / 3, 0, Math.PI / 4];
+                this.updateCamera();
+            }
+        }
+
+        if (this.statusElement) this.statusElement.textContent = `${count.toLocaleString()} points (realtime)`;
+        if (this.loadingOverlay) this.loadingOverlay.style.display = 'none';
         this.requestRender();
     }
 

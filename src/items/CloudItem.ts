@@ -33,28 +33,196 @@ export interface CloudItemOptions {
 }
 
 export class CloudItem extends THREE.Points {
+    private pointCount: number;
+
     constructor(positions: Float32Array, values: Float32Array, options: CloudItemOptions = {}, rgbColors?: Float32Array | Uint8Array) {
+        if (positions.length !== values.length * 3) {
+            throw new Error('positions length must be values length * 3');
+        }
+
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         geometry.setAttribute('value', new THREE.BufferAttribute(values, 1));
 
         if (rgbColors) {
-            const normalized = (rgbColors instanceof Uint8Array || rgbColors instanceof Uint8ClampedArray);
-            geometry.setAttribute('color', new THREE.BufferAttribute(rgbColors, 3, normalized));
+            geometry.setAttribute('color', new THREE.BufferAttribute(CloudItem.toUint8Colors(rgbColors), 3, true));
             options.colorMode = 'RGB';
         } else {
             geometry.setAttribute('color', new THREE.BufferAttribute(new Uint8Array(positions.length), 3, true));
         }
+        geometry.setDrawRange(0, values.length);
 
         const material = new CloudShaderMaterial(options);
 
         super(geometry, material);
+        this.pointCount = values.length;
         this.frustumCulled = false; // often necessary for custom shaders or dynamic bounds
+    }
+
+    getPointCount(): number {
+        return this.pointCount;
+    }
+
+    replacePoints(positions: Float32Array, values: Float32Array, rgbColors?: Float32Array | Uint8Array): void {
+        if (positions.length !== values.length * 3) {
+            throw new Error('positions length must be values length * 3');
+        }
+
+        const nextCount = values.length;
+        this.ensureCapacity(nextCount);
+
+        const positionArray = this.getPositionArray();
+        const valueArray = this.getValueArray();
+        const colorArray = this.getColorArray();
+
+        positionArray.set(positions, 0);
+        valueArray.set(values, 0);
+
+        if (rgbColors) {
+            colorArray.set(CloudItem.toUint8Colors(rgbColors), 0);
+        } else if (nextCount > 0) {
+            colorArray.fill(0, 0, nextCount * 3);
+        }
+
+        this.pointCount = nextCount;
+        this.markAttributesDirty();
+    }
+
+    appendPoints(
+        positions: Float32Array,
+        values: Float32Array,
+        rgbColors?: Float32Array | Uint8Array,
+        maxPoints?: number,
+    ): number {
+        if (positions.length !== values.length * 3) {
+            throw new Error('positions length must be values length * 3');
+        }
+
+        const appendCount = values.length;
+        if (appendCount === 0) return this.pointCount;
+
+        this.ensureCapacity(this.pointCount + appendCount);
+
+        const positionArray = this.getPositionArray();
+        const valueArray = this.getValueArray();
+        const colorArray = this.getColorArray();
+        const incomingColors = rgbColors ? CloudItem.toUint8Colors(rgbColors) : null;
+
+        let currentCount = this.pointCount;
+
+        if (maxPoints !== undefined && maxPoints > 0 && currentCount + appendCount > maxPoints) {
+            const overflow = currentCount + appendCount - maxPoints;
+
+            if (overflow >= currentCount) {
+                const keepFromIncoming = Math.min(appendCount, maxPoints);
+                const srcOffsetPoints = appendCount - keepFromIncoming;
+                const srcOffsetPos = srcOffsetPoints * 3;
+
+                positionArray.set(positions.subarray(srcOffsetPos), 0);
+                valueArray.set(values.subarray(srcOffsetPoints), 0);
+                if (incomingColors) {
+                    colorArray.set(incomingColors.subarray(srcOffsetPos), 0);
+                } else {
+                    colorArray.fill(0, 0, keepFromIncoming * 3);
+                }
+
+                this.pointCount = keepFromIncoming;
+                this.markAttributesDirty();
+                return this.pointCount;
+            }
+
+            const keepOldCount = currentCount - overflow;
+            positionArray.copyWithin(0, overflow * 3, currentCount * 3);
+            valueArray.copyWithin(0, overflow, currentCount);
+            colorArray.copyWithin(0, overflow * 3, currentCount * 3);
+            currentCount = keepOldCount;
+        }
+
+        const dstOffsetPos = currentCount * 3;
+        positionArray.set(positions, dstOffsetPos);
+        valueArray.set(values, currentCount);
+        if (incomingColors) {
+            colorArray.set(incomingColors, dstOffsetPos);
+        } else {
+            colorArray.fill(0, dstOffsetPos, dstOffsetPos + appendCount * 3);
+        }
+
+        this.pointCount = currentCount + appendCount;
+        this.markAttributesDirty();
+        return this.pointCount;
     }
 
     updateViewport(height: number) {
         const material = this.material as CloudShaderMaterial;
         material.uniforms.viewportHeight.value = Math.max(height, 1);
+    }
+
+    private ensureCapacity(requiredPoints: number): void {
+        const positionAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
+        const currentCapacity = positionAttr.array.length / 3;
+        if (requiredPoints <= currentCapacity) return;
+
+        const newCapacity = Math.max(requiredPoints, currentCapacity * 2, 1024);
+        const nextPos = new Float32Array(newCapacity * 3);
+        const nextVal = new Float32Array(newCapacity);
+        const nextColor = new Uint8Array(newCapacity * 3);
+
+        const positionArray = this.getPositionArray();
+        const valueArray = this.getValueArray();
+        const colorArray = this.getColorArray();
+        const copiedPosLen = this.pointCount * 3;
+
+        if (copiedPosLen > 0) {
+            nextPos.set(positionArray.subarray(0, copiedPosLen), 0);
+            nextVal.set(valueArray.subarray(0, this.pointCount), 0);
+            nextColor.set(colorArray.subarray(0, copiedPosLen), 0);
+        }
+
+        this.geometry.setAttribute('position', new THREE.BufferAttribute(nextPos, 3));
+        this.geometry.setAttribute('value', new THREE.BufferAttribute(nextVal, 1));
+        this.geometry.setAttribute('color', new THREE.BufferAttribute(nextColor, 3, true));
+    }
+
+    private markAttributesDirty(): void {
+        const positionAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
+        const valueAttr = this.geometry.getAttribute('value') as THREE.BufferAttribute;
+        const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute;
+
+        positionAttr.needsUpdate = true;
+        valueAttr.needsUpdate = true;
+        colorAttr.needsUpdate = true;
+        this.geometry.setDrawRange(0, this.pointCount);
+        this.geometry.boundingBox = null;
+        this.geometry.boundingSphere = null;
+    }
+
+    private getPositionArray(): Float32Array {
+        const attr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
+        return attr.array as Float32Array;
+    }
+
+    private getValueArray(): Float32Array {
+        const attr = this.geometry.getAttribute('value') as THREE.BufferAttribute;
+        return attr.array as Float32Array;
+    }
+
+    private getColorArray(): Uint8Array {
+        const attr = this.geometry.getAttribute('color') as THREE.BufferAttribute;
+        return attr.array as Uint8Array;
+    }
+
+    private static toUint8Colors(rgbColors: Float32Array | Uint8Array): Uint8Array {
+        if (rgbColors instanceof Uint8Array || rgbColors instanceof Uint8ClampedArray) {
+            return rgbColors;
+        }
+
+        const out = new Uint8Array(rgbColors.length);
+        for (let i = 0; i < rgbColors.length; i++) {
+            const v = rgbColors[i];
+            const scaled = v <= 1.0 ? v * 255 : v;
+            out[i] = Math.max(0, Math.min(255, Math.round(scaled)));
+        }
+        return out;
     }
 }
 
