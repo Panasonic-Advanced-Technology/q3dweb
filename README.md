@@ -30,10 +30,6 @@ Open the URL below and drag and drop a point cloud file into the viewer.
 
 https://Panasonic-Advanced-Technology.github.io/q3dweb
 
-If you want to check the latest development build from the `develop` branch, use the preview URL below.
-
-https://Panasonic-Advanced-Technology.github.io/q3dweb/develop/
-
 ### VS Code
 
 1. Search for `q3dviewer` in the VS Code Extensions view and install it.
