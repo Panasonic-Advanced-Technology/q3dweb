@@ -2,6 +2,9 @@
 export { CloudItem, CloudShaderMaterial } from './CloudItem';
 export type { CloudItemOptions } from './CloudItem';
 
+export { NativeCloudItem } from './NativeCloudItem';
+export type { NativeCloudItemOptions } from './NativeCloudItem';
+
 export { AxisItem } from './AxisItem';
 export type { AxisItemOptions } from './AxisItem';
 
