@@ -36,6 +36,7 @@ try {
 
     if (useRealtime && viewer instanceof RealtimeViewer) {
         const topicName = params.get('topic') ?? undefined;
+        const odomTopicName = params.get('odomTopic') ?? undefined;
         const maxPointsPerScanRaw = Number(params.get('maxScan'));
         const maxAccumulatedPointsRaw = Number(params.get('maxCloud'));
         const maxPointsPerScan = Number.isFinite(maxPointsPerScanRaw) && maxPointsPerScanRaw > 0
@@ -46,6 +47,7 @@ try {
             : undefined;
         viewer.setRealtimeOptions({
             topicName,
+            odomTopicName,
             maxPointsPerScan,
             maxAccumulatedPoints,
         });
@@ -54,6 +56,7 @@ try {
         if (rosWsUrl) {
             viewer.connectRosbridge(rosWsUrl, {
                 topicName,
+                odomTopicName,
                 maxPointsPerScan,
                 maxAccumulatedPoints,
                 autoFitOnFirstChunk: true,
