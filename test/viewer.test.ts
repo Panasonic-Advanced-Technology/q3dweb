@@ -603,6 +603,37 @@ describe('Viewer streaming - PCD', () => {
     expect(v.items.cloud).toBeDefined();
   });
 
+  it('streams fake 2GiB+ ASCII PCD without allocating the full file', async () => {
+    const data = makeAsciiPCD([
+      [0, 0, 0, 10], [1, 1, 1, 20], [2, 2, 2, 30],
+      [3, 3, 3, 40], [4, 4, 4, 50], [5, 5, 5, 60],
+    ]);
+    const renderSpy = vi.spyOn(v, 'renderPoints');
+    const fakeFile = {
+      name: 'huge_ascii.pcd',
+      size: 2 * 1024 * 1024 * 1024 + 1,
+      stream() {
+        let sent = false;
+        return {
+          getReader() {
+            return {
+              async read() {
+                if (sent) return { done: true, value: undefined };
+                sent = true;
+                return { done: false, value: data };
+              },
+              async cancel() {},
+            };
+          },
+        };
+      },
+    } as any as File;
+    await v.loadFile(fakeFile);
+    expect(renderSpy).toHaveBeenCalled();
+    expect((renderSpy.mock.calls[0][0] as Float32Array).length / 3).toBe(3);
+    expect((v as any).fullBuffer).toBeNull();
+  });
+
   it('loads binary PCD with RGB', () => {
     const data = makeBinaryPCDWithRGB();
     v.loadData(data, 'foo.pcd');
@@ -694,6 +725,37 @@ describe('Viewer PLY parsing', () => {
   it('parses ASCII PLY with intensity + colors', () => {
     v.loadData(asciiPLY(true, true), 'a.ply');
     expect(v.items.cloud).toBeDefined();
+  });
+
+  it('streams fake 2GiB+ ASCII PLY with source-size thinning', async () => {
+    let header = 'ply\nformat ascii 1.0\nelement vertex 6\n';
+    header += 'property float x\nproperty float y\nproperty float z\nproperty float intensity\nend_header\n';
+    const body = '0 0 0 0\n1 1 1 1\n2 2 2 2\n3 3 3 3\n4 4 4 4\n5 5 5 5\n';
+    const data = new TextEncoder().encode(header + body);
+    const renderSpy = vi.spyOn(v, 'renderPoints');
+    const fakeFile = {
+      name: 'huge_ascii.ply',
+      size: 2 * 1024 * 1024 * 1024 + 1,
+      stream() {
+        let sent = false;
+        return {
+          getReader() {
+            return {
+              async read() {
+                if (sent) return { done: true, value: undefined };
+                sent = true;
+                return { done: false, value: data };
+              },
+              async cancel() {},
+            };
+          },
+        };
+      },
+    } as any as File;
+    await v.loadFile(fakeFile);
+    expect(renderSpy).toHaveBeenCalled();
+    expect((renderSpy.mock.calls[0][0] as Float32Array).length / 3).toBe(3);
+    expect((v as any).chunkList.length).toBe(0);
   });
 
   it('parses ASCII PLY with intensity only (no colors)', () => {

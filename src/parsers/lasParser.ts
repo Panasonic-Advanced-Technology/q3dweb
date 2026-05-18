@@ -6,6 +6,7 @@
 import { parseLASGeoInfo, readLASBounds } from '../utils/lasGeo';
 import { projToLatLon, registerWKT, convertByKey } from '../utils/projConvert';
 import type { ParsedCloud } from './pcdParser';
+import { computePointSampleRatio, estimateSampledPointCount } from './sampling';
 
 export interface LASBounds {
     minX: number; maxX: number;
@@ -127,12 +128,12 @@ export function parseLASMetadata(data: Uint8Array): LASMetadata {
 }
 
 /** Parse a fully-buffered LAS file. Samples to maxPoints. */
-export function parseLAS(data: Uint8Array, maxPoints: number): ParsedLAS {
+export function parseLAS(data: Uint8Array, maxPoints: number, sourceBytes: number = data.byteLength): ParsedLAS {
     const meta = parseLASMetadata(data);
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
 
-    const sampleRatio       = meta.numberOfPoints > maxPoints ? Math.ceil(meta.numberOfPoints / maxPoints) : 1;
-    const estimatedVisPoints = Math.ceil(meta.numberOfPoints / sampleRatio);
+    const sampleRatio = computePointSampleRatio(meta.numberOfPoints, maxPoints, sourceBytes);
+    const estimatedVisPoints = estimateSampledPointCount(meta.numberOfPoints, sampleRatio, maxPoints);
 
     const positions    = new Float32Array(estimatedVisPoints * 3);
     const intensities  = new Float32Array(estimatedVisPoints);
@@ -174,7 +175,7 @@ export function parseLAS(data: Uint8Array, maxPoints: number): ParsedLAS {
 }
 
 /** Decompress a LAZ file via laz-perf WASM, then reuse parseLAS. */
-export async function parseLAZ(data: Uint8Array, maxPoints: number): Promise<ParsedLAS> {
+export async function parseLAZ(data: Uint8Array, maxPoints: number, sourceBytes: number = data.byteLength): Promise<ParsedLAS> {
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
     if (magic !== 'LASF') throw new Error('Not a valid LAZ/LAS file');
@@ -212,7 +213,7 @@ export async function parseLAZ(data: Uint8Array, maxPoints: number): Promise<Par
             }
         } finally { LazPerf._free(pointPtr); }
 
-        return parseLAS(synthetic, maxPoints);
+        return parseLAS(synthetic, maxPoints, sourceBytes);
     } finally {
         try { laszip.delete(); } catch { /* ignore */ }
         LazPerf._free(dataPtr);

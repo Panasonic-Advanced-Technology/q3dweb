@@ -5,9 +5,10 @@
 
 import type { ParsedCloud } from './pcdParser';
 import { normalizeIntensity } from './lasParser';
+import { computePointSampleRatio, estimateSampledPointCount } from './sampling';
 
 /** Parse an E57 file. Recenters points around their mean for float32 stability. */
-export async function parseE57(data: Uint8Array, maxPoints: number): Promise<ParsedCloud> {
+export async function parseE57(data: Uint8Array, maxPoints: number, sourceBytes: number = data.byteLength): Promise<ParsedCloud> {
     console.log(`E57: parsing ${data.byteLength} bytes via vendor/e57-wasm...`);
     const mod: any = await import('../../vendor/e57-wasm/pkg/e57_wasm.js');
     const wasmUrl = (await import('../../vendor/e57-wasm/pkg/e57_wasm_bg.wasm?url')).default;
@@ -21,8 +22,8 @@ export async function parseE57(data: Uint8Array, maxPoints: number): Promise<Par
     const hasColor     = pts.hasColor   as boolean;
     const hasIntensity = pts.hasIntensity as boolean;
 
-    const sampleRatio = totalPoints > maxPoints ? Math.ceil(totalPoints / maxPoints) : 1;
-    const estimated   = Math.ceil(totalPoints / sampleRatio);
+    const sampleRatio = computePointSampleRatio(totalPoints, maxPoints, sourceBytes);
+    const estimated   = estimateSampledPointCount(totalPoints, sampleRatio, maxPoints);
 
     const positions = new Float32Array(estimated * 3);
     const intensity = new Float32Array(estimated);

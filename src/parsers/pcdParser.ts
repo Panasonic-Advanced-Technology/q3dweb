@@ -1,3 +1,5 @@
+import { computePointSampleRatio, estimateSampledPointCount } from './sampling';
+
 /**
  * PCD (Point Cloud Data) parsing utilities.
  * Extracted from viewer.ts for modularity.
@@ -157,12 +159,13 @@ export function parsePCDAscii(
     data: Uint8Array,
     header: PCDHeader,
     maxPoints: number,
+    sourceBytes: number = data.byteLength,
 ): ParsedCloud {
     const text = new TextDecoder().decode(data.subarray(header.headerLen));
     const lines = text.split(/\r?\n/);
     const totalPoints = header.points ?? lines.length;
-    const sampleRatio = totalPoints > maxPoints ? Math.ceil(totalPoints / maxPoints) : 1;
-    const estimated = Math.ceil(totalPoints / sampleRatio);
+    const sampleRatio = computePointSampleRatio(totalPoints, maxPoints, sourceBytes);
+    const estimated = estimateSampledPointCount(totalPoints, sampleRatio, maxPoints);
 
     const positions = new Float32Array(estimated * 3);
     const values    = new Float32Array(estimated);

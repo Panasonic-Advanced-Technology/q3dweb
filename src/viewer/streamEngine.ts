@@ -4,11 +4,19 @@ import { detectHeapLimit, detectHeapUsed, estimateMemoryRequirement, formatBytes
 import {
     PCDBinaryState, parsePCDHeader, processPCDBinaryChunk, parsePCDAscii, getFieldSpec,
 } from '../parsers/pcdParser';
+import {
+    createPCDAsciiStreamState, finalizePCDAsciiStream, processPCDAsciiStreamChunk,
+} from '../parsers/pcdAsciiStream';
 import { parsePLY } from '../parsers/plyParser';
+import {
+    createPLYStreamState, findPLYHeaderEnd, finalizePLYStreamState,
+    parsePLYStreamHeader, processPLYStreamChunk,
+} from '../parsers/plyStreamParser';
 import {
     LASBounds, normalizeIntensity, parseLASMetadata, parseLAZ, processLASRecords,
 } from '../parsers/lasParser';
 import { parseE57 } from '../parsers/e57Parser';
+import { computePointSampleRatio, estimateSampledPointCount } from '../parsers/sampling';
 
 export type FormatType = 'pcd' | 'ply' | 'las' | 'laz' | 'e57' | 'unknown';
 
@@ -22,7 +30,7 @@ export function detectFormat(filename?: string): FormatType {
 }
 
 export function shouldDeferInitialMemoryCheck(format: string): boolean {
-    return format === 'pcd' || format === 'las';
+    return format === 'pcd' || format === 'las' || format === 'ply';
 }
 
 export function estimateVisiblePointBufferBytes(pointCount: number, hasRGB: boolean): number {
@@ -62,6 +70,7 @@ export function abortStream(v: any, message: string): void {
     v.leftoverChunk = null; v.chunkList = []; v.fullBuffer = null;
     v.fullBufferWriteOffset = 0; v.posBuffer = null; v.valBuffer = null;
     v.rgbBuffer = null; v.lasStream = null;
+    v.pcdAsciiStream = null; v.plyStream = null;
     if (v.loadingOverlay) {
         v.loadingOverlay.style.display = 'flex';
         v.loadingOverlay.innerHTML = `<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Error: ${message}</div>`;
@@ -74,6 +83,7 @@ export function startStream(v: any, totalSize: number, filename?: string): void 
     v.leftoverChunk = null; v.pointsLoaded = 0; v.posIndex = 0;
     v.posBuffer = null; v.valBuffer = null; v.fullBuffer = null;
     v.rgbBuffer = null; v.fullBufferWriteOffset = 0; v.chunkList = [];
+    v.pcdAsciiStream = null; v.plyStream = null;
     v.currentFormat = detectFormat(filename);
     if (v.loadingOverlay) {
         v.loadingOverlay.style.display = 'flex';
@@ -110,8 +120,8 @@ function processLASChunkInternal(v: any, chunkData: Uint8Array): void {
         const offsetToPointData = view.getUint32(96, true);
         if (chunkData.byteLength < offsetToPointData) { v.leftoverChunk = chunkData; return; }
         const meta = parseLASMetadata(chunkData.subarray(0, offsetToPointData));
-        v.targetSampleRatio = meta.numberOfPoints > v.MAX_POINTS_VISUAL ? Math.ceil(meta.numberOfPoints / v.MAX_POINTS_VISUAL) : 1;
-        const estimated = Math.ceil(meta.numberOfPoints / v.targetSampleRatio);
+        v.targetSampleRatio = computePointSampleRatio(meta.numberOfPoints, v.MAX_POINTS_VISUAL, v.streamTotalSize);
+        const estimated = estimateSampledPointCount(meta.numberOfPoints, v.targetSampleRatio, v.MAX_POINTS_VISUAL);
         const needsRGB = meta.hasRGB && meta.rgbOffset !== -1;
         if (!ensureStreamedPointBudget(v, estimated, needsRGB, 'las', v.streamFilename)) return;
         v.posBuffer = new Float32Array(estimated * 3);
@@ -129,6 +139,38 @@ function processLASChunkInternal(v: any, chunkData: Uint8Array): void {
     v.pointsLoaded = v.lasStream.rawPointIndex;
 }
 
+function processPLYChunkInternal(v: any, chunkData: Uint8Array): void {
+    if (v.plyStream) {
+        processPLYStreamChunk(v.plyStream, chunkData);
+        v.pointsLoaded = v.plyStream.vertexIndex;
+        return;
+    }
+    if (v.leftoverChunk) {
+        const merged = new Uint8Array(v.leftoverChunk.byteLength + chunkData.byteLength);
+        merged.set(v.leftoverChunk); merged.set(chunkData, v.leftoverChunk.byteLength);
+        chunkData = merged; v.leftoverChunk = null;
+    }
+
+    const headerEnd = findPLYHeaderEnd(chunkData);
+    if (headerEnd === -1) {
+        if (chunkData.byteLength >= 100000) abortStream(v, 'Invalid PLY file: missing end_header');
+        else v.leftoverChunk = chunkData;
+        return;
+    }
+
+    const header = parsePLYStreamHeader(chunkData.subarray(0, headerEnd));
+    const hasRGB = ('red' in header.propIndex && 'green' in header.propIndex && 'blue' in header.propIndex)
+        || 'rgb' in header.propIndex;
+    const sampleRatio = computePointSampleRatio(header.vertexCount, v.MAX_POINTS_VISUAL, v.streamTotalSize);
+    const estimated = estimateSampledPointCount(header.vertexCount, sampleRatio, v.MAX_POINTS_VISUAL);
+    if (!ensureStreamedPointBudget(v, estimated, hasRGB, 'ply', v.streamFilename)) return;
+    v.plyStream = createPLYStreamState(header, v.MAX_POINTS_VISUAL, v.streamTotalSize);
+    v.targetSampleRatio = v.plyStream.sampleRatio;
+    if (v.statusElement) v.statusElement.textContent = `Streaming: ~${estimated.toLocaleString()} pts`;
+    processPLYStreamChunk(v.plyStream, chunkData.subarray(header.dataStartByte));
+    v.pointsLoaded = v.plyStream.vertexIndex;
+}
+
 export function processChunk(v: any, chunkData: Uint8Array, _offset: number): void {
     try {
         if (v.streamAborted) return;
@@ -137,6 +179,11 @@ export function processChunk(v: any, chunkData: Uint8Array, _offset: number): vo
         const pHtml = (pct: number) => `<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Loading: ${pct.toFixed(1)}%</div>`;
         if (v.currentFormat === 'las') {
             processLASChunkInternal(v, chunkData);
+            if (!v.streamAborted && v.loadingOverlay) v.loadingOverlay.innerHTML = pHtml(progress);
+            return;
+        }
+        if (v.currentFormat === 'ply') {
+            processPLYChunkInternal(v, chunkData);
             if (!v.streamAborted && v.loadingOverlay) v.loadingOverlay.innerHTML = pHtml(progress);
             return;
         }
@@ -161,8 +208,8 @@ export function processChunk(v: any, chunkData: Uint8Array, _offset: number): vo
                     if (v.pcdHeader!.data === 'binary') {
                         v.isBinary = true;
                         const totalPts = v.pcdHeader!.points;
-                        v.targetSampleRatio = totalPts > v.MAX_POINTS_VISUAL ? Math.ceil(totalPts / v.MAX_POINTS_VISUAL) : 1;
-                        const estimated = Math.ceil(totalPts / v.targetSampleRatio);
+                        v.targetSampleRatio = computePointSampleRatio(totalPts, v.MAX_POINTS_VISUAL, v.streamTotalSize);
+                        const estimated = estimateSampledPointCount(totalPts, v.targetSampleRatio, v.MAX_POINTS_VISUAL);
                         const hasRGB = (v.pcdHeader!.offset['rgb'] !== undefined || v.pcdHeader!.offset['rgba'] !== undefined);
                         if (!ensureStreamedPointBudget(v, estimated, hasRGB, 'pcd', v.streamFilename)) return;
                         v.posBuffer = new Float32Array(estimated * 3);
@@ -170,6 +217,17 @@ export function processChunk(v: any, chunkData: Uint8Array, _offset: number): vo
                         v.rgbBuffer = hasRGB ? new Uint8Array(estimated * 3) : null;
                         if (v.statusElement) v.statusElement.textContent = `Streaming: ~${estimated.toLocaleString()} pts`;
                         processBinaryData(v, chunkData.subarray(v.pcdHeader!.headerLen));
+                    } else if (v.pcdHeader!.data === 'ascii') {
+                        v.isBinary = false;
+                        const totalPts = v.pcdHeader!.points;
+                        const sampleRatio = computePointSampleRatio(totalPts, v.MAX_POINTS_VISUAL, v.streamTotalSize);
+                        const estimated = estimateSampledPointCount(totalPts, sampleRatio, v.MAX_POINTS_VISUAL);
+                        const hasRGB = (v.pcdHeader!.offset['rgb'] !== undefined || v.pcdHeader!.offset['rgba'] !== undefined);
+                        if (!ensureStreamedPointBudget(v, estimated, hasRGB, 'pcd', v.streamFilename)) return;
+                        v.pcdAsciiStream = createPCDAsciiStreamState(v.pcdHeader!, v.MAX_POINTS_VISUAL, v.streamTotalSize);
+                        v.targetSampleRatio = v.pcdAsciiStream.sampleRatio;
+                        if (v.statusElement) v.statusElement.textContent = `Streaming: ~${estimated.toLocaleString()} pts`;
+                        processPCDAsciiStreamChunk(v.pcdAsciiStream, chunkData.subarray(v.pcdHeader!.headerLen));
                     } else {
                         v.isBinary = false;
                         if (!checkMemoryBudget(v, v.streamTotalSize || chunkData.byteLength, 'pcd', v.streamFilename)) {
@@ -187,6 +245,9 @@ export function processChunk(v: any, chunkData: Uint8Array, _offset: number): vo
                 temp.set(v.leftoverChunk); temp.set(chunkData, v.leftoverChunk.byteLength);
                 v.leftoverChunk = null; processBinaryData(v, temp);
             } else { processBinaryData(v, chunkData); }
+        } else if (v.pcdAsciiStream) {
+            processPCDAsciiStreamChunk(v.pcdAsciiStream, chunkData);
+            v.pointsLoaded = v.pcdAsciiStream.rawPointIndex;
         } else if (v.fullBuffer) {
             v.fullBuffer.set(chunkData, v.fullBufferWriteOffset);
             v.fullBufferWriteOffset += chunkData.byteLength;
@@ -237,23 +298,29 @@ export function finalizeStream(v: any): void {
             v.renderPoints(pos, val, v.rgbBuffer ? v.rgbBuffer.subarray(0, v.posIndex * 3) : undefined);
             if (v.lasStream.originLatLon && v.lasStream.bounds) addLASOverlay(v, v.lasStream.originLatLon, v.lasStream.bounds);
             v.lasStream = null; v.leftoverChunk = null; v.posBuffer = null; v.valBuffer = null; v.rgbBuffer = null;
-        } else if (v.currentFormat === 'ply' || v.currentFormat === 'laz' || v.currentFormat === 'e57') {
+        } else if (v.currentFormat === 'ply' && v.plyStream) {
+            const result = finalizePLYStreamState(v.plyStream);
+            v.pointsLoaded = result.values.length;
+            if (result.values.length > 0) normalizeIntensity(result.values as Float32Array);
+            v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
+            v.plyStream = null; v.leftoverChunk = null;
+        } else if ((v.currentFormat === 'laz' || v.currentFormat === 'e57') || v.currentFormat === 'ply') {
             const assembled = assembleChunkList(v);
             if (assembled.byteLength === 0) throw new Error(`Empty ${v.currentFormat.toUpperCase()} stream`);
             console.log(`${v.currentFormat.toUpperCase()} assembled bytes: ${assembled.byteLength}`);
             if (v.currentFormat === 'ply') {
-                const result = parsePLY(assembled, v.MAX_POINTS_VISUAL);
+                const result = parsePLY(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength);
                 v.pointsLoaded = result.values.length;
                 if (result.values.length > 0) normalizeIntensity(result.values as Float32Array);
                 v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
             } else if (v.currentFormat === 'laz') {
-                void parseLAZ(assembled, v.MAX_POINTS_VISUAL).then((r) => {
+                void parseLAZ(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength).then((r) => {
                     v.pointsLoaded = r.values.length;
                     v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
                     if (r.originLatLon && r.bounds) addLASOverlay(v, r.originLatLon, r.bounds);
                 }).catch(onErr);
             } else {
-                void parseE57(assembled, v.MAX_POINTS_VISUAL).then((r) => {
+                void parseE57(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength).then((r) => {
                     v.pointsLoaded = r.values.length;
                     v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
                 }).catch(onErr);
@@ -266,11 +333,17 @@ export function finalizeStream(v: any): void {
             v.renderPoints(pos, val, v.rgbBuffer ? v.rgbBuffer.subarray(0, v.posIndex * 3) : undefined);
             v.posBuffer = null; v.valBuffer = null; v.rgbBuffer = null;
         } else if (v.fullBuffer && v.pcdHeader?.data === 'ascii') {
-            const result = parsePCDAscii(v.fullBuffer, v.pcdHeader, v.MAX_POINTS_VISUAL);
+            const result = parsePCDAscii(v.fullBuffer, v.pcdHeader, v.MAX_POINTS_VISUAL, v.streamTotalSize || v.fullBuffer.byteLength);
             v.pointsLoaded = result.values.length;
             if (getFieldSpec(v.pcdHeader, 'intensity')) normalizeIntensity(result.values as Float32Array);
             v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
             v.fullBuffer = null;
+        } else if (v.pcdAsciiStream) {
+            const result = finalizePCDAsciiStream(v.pcdAsciiStream);
+            v.pointsLoaded = result.values.length;
+            if (v.pcdHeader && getFieldSpec(v.pcdHeader, 'intensity')) normalizeIntensity(result.values as Float32Array);
+            v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
+            v.pcdAsciiStream = null;
         } else if (v.fullBuffer) {
             console.warn('binary_compressed PCD not supported in streaming mode.');
             if (v.loadingOverlay) v.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">binary_compressed PCD is not supported.</div>';

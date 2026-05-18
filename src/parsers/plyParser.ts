@@ -4,8 +4,19 @@
  */
 
 import type { ParsedCloud } from './pcdParser';
+import { computePointSampleRatio, estimateSampledPointCount } from './sampling';
 
-function plyTypeSize(type: string): number {
+export interface PLYProp { name: string; type: string; }
+
+export interface PLYHeader {
+    format: string;
+    vertexCount: number;
+    vertexProps: PLYProp[];
+    propIndex: { [key: string]: number };
+    dataStartByte: number;
+}
+
+export function plyTypeSize(type: string): number {
     switch (type) {
         case 'char': case 'int8':
         case 'uchar': case 'uint8': return 1;
@@ -18,7 +29,7 @@ function plyTypeSize(type: string): number {
     }
 }
 
-function readPLYValue(view: DataView, offset: number, type: string, isLE: boolean): number {
+export function readPLYValue(view: DataView, offset: number, type: string, isLE: boolean): number {
     switch (type) {
         case 'char': case 'int8':    return view.getInt8(offset);
         case 'uchar': case 'uint8':  return view.getUint8(offset);
@@ -32,7 +43,7 @@ function readPLYValue(view: DataView, offset: number, type: string, isLE: boolea
     }
 }
 
-function decodePLYPackedRGB(value: number, type: string): number {
+export function decodePLYPackedRGB(value: number, type: string): number {
     if (type === 'float' || type === 'float32') {
         const buf = new ArrayBuffer(4);
         const dv  = new DataView(buf);
@@ -42,23 +53,21 @@ function decodePLYPackedRGB(value: number, type: string): number {
     return (Math.max(0, Math.trunc(value)) >>> 0);
 }
 
-/** Parse a PLY file (entire Uint8Array). Returns positions/values/rgb. */
-export function parsePLY(data: Uint8Array, maxPoints: number): ParsedCloud {
-    const headerRegion  = new TextDecoder().decode(data.subarray(0, Math.min(data.byteLength, 100000)));
-    const endHeaderIdx  = headerRegion.indexOf('end_header');
+export function parsePLYHeader(data: Uint8Array): PLYHeader {
+    const headerRegion = new TextDecoder().decode(data.subarray(0, Math.min(data.byteLength, 100000)));
+    const endHeaderIdx = headerRegion.indexOf('end_header');
     if (endHeaderIdx === -1) throw new Error('Invalid PLY file: missing end_header');
     const nlIdx = headerRegion.indexOf('\n', endHeaderIdx);
     if (nlIdx === -1) throw new Error('Invalid PLY file: malformed end_header');
     const dataStartByte = nlIdx + 1;
 
     const headerStr = headerRegion.substring(0, endHeaderIdx);
-    const lines     = headerStr.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('comment'));
+    const lines = headerStr.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('comment'));
 
     if (lines[0] !== 'ply') throw new Error('Not a PLY file');
 
     let format = 'ascii';
     let vertexCount = 0;
-    interface PLYProp { name: string; type: string; }
     const vertexProps: PLYProp[] = [];
     let currentElement = '';
 
@@ -75,10 +84,17 @@ export function parsePLY(data: Uint8Array, maxPoints: number): ParsedCloud {
         }
     }
 
-    console.log(`PLY: format=${format}, vertices=${vertexCount}, props=${vertexProps.map(p => p.name).join(',')}`);
-
     const propIndex: { [key: string]: number } = {};
     vertexProps.forEach((p, i) => { propIndex[p.name] = i; });
+
+    return { format, vertexCount, vertexProps, propIndex, dataStartByte };
+}
+
+/** Parse a PLY file (entire Uint8Array). Returns positions/values/rgb. */
+export function parsePLY(data: Uint8Array, maxPoints: number, sourceBytes: number = data.byteLength): ParsedCloud {
+    const { format, vertexCount, vertexProps, propIndex, dataStartByte } = parsePLYHeader(data);
+
+    console.log(`PLY: format=${format}, vertices=${vertexCount}, props=${vertexProps.map(p => p.name).join(',')}`);
 
     if (!('x' in propIndex) || !('y' in propIndex) || !('z' in propIndex)) {
         throw new Error('PLY missing x/y/z properties');
@@ -93,8 +109,8 @@ export function parsePLY(data: Uint8Array, maxPoints: number): ParsedCloud {
         : 'scalar_Intensity' in propIndex ? 'scalar_Intensity'
         : 'reflectance';
 
-    const sampleRatio       = vertexCount > maxPoints ? Math.ceil(vertexCount / maxPoints) : 1;
-    const estimatedVisPoints = Math.ceil(vertexCount / sampleRatio);
+    const sampleRatio = computePointSampleRatio(vertexCount, maxPoints, sourceBytes);
+    const estimatedVisPoints = estimateSampledPointCount(vertexCount, sampleRatio, maxPoints);
 
     const positions = new Float32Array(estimatedVisPoints * 3);
     const values    = new Float32Array(estimatedVisPoints);
