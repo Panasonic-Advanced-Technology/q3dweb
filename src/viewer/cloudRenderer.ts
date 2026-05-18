@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CloudItem, CloudShaderMaterial } from '../../items/CloudItem';
+import { CloudItem, CloudShaderMaterial } from '../items/CloudItem';
 
 export function renderPoints(v: any, positions: Float32Array, values: Float32Array, rgbColors?: Uint8Array): void {
     const count = values.length;

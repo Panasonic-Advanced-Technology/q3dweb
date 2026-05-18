@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { eulerToMatrix4 } from '../maths';
+import { eulerToMatrix4 } from '../utils/maths';
 
 export interface InputContext {
     euler: [number, number, number];
@@ -16,7 +16,7 @@ export interface InputContext {
     ctrlPressed: boolean;
     showCenter: boolean;
     activeKeys: Set<string>;
-    filmMakerTabActive: boolean;
+    filmMakerTabActive?: boolean;
     rendererPixelRatio: number;
     container: { clientWidth: number; clientHeight: number };
     camera: { fov: number };
@@ -28,8 +28,8 @@ export interface InputContext {
     toggleSettingsPanel(): void;
     addMeasurementPoint(e: MouseEvent): void;
     removeMeasurementPoint(): void;
-    addKeyFrameFromCamera(): void;
-    deleteCurrentKeyFrame(): void;
+    addKeyFrameFromCamera?(): void;
+    deleteCurrentKeyFrame?(): void;
     requestRender(): void;
 }
 
@@ -110,8 +110,8 @@ export function setupKeyboardControls(ctx: InputContext): void {
             ctx.toggleSettingsPanel();
         }
         if (ctx.filmMakerTabActive && !isEditable(e.target)) {
-            if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); ctx.addKeyFrameFromCamera(); }
-            else if (e.key === 'Delete') { e.preventDefault(); ctx.deleteCurrentKeyFrame(); }
+            if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); ctx.addKeyFrameFromCamera?.(); }
+            else if (e.key === 'Delete') { e.preventDefault(); ctx.deleteCurrentKeyFrame?.(); }
         }
     });
     window.addEventListener('keyup', (e: KeyboardEvent) => {

@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { recoverCenterEuler } from '../maths';
+import { recoverCenterEuler } from '../utils/maths';
 
 export interface FilmPlaybackContext {
     filmMaker: any;

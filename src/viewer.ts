@@ -3,41 +3,33 @@ import { AxisItem } from './items/AxisItem';
 import { GridItem } from './items/GridItem';
 import { Text2DItem } from './items/Text2DItem';
 import { Text3DItem } from './items/Text3DItem';
-import { FilmMaker, KeyFrame } from './filmMaker';
-import { eulerToMatrix4, recoverCenterEuler } from './utils/maths';
+import { eulerToMatrix4 } from './utils/maths';
 import {
     PCDHeader, getFieldSpec, readPackedRGB as _readPackedRGB,
     parseAsciiPackedRGB as _parseAsciiPackedRGB, readNumericValue as _readNumericValue,
-} from './utils/viewer/pcdParser';
-import { LASStreamState } from './utils/viewer/lasParser';
+} from './parsers/pcdParser';
+import { LASStreamState } from './parsers/lasParser';
 import {
     makeLabel, makeTextInput, makeCheckbox, buildCloudItemSettings,
-    buildFilmMakerSettings, refreshFilmMakerList, syncFilmMakerSpinboxes, FilmMakerUIRefs,
-} from './utils/viewer/settingsUI';
-import {
-    FilmPlaybackContext,
-    startPlayback as _startPlayback, stopPlayback as _stopPlayback,
-    tickFilmPlayback as _tickPlayback, startRecording as _startRecording,
-    stopRecording as _stopRecording, downloadLastRecording as _downloadLastRecording,
-} from './utils/viewer/filmPlayback';
+} from './viewer/settingsUI';
 import {
     setupMouseControls as _setupMouse, setupKeyboardControls as _setupKeys, updateCameraMovement,
-} from './utils/viewer/mouseControls';
+} from './viewer/mouseControls';
 import {
     addMeasurementPoint as _addMeasure, removeMeasurementPoint as _removeMeasure,
     updateMeasurementMarker as _updateMeasureMarker,
-} from './utils/viewer/measurement';
+} from './viewer/measurement';
 import {
     detectFormat, assembleChunkList as _assembleChunkList,
     startStream as _startStream, processChunk as _processChunk,
     finalizeStream as _finalizeStream, loadData as _loadData,
     loadFile as _loadFile, handleDrop as _handleDrop, parseHeader as _parseHeader,
     checkMemoryBudget as _checkMemoryBudget,
-} from './utils/viewer/streamEngine';
+} from './viewer/streamEngine';
 import {
     renderPoints as _renderPoints, resetRealtimeCloud as _resetRealtime,
     appendRealtimePoints as _appendRealtime,
-} from './utils/viewer/cloudRenderer';
+} from './viewer/cloudRenderer';
 import { CloudItem } from './items/CloudItem';
 interface SettingBuilder { addSetting(container: HTMLElement): void; }
 export class Viewer {
@@ -98,26 +90,6 @@ export class Viewer {
     animationFrameId: number = 0;
     colorStr: string = 'black';
 
-    filmMaker: FilmMaker = new FilmMaker();
-    filmMakerTabActive: boolean = false;
-    filmPlaybackIndex: number = 0;
-    filmPlaybackRequestId: number | null = null;
-    filmPlaybackLastTimestamp: number | null = null;
-    filmPlaybackAccumulatorMs: number = 0;
-    isPlayingFilm: boolean = false;
-    isRecordingFilm: boolean = false;
-    mediaRecorder: MediaRecorder | null = null;
-    recordedChunks: Blob[] = [];
-    lastRecordedBlob: Blob | null = null;
-    videoFileName: string = 'q3dweb.mp4';
-    videoMimeType: string = 'video/mp4;codecs=h264';
-    recordingVideoBitsPerSecond: number = 32_000_000;
-    recordingPixelRatioMin: number = 2;
-    private filmMakerListEl: HTMLElement | null = null;
-    private filmMakerPlayBtn: HTMLButtonElement | null = null;
-    private filmMakerSpinLin: HTMLInputElement | null = null;
-    private filmMakerSpinAng: HTMLInputElement | null = null;
-    private filmMakerSpinStop: HTMLInputElement | null = null;
     rendererPixelRatio: number = 1;
 
     constructor(containerId: string) {
@@ -223,6 +195,8 @@ export class Viewer {
     removeMeasurementPoint() { _removeMeasure(this as any); }
     updateMeasurementMarker() { _updateMeasureMarker(this as any); }
 
+    protected buildAppControls(_panel: HTMLElement): void { /* subclasses add app-specific controls here */ }
+
     createSettingsPanel() {
         const panel = document.createElement('div');
         panel.style.cssText = 'position:absolute;top:10px;left:10px;background:rgba(20,20,20,0.92);color:#eee;padding:12px;border-radius:8px;font-family:monospace;font-size:12px;z-index:1100;width:260px;display:block;max-height:calc(100% - 20px);overflow-y:auto;border:1px solid #555;';
@@ -235,6 +209,7 @@ export class Viewer {
         select.onchange = () => this.onSettingsItemSelected(select.value);
         panel.appendChild(select);
         this.settingsItemSelect = select;
+        this.buildAppControls(panel);
         const content = document.createElement('div');
         content.style.cssText = 'border:1px solid #444;border-radius:4px;padding:8px;';
         panel.appendChild(content);
@@ -248,22 +223,16 @@ export class Viewer {
         if (!this.settingsPanel) return;
         const visible = this.settingsPanel.style.display !== 'none';
         this.settingsPanel.style.display = visible ? 'none' : 'block';
-        if (!visible && this.settingsItemSelect) {
-            const cur = this.settingsItemSelect.value;
-            if (!cur || !Array.from(this.settingsItemSelect.options).some(o => o.value === cur))
-                this.settingsItemSelect.value = '__main_win__';
-            this.onSettingsItemSelected(this.settingsItemSelect.value);
-        }
+        if (!visible) this.onSettingsItemSelected(this.settingsItemSelect?.value ?? '__main_win__');
     }
 
     refreshSettingsItemList(preferredSelection?: string) {
         if (!this.settingsItemSelect) return;
         const prev = this.settingsItemSelect.value;
         this.settingsItemSelect.innerHTML = '';
-        for (const [val, txt] of [['__main_win__', 'Viewer'], ['__film_maker__', 'Film Maker']] as [string, string][]) {
-            const o = document.createElement('option'); o.value = val; o.textContent = txt;
-            this.settingsItemSelect.appendChild(o);
-        }
+        const mainOpt = document.createElement('option');
+        mainOpt.value = '__main_win__'; mainOpt.textContent = 'Viewer';
+        this.settingsItemSelect.appendChild(mainOpt);
         for (const name of Object.keys(this.items)) {
             if (this.hiddenSettingItems.has(name)) continue;
             const o = document.createElement('option'); o.value = name; o.textContent = name;
@@ -272,13 +241,13 @@ export class Viewer {
         const desired = preferredSelection ?? prev;
         const exists = desired && Array.from(this.settingsItemSelect.options).some(o => o.value === desired);
         this.settingsItemSelect.value = exists ? desired! : '__main_win__';
-        if (this.settingsPanel?.style.display !== 'none') this.onSettingsItemSelected(this.settingsItemSelect.value);
+        if (this.settingsPanel?.style.display !== 'none')
+            this.onSettingsItemSelected(this.settingsItemSelect.value);
     }
 
     onSettingsItemSelected(name: string) {
         if (!this.settingsContent) return;
         this.settingsContent.innerHTML = '';
-        this.filmMakerTabActive = name === '__film_maker__';
         if (name === '__main_win__') {
             this.settingsContent.appendChild(makeLabel('Set background color:'));
             const inp = makeTextInput(this.colorStr, (val) => {
@@ -289,7 +258,6 @@ export class Viewer {
             this.settingsContent.appendChild(makeCheckbox('Show Center Point', this.enableShowCenter, (v) => { this.enableShowCenter = v; }));
             return;
         }
-        if (name === '__film_maker__') { this.buildFilmMakerSettings(this.settingsContent); return; }
         const item = this.items[name];
         if (!item) return;
         if ('addSetting' in item && typeof (item as any).addSetting === 'function') {
@@ -298,95 +266,6 @@ export class Viewer {
         const mat = (item as any).material;
         if (mat?.uniforms) buildCloudItemSettings(item, mat, this.settingsContent, this.getBaseRendererPixelRatio(), () => this.requestRender());
     }
-
-    addKeyFrameFromCamera(): KeyFrame {
-        this.camera.updateMatrixWorld();
-        const kf = this.filmMaker.addKeyFrame(this.camera.matrixWorld.clone());
-        this.scene.add(kf.item);
-        this.refreshFilmMakerListUI();
-        this.highlightSelectedKeyFrame();
-        this.requestRender();
-        return kf;
-    }
-
-    deleteCurrentKeyFrame(): void {
-        const removed = this.filmMaker.deleteKeyFrame(this.filmMaker.currentIndex);
-        if (removed) { this.scene.remove(removed.item); this.refreshFilmMakerListUI(); this.highlightSelectedKeyFrame(); this.requestRender(); }
-    }
-
-    selectKeyFrame(index: number): void {
-        this.filmMaker.select(index);
-        this.highlightSelectedKeyFrame();
-        syncFilmMakerSpinboxes(this.filmMaker, this.filmMakerSpinLin, this.filmMakerSpinAng, this.filmMakerSpinStop);
-        this.requestRender();
-    }
-
-    jumpToKeyFrame(index: number): void {
-        const kf = this.filmMaker.keyFrames[index];
-        if (!kf) return;
-        const { center, euler } = recoverCenterEuler(kf.Twc, this.cameraDist);
-        this.cameraCenter.copy(center);
-        this.euler = [euler[0], euler[1], euler[2]];
-        this.updateCamera();
-    }
-
-    private highlightSelectedKeyFrame() {
-        const sel = this.filmMaker.currentIndex;
-        this.filmMaker.keyFrames.forEach((kf: any, i: number) => {
-            kf.item.setColor(i === sel ? '#ff0000' : '#0000ff');
-            kf.item.setLineWidth(i === sel ? 5 : 3);
-        });
-    }
-
-    private refreshFilmMakerListUI() {
-        if (!this.filmMakerListEl) return;
-        refreshFilmMakerList(this.filmMakerListEl, this.filmMaker,
-            (i) => { this.selectKeyFrame(i); this.refreshFilmMakerListUI(); },
-            (i) => this.jumpToKeyFrame(i));
-    }
-
-    private buildFilmMakerSettings(container: HTMLElement) {
-        const refs: FilmMakerUIRefs = buildFilmMakerSettings(container, {
-            filmMaker: this.filmMaker,
-            isPlayingFilm: this.isPlayingFilm, isRecordingFilm: this.isRecordingFilm,
-            videoFileName: this.videoFileName, videoMimeType: this.videoMimeType,
-            addKeyFrameFromCamera: () => this.addKeyFrameFromCamera(),
-            deleteCurrentKeyFrame: () => this.deleteCurrentKeyFrame(),
-            togglePlayback: () => this.togglePlayback(),
-            downloadLastRecording: () => this.downloadLastRecording(),
-            selectKeyFrame: (i: number) => { this.selectKeyFrame(i); this.refreshFilmMakerListUI(); },
-            jumpToKeyFrame: (i: number) => this.jumpToKeyFrame(i),
-            refreshFilmMakerList: () => this.refreshFilmMakerListUI(),
-            setIsRecordingFilm: (v: boolean) => { this.isRecordingFilm = v; },
-            setVideoFileName: (v: string) => { this.videoFileName = v; },
-            setVideoMimeType: (v: string) => { this.videoMimeType = v; },
-            setLinVel: (i: number, v: number) => this.filmMaker.setLinVel(i, v),
-            setAngVel: (i: number, v: number) => this.filmMaker.setAngVel(i, v),
-            setStopTime: (i: number, v: number) => this.filmMaker.setStopTime(i, v),
-        });
-        this.filmMakerListEl = refs.listEl; this.filmMakerPlayBtn = refs.playBtn;
-        this.filmMakerSpinLin = refs.spinLin; this.filmMakerSpinAng = refs.spinAng; this.filmMakerSpinStop = refs.spinStop;
-        this.setFilmMakerPlayButtonState(this.isPlayingFilm);
-        this.refreshFilmMakerListUI();
-        syncFilmMakerSpinboxes(this.filmMaker, this.filmMakerSpinLin, this.filmMakerSpinAng, this.filmMakerSpinStop);
-    }
-
-    setFilmMakerPlayButtonState(isPlaying: boolean): void {
-        if (!this.filmMakerPlayBtn) return;
-        this.filmMakerPlayBtn.textContent = isPlaying ? 'Playing' : 'Play';
-        this.filmMakerPlayBtn.style.backgroundColor = isPlaying ? '#a33' : '#333';
-        this.filmMakerPlayBtn.style.color = isPlaying ? '#fff' : '#eee';
-        this.filmMakerPlayBtn.style.borderColor = isPlaying ? '#d66' : '#666';
-    }
-
-    private get _filmCtx(): FilmPlaybackContext { return this as any; }
-    togglePlayback() { this.isPlayingFilm ? this.stopPlayback() : this.startPlayback(); }
-    startPlayback(): boolean { return _startPlayback(this._filmCtx); }
-    stopPlayback() { _stopPlayback(this._filmCtx); }
-    tickFilmPlayback(timestamp?: number): void { _tickPlayback(this._filmCtx, timestamp); }
-    startRecording(): void { _startRecording(this._filmCtx); }
-    stopRecording(): void { _stopRecording(this._filmCtx); }
-    downloadLastRecording(): boolean { return _downloadLastRecording(this._filmCtx, (this as any).vscode); }
 
     getBaseRendererPixelRatio(): number { return Math.max(window.devicePixelRatio || 1, 1); }
     private getCloudViewportHeight(): number { return Math.max(this.container.clientHeight * this.rendererPixelRatio, 1); }

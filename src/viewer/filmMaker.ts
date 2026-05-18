@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { FrameItem } from './items/FrameItem';
-import { interpolatePose } from './utils/maths';
+import { FrameItem } from '../items/FrameItem';
+import { interpolatePose } from '../utils/maths';
 
 export interface KeyFrameOptions {
     Twc: THREE.Matrix4;

@@ -9,8 +9,8 @@ import { normalizeIntensity } from './lasParser';
 /** Parse an E57 file. Recenters points around their mean for float32 stability. */
 export async function parseE57(data: Uint8Array, maxPoints: number): Promise<ParsedCloud> {
     console.log(`E57: parsing ${data.byteLength} bytes via vendor/e57-wasm...`);
-    const mod: any = await import('../../../vendor/e57-wasm/pkg/e57_wasm.js');
-    const wasmUrl = (await import('../../../vendor/e57-wasm/pkg/e57_wasm_bg.wasm?url')).default;
+    const mod: any = await import('../../vendor/e57-wasm/pkg/e57_wasm.js');
+    const wasmUrl = (await import('../../vendor/e57-wasm/pkg/e57_wasm_bg.wasm?url')).default;
     await mod.default({ module_or_path: wasmUrl });
 
     const pts          = mod.parsePoints(data);

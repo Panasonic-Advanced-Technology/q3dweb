@@ -1,5 +1,5 @@
 import './style.css'
-import { Viewer } from './viewer';
+import { FilmMakerViewer } from './filmMakerViewer';
 import { RealtimeViewer } from './realtime_viewer';
 
 function toFloat32Array(data: unknown): Float32Array {
@@ -32,7 +32,7 @@ declare function acquireVsCodeApi(): any;
 try {
     const params = new URLSearchParams(window.location.search);
     const useRealtime = params.get('mode') === 'realtime';
-    const viewer = useRealtime ? new RealtimeViewer('app') : new Viewer('app');
+    const viewer = useRealtime ? new RealtimeViewer('app') : new FilmMakerViewer('app');
 
     if (useRealtime && viewer instanceof RealtimeViewer) {
         const topicName = params.get('topic') ?? undefined;

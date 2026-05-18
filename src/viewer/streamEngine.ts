@@ -1,14 +1,14 @@
 import * as THREE from 'three';
-import { GNSSMapItem } from '../../items/GNSSMapItem';
-import { detectHeapLimit, detectHeapUsed, estimateMemoryRequirement, formatBytes } from '../memoryCheck';
+import { GNSSMapItem } from '../items/GNSSMapItem';
+import { detectHeapLimit, detectHeapUsed, estimateMemoryRequirement, formatBytes } from '../utils/memoryCheck';
 import {
     PCDBinaryState, parsePCDHeader, processPCDBinaryChunk, parsePCDAscii, getFieldSpec,
-} from './pcdParser';
-import { parsePLY } from './plyParser';
+} from '../parsers/pcdParser';
+import { parsePLY } from '../parsers/plyParser';
 import {
     LASBounds, normalizeIntensity, parseLASMetadata, parseLAZ, processLASRecords,
-} from './lasParser';
-import { parseE57 } from './e57Parser';
+} from '../parsers/lasParser';
+import { parseE57 } from '../parsers/e57Parser';
 
 export type FormatType = 'pcd' | 'ply' | 'las' | 'laz' | 'e57' | 'unknown';
 

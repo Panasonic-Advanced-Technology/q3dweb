@@ -3,8 +3,8 @@
  * Extracted from viewer.ts for modularity.
  */
 
-import { parseLASGeoInfo, readLASBounds } from '../lasGeo';
-import { projToLatLon, registerWKT, convertByKey } from '../projConvert';
+import { parseLASGeoInfo, readLASBounds } from '../utils/lasGeo';
+import { projToLatLon, registerWKT, convertByKey } from '../utils/projConvert';
 import type { ParsedCloud } from './pcdParser';
 
 export interface LASBounds {
