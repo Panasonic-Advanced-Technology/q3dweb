@@ -4,6 +4,7 @@ import { RealtimeViewer } from './realtime_viewer';
 import { CloudViewer } from './cloud_viewer';
 import { installViewerModeSelector, normalizeViewerMode } from './viewerMode';
 import { configureSamplingHeapBudget } from './parsers/sampling';
+import { parseRealtimeUrlOptions } from './realtimeUrlOptions';
 
 function toFloat32Array(data: unknown): Float32Array {
     if (data instanceof Float32Array) return data;
@@ -39,19 +40,19 @@ declare function acquireVsCodeApi(): any;
 try {
     const params = new URLSearchParams(window.location.search);
     const mode = normalizeViewerMode(params.get('mode'));
+    const realtimeOptions = mode === 'realtime' ? parseRealtimeUrlOptions(params) : undefined;
     const viewer: CloudViewer | RealtimeViewer =
-        mode === 'realtime'   ? new RealtimeViewer('app') :
+        mode === 'realtime'   ? new RealtimeViewer('app', realtimeOptions) :
         mode === 'film_maker' ? new FilmMakerViewer('app') :
                                 new CloudViewer('app');  // default: no param or ?mode=cloud
     installViewerModeSelector(viewer, mode);
 
     if (mode === 'realtime' && viewer instanceof RealtimeViewer) {
-        const rosWsUrl = params.get('ros');
-        if (rosWsUrl) {
-            viewer.connectRosbridge(rosWsUrl);
-            console.log(`Realtime mode enabled, connecting to rosbridge: ${rosWsUrl}`);
+        if (realtimeOptions?.rosbridgeUrl) {
+            viewer.connectRosbridge(realtimeOptions.rosbridgeUrl, realtimeOptions);
+            console.log(`Realtime mode enabled, connecting to rosbridge: ${realtimeOptions.rosbridgeUrl}`);
         } else {
-            console.log('Realtime mode enabled. Configure topics in the settings panel, or provide ?ros=ws://host:9090 to auto-connect.');
+            console.log('Realtime mode enabled. Configure settings in the panel, or provide ?ros=ws://host:9090&cloudTopic=/points&odomTopic=/odom to auto-connect.');
         }
     }
 

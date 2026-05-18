@@ -26,6 +26,7 @@ import { Viewer } from '../src/viewer';
 import { CloudViewer } from '../src/cloud_viewer';
 import { FilmMakerViewer } from '../src/film_maker_viewer';
 import { RealtimeViewer } from '../src/realtime_viewer';
+import { parseRealtimeUrlOptions } from '../src/realtimeUrlOptions';
 import { installViewerModeSelector, normalizeViewerMode } from '../src/viewerMode';
 
 function makeContainer(id = 'app'): HTMLElement {
@@ -516,6 +517,65 @@ describe('RealtimeViewer settings layout', () => {
     );
     expect(realtime.style.borderBottomWidth).toBe('2px');
     expect(v.settingsItemSelect!.style.marginTop).toBe('2px');
+  });
+
+  it('applies realtime options to settings inputs', () => {
+    cleanupContainers();
+    makeContainer();
+    v = new RealtimeViewer('app', {
+      rosbridgeUrl: 'ws://robot.local:9090',
+      cloudTopicName: '/points_raw',
+      odomTopicName: '/odom/wheel',
+      maxPointsPerScan: 3200,
+      maxAccumulatedPoints: 1_200_000,
+    });
+
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-ros-url"]') as HTMLInputElement).value)
+      .toBe('ws://robot.local:9090');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-cloud-topic"]') as HTMLInputElement).value)
+      .toBe('/points_raw');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-odom-topic"]') as HTMLInputElement).value)
+      .toBe('/odom/wheel');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-max-points-per-scan"]') as HTMLInputElement).value)
+      .toBe('3200');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-max-accumulated-points"]') as HTMLInputElement).value)
+      .toBe('1200000');
+  });
+});
+
+describe('realtime URL options', () => {
+  it('parses rosbridge, topics, and point budgets from URL params', () => {
+    const options = parseRealtimeUrlOptions(new URLSearchParams({
+      ros: 'ws://robot.local:9090',
+      cloudTopic: '/points_raw',
+      odomTopic: '/odom/wheel',
+      maxPointsPerScan: '3200',
+      maxAccumulatedPoints: '1200000',
+    }));
+
+    expect(options).toEqual({
+      rosbridgeUrl: 'ws://robot.local:9090',
+      cloudTopicName: '/points_raw',
+      odomTopicName: '/odom/wheel',
+      maxPointsPerScan: 3200,
+      maxAccumulatedPoints: 1_200_000,
+    });
+  });
+
+  it('supports aliases and ignores invalid point budgets', () => {
+    const options = parseRealtimeUrlOptions(new URLSearchParams({
+      rosbridgeUrl: 'ws://host:9090',
+      topic: '/cloud_alias',
+      odom: '/odom_alias',
+      scanPoints: '-5',
+      maxPoints: '2500000.9',
+    }));
+
+    expect(options.rosbridgeUrl).toBe('ws://host:9090');
+    expect(options.cloudTopicName).toBe('/cloud_alias');
+    expect(options.odomTopicName).toBe('/odom_alias');
+    expect(options.maxPointsPerScan).toBeUndefined();
+    expect(options.maxAccumulatedPoints).toBe(2_500_000);
   });
 });
 

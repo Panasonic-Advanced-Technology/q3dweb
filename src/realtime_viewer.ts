@@ -5,6 +5,7 @@ import { AxisItem } from './items/AxisItem';
 import { NativeCloudItem } from './items/NativeCloudItem';
 import { decodePointCloud2, inferColorModeFromFields } from './utils/pointCloud2Decode';
 import { makeLabel, makeTextInput, makeNumberInput, makeButton, buildNativeCloudItemSettings } from './viewer/settingsUI';
+import type { RealtimeUrlOptions } from './realtimeUrlOptions';
 import type {
     ColorMode,
     DecodedCloudChunk,
@@ -20,9 +21,15 @@ import type {
  */
 export class RealtimeViewer extends Viewer {
     private rosSocket: WebSocket | null = null;
+    private rosbridgeUrl: string = 'ws://localhost:9090';
     private cloudTopicName: string = '/cloud_registered';
     private odomTopicName: string = '/odometry';
     private maxPointsPerScan: number = 1500;
+    private rosUrlInput: HTMLInputElement | null = null;
+    private cloudTopicInput: HTMLInputElement | null = null;
+    private odomTopicInput: HTMLInputElement | null = null;
+    private maxScanInput: HTMLInputElement | null = null;
+    private maxCloudInput: HTMLInputElement | null = null;
     private mapColorMode: ColorMode | null = null;
     private readonly maxQueuedChunks = 4;
     private readonly maxApplyChunksPerCommit = 4;
@@ -37,8 +44,9 @@ export class RealtimeViewer extends Viewer {
     private readonly odomItemName = 'odom';
     realtimeMaxPoints: number = 5_000_000;
 
-    constructor(containerId: string) {
+    constructor(containerId: string, options: RealtimeUrlOptions = {}) {
         super(containerId);
+        this.setRealtimeOptions(options);
         this.setupRealtimeItems();
         this.installRealtimeSection();
     }
@@ -51,28 +59,39 @@ export class RealtimeViewer extends Viewer {
         section.setAttribute('data-role', 'realtime');
 
         section.appendChild(makeLabel('ROS Bridge URL'));
-        const rosInput = makeTextInput('ws://localhost:9090', () => {});
+        const rosInput = makeTextInput(this.rosbridgeUrl, v => { this.rosbridgeUrl = v; });
+        rosInput.setAttribute('data-role', 'realtime-ros-url');
+        this.rosUrlInput = rosInput;
 
         section.appendChild(rosInput);
         section.appendChild(makeLabel('Cloud Topic'));
         const cloudTopicInput = makeTextInput(this.cloudTopicName, v => { this.cloudTopicName = v; });
+        cloudTopicInput.setAttribute('data-role', 'realtime-cloud-topic');
+        this.cloudTopicInput = cloudTopicInput;
         section.appendChild(cloudTopicInput);
 
         section.appendChild(makeLabel('Odom Topic'));
         const odomTopicInput = makeTextInput(this.odomTopicName, v => { this.odomTopicName = v; });
+        odomTopicInput.setAttribute('data-role', 'realtime-odom-topic');
+        this.odomTopicInput = odomTopicInput;
         section.appendChild(odomTopicInput);
 
         section.appendChild(makeLabel('Max Points / Scan'));
         const maxScanInput = makeNumberInput(this.maxPointsPerScan, 1, 1_000_000, 100, v => { this.maxPointsPerScan = Math.floor(v); });
+        maxScanInput.setAttribute('data-role', 'realtime-max-points-per-scan');
+        this.maxScanInput = maxScanInput;
         section.appendChild(maxScanInput);
 
         section.appendChild(makeLabel('Max Accumulated Points'));
         const maxCloudInput = makeNumberInput(this.realtimeMaxPoints, 10_000, 50_000_000, 100_000, v => { this.realtimeMaxPoints = Math.floor(v); });
+        maxCloudInput.setAttribute('data-role', 'realtime-max-accumulated-points');
+        this.maxCloudInput = maxCloudInput;
         section.appendChild(maxCloudInput);
 
         const connectBtn = makeButton('Connect', () => {
             const url = rosInput.value.trim();
             if (!url) return;
+            this.rosbridgeUrl = url;
             this.connectRosbridge(url);
             connectBtn.textContent = 'Reconnect';
         });
@@ -85,6 +104,15 @@ export class RealtimeViewer extends Viewer {
         } else {
             this.settingsPanel.insertBefore(section, this.settingsContent);
         }
+        this.syncRealtimeControls();
+    }
+
+    private syncRealtimeControls(): void {
+        if (this.rosUrlInput) this.rosUrlInput.value = this.rosbridgeUrl;
+        if (this.cloudTopicInput) this.cloudTopicInput.value = this.cloudTopicName;
+        if (this.odomTopicInput) this.odomTopicInput.value = this.odomTopicName;
+        if (this.maxScanInput) this.maxScanInput.value = this.maxPointsPerScan.toString();
+        if (this.maxCloudInput) this.maxCloudInput.value = this.realtimeMaxPoints.toString();
     }
 
     override onSettingsItemSelected(name: string): void {
@@ -102,7 +130,8 @@ export class RealtimeViewer extends Viewer {
         super.onSettingsItemSelected(name);
     }
 
-    setRealtimeOptions(options: RealtimeTopicOptions): void {
+    setRealtimeOptions(options: RealtimeUrlOptions): void {
+        if (options.rosbridgeUrl) this.rosbridgeUrl = options.rosbridgeUrl;
         const cloudTopic = options.cloudTopicName ?? options.topicName;
         if (cloudTopic) this.cloudTopicName = cloudTopic;
         if (options.odomTopicName) this.odomTopicName = options.odomTopicName;
@@ -112,9 +141,11 @@ export class RealtimeViewer extends Viewer {
         if (typeof options.maxAccumulatedPoints === 'number' && options.maxAccumulatedPoints > 0) {
             this.realtimeMaxPoints = Math.floor(options.maxAccumulatedPoints);
         }
+        this.syncRealtimeControls();
     }
 
     connectRosbridge(wsUrl: string, options: RealtimeTopicOptions = {}): void {
+        this.rosbridgeUrl = wsUrl;
         this.setRealtimeOptions(options);
         this.mapColorMode = null;
         this.pendingChunks = [];
