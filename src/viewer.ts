@@ -5,11 +5,6 @@ import { Text2DItem } from './items/Text2DItem';
 import { Text3DItem } from './items/Text3DItem';
 import { eulerToMatrix4 } from './utils/maths';
 import {
-    PCDHeader, getFieldSpec, readPackedRGB as _readPackedRGB,
-    parseAsciiPackedRGB as _parseAsciiPackedRGB, readNumericValue as _readNumericValue,
-} from './parsers/pcdParser';
-import { LASStreamState } from './parsers/lasParser';
-import {
     makeLabel, makeTextInput, makeCheckbox, buildCloudItemSettings,
 } from './viewer/settingsUI';
 import {
@@ -19,17 +14,6 @@ import {
     addMeasurementPoint as _addMeasure, removeMeasurementPoint as _removeMeasure,
     updateMeasurementMarker as _updateMeasureMarker,
 } from './viewer/measurement';
-import {
-    detectFormat, assembleChunkList as _assembleChunkList,
-    startStream as _startStream, processChunk as _processChunk,
-    finalizeStream as _finalizeStream, loadData as _loadData,
-    loadFile as _loadFile, handleDrop as _handleDrop, parseHeader as _parseHeader,
-    checkMemoryBudget as _checkMemoryBudget,
-} from './viewer/streamEngine';
-import {
-    renderPoints as _renderPoints, resetRealtimeCloud as _resetRealtime,
-    appendRealtimePoints as _appendRealtime,
-} from './viewer/cloudRenderer';
 import { CloudItem } from './items/CloudItem';
 interface SettingBuilder { addSetting(container: HTMLElement): void; }
 export class Viewer {
@@ -59,32 +43,6 @@ export class Viewer {
     loadingOverlay: HTMLElement;
     selectedPoints: THREE.Vector3[] = [];
     text2dItem: Text2DItem | null = null;
-    static readonly SUPPORTED_EXTENSIONS = ['.pcd', '.ply', '.las', '.laz', '.e57'];
-    skipMemoryCheck: boolean = false;
-
-    currentFormat: ReturnType<typeof detectFormat> = 'pcd';
-    streamFilename: string | undefined = undefined;
-    streamTotalSize: number = 0;
-    streamLoadedSize: number = 0;
-    streamAborted: boolean = false;
-    pcdHeader: PCDHeader | null = null;
-    lasStream: LASStreamState | null = null;
-    isBinary: boolean = false;
-    leftoverChunk: Uint8Array | null = null;
-    pointsLoaded: number = 0;
-    targetSampleRatio: number = 1;
-    fullBufferWriteOffset: number = 0;
-    chunkList: Uint8Array[] = [];
-
-    MAX_POINTS_VISUAL = 15_000_000;
-    realtimeMaxPoints: number = 5_000_000;
-    posBuffer: Float32Array | null = null;
-    valBuffer: Float32Array | null = null;
-    rgbBuffer: Uint8Array | null = null;
-    fullBuffer: Uint8Array | null = null;
-    posIndex: number = 0;
-    dataMin: number = 0;
-    dataMax: number = 255;
 
     renderRequested: boolean = false;
     animationFrameId: number = 0;
@@ -118,7 +76,6 @@ export class Viewer {
         this.addDefaultItems();
         this.createCenterPoint();
         this.createSettingsPanel();
-        this.setupDragDrop();
         window.addEventListener('resize', this.onWindowResize.bind(this), false);
         this.startAnimationLoop();
     }
@@ -195,8 +152,6 @@ export class Viewer {
     removeMeasurementPoint() { _removeMeasure(this as any); }
     updateMeasurementMarker() { _updateMeasureMarker(this as any); }
 
-    protected buildAppControls(_panel: HTMLElement): void { /* subclasses add app-specific controls here */ }
-
     createSettingsPanel() {
         const panel = document.createElement('div');
         panel.style.cssText = 'position:absolute;top:10px;left:10px;background:rgba(20,20,20,0.92);color:#eee;padding:12px;border-radius:8px;font-family:monospace;font-size:12px;z-index:1100;width:260px;display:block;max-height:calc(100% - 20px);overflow-y:auto;border:1px solid #555;';
@@ -209,7 +164,6 @@ export class Viewer {
         select.onchange = () => this.onSettingsItemSelected(select.value);
         panel.appendChild(select);
         this.settingsItemSelect = select;
-        this.buildAppControls(panel);
         const content = document.createElement('div');
         content.style.cssText = 'border:1px solid #444;border-radius:4px;padding:8px;';
         panel.appendChild(content);
@@ -269,8 +223,8 @@ export class Viewer {
 
     getBaseRendererPixelRatio(): number { return Math.max(window.devicePixelRatio || 1, 1); }
     private getCloudViewportHeight(): number { return Math.max(this.container.clientHeight * this.rendererPixelRatio, 1); }
-    private syncCloudItemViewport(item: THREE.Object3D) { if (item instanceof CloudItem) item.updateViewport(this.getCloudViewportHeight()); }
-    private syncAllCloudItemViewports() { Object.values(this.items).forEach(i => this.syncCloudItemViewport(i)); }
+    protected syncCloudItemViewport(item: THREE.Object3D) { if (item instanceof CloudItem) item.updateViewport(this.getCloudViewportHeight()); }
+    protected syncAllCloudItemViewports() { Object.values(this.items).forEach(i => this.syncCloudItemViewport(i)); }
 
     applyRendererResolution(pixelRatio: number): void {
         this.rendererPixelRatio = Math.max(pixelRatio, 1);
@@ -295,31 +249,6 @@ export class Viewer {
             if (this.statusElement) { this.statusElement.textContent = `Async Error: ${ev.reason}`; this.statusElement.style.backgroundColor = 'rgba(255,0,0,0.8)'; }
         });
     }
-
-    setupDragDrop() {
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(n =>
-            this.container.addEventListener(n, (e: Event) => { e.preventDefault(); e.stopPropagation(); }, false));
-        this.container.addEventListener('drop', (e) => void _handleDrop(this, e as DragEvent), false);
-    }
-
-    startStream(totalSize: number, filename?: string) { _startStream(this, totalSize, filename); }
-    processChunk(chunkData: Uint8Array, offset: number) { _processChunk(this, chunkData, offset); }
-    parseHeader(headerStr: string) { _parseHeader(this, headerStr); }
-    finalizeStream() { _finalizeStream(this); }
-    loadData(content: Uint8Array, filename?: string) { _loadData(this, content, filename); }
-    async loadFile(file: File, append: boolean = false): Promise<void> { return _loadFile(this, file, append); }
-    async handleDrop(e: DragEvent) { await _handleDrop(this, e); }
-    readPackedRGB(view: DataView, byteOffset: number, type: string, size: number): number { return _readPackedRGB(view, byteOffset, type, size); }
-    parseAsciiPackedRGB(token: string, type: string, size: number): number { return _parseAsciiPackedRGB(token, type, size); }
-    readNumericValue(view: DataView, byteOffset: number, type: string, size: number): number { return _readNumericValue(view, byteOffset, type, size); }
-    getFieldSpec(fieldName: string) { return this.pcdHeader ? getFieldSpec(this.pcdHeader, fieldName) : null; }
-    detectFormat(filename?: string) { return detectFormat(filename); }
-    checkMemoryBudget(fileSize: number, format: string, filename?: string) { return _checkMemoryBudget(this, fileSize, format, filename); }
-    assembleChunkList() { return _assembleChunkList(this); }
-
-    renderPoints(positions: Float32Array, values: Float32Array, rgbColors?: Uint8Array): void { _renderPoints(this, positions, values, rgbColors); }
-    resetRealtimeCloud(): void { _resetRealtime(this); }
-    appendRealtimePoints(positions: Float32Array, values: Float32Array, rgbColors?: Uint8Array, maxPoints?: number, autoFitOnFirstChunk: boolean = false): void { _appendRealtime(this, positions, values, rgbColors, maxPoints, autoFitOnFirstChunk); }
 
     addItem(name: string, object: THREE.Object3D) {
         if (this.items[name]) this.removeItem(name);

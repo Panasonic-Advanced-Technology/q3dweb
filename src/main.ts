@@ -1,6 +1,7 @@
 import './style.css'
 import { FilmMakerViewer } from './filmMakerViewer';
 import { RealtimeViewer } from './realtime_viewer';
+import { CloudViewer } from './cloud_viewer';
 
 function toFloat32Array(data: unknown): Float32Array {
     if (data instanceof Float32Array) return data;
@@ -31,10 +32,13 @@ declare function acquireVsCodeApi(): any;
 // Initialize Viewer
 try {
     const params = new URLSearchParams(window.location.search);
-    const useRealtime = params.get('mode') === 'realtime';
-    const viewer = useRealtime ? new RealtimeViewer('app') : new FilmMakerViewer('app');
+    const mode = params.get('mode');
+    const viewer: CloudViewer | RealtimeViewer =
+        mode === 'realtime'   ? new RealtimeViewer('app') :
+        mode === 'film_maker' ? new FilmMakerViewer('app') :
+                                new CloudViewer('app');  // default: no param or ?mode=cloud
 
-    if (useRealtime && viewer instanceof RealtimeViewer) {
+    if (mode === 'realtime' && viewer instanceof RealtimeViewer) {
         const topicName = params.get('topic') ?? undefined;
         const odomTopicName = params.get('odomTopic') ?? undefined;
         const maxPointsPerScanRaw = Number(params.get('maxScan'));
@@ -85,21 +89,22 @@ try {
         (viewer as any).vscode = vscode;
         // VS Code Mode
         // Listen for messages from VS Code extension
+        const cv = viewer instanceof CloudViewer ? viewer : null;
         window.addEventListener('message', event => {
             const message = event.data;
             switch (message.type) {
                 case 'loadData':
                 case 'loadPCD':
-                    viewer.loadData(message.value, message.filename);
+                    cv?.loadData(message.value, message.filename);
                     break;
                 case 'startStream':
-                    viewer.startStream(message.totalSize, message.filename);
+                    cv?.startStream(message.totalSize, message.filename);
                     break;
                 case 'chunk':
-                    viewer.processChunk(message.data, message.offset);
+                    cv?.processChunk(message.data, message.offset);
                     break;
                 case 'endStream':
-                    viewer.finalizeStream();
+                    cv?.finalizeStream();
                     break;
                 case 'realtimePoints': {
                     const positions = toFloat32Array(message.positions);
@@ -107,11 +112,11 @@ try {
                     const rgb = message.rgb !== undefined ? toUint8Array(message.rgb) : undefined;
                     const maxPoints = typeof message.maxPoints === 'number' ? message.maxPoints : undefined;
                     const autoFit = message.autoFitOnFirstChunk === true;
-                    viewer.appendRealtimePoints(positions, values, rgb, maxPoints, autoFit);
+                    cv?.appendRealtimePoints(positions, values, rgb, maxPoints, autoFit);
                     break;
                 }
                 case 'realtimeReset':
-                    viewer.resetRealtimeCloud();
+                    cv?.resetRealtimeCloud();
                     break;
             }
         });

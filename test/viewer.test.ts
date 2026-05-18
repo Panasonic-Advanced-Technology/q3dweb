@@ -23,6 +23,7 @@ vi.mock('three', async () => {
 
 import * as THREE from 'three';
 import { Viewer } from '../src/viewer';
+import { CloudViewer } from '../src/cloud_viewer';
 import { FilmMakerViewer } from '../src/filmMakerViewer';
 
 function makeContainer(id = 'app'): HTMLElement {
@@ -399,6 +400,23 @@ describe('Viewer Film Maker controls', () => {
   it('covers playback guard paths and captureStream fallback', () => {
     expect(v.startPlayback()).toBe(false);
     addTwoKeyFrames();
+    const createFrames = vi.spyOn(v.filmMaker, 'createFrames').mockImplementation(() => {
+      v.filmMaker.frames = [];
+      return [];
+    });
+    expect(v.startPlayback()).toBe(false);
+    createFrames.mockRestore();
+
+    v.isRecordingFilm = true;
+    (v.renderer.domElement as HTMLCanvasElement).captureStream = undefined as any;
+    (v as any).startRecording();
+    expect(v.isRecordingFilm).toBe(false);
+
+    const stopped = { stop: vi.fn(() => { throw new Error('stop failed'); }) };
+    (v as any).mediaRecorder = stopped;
+    (v as any).stopRecording();
+    expect(stopped.stop).toHaveBeenCalled();
+  });
 
   it('downloads recorded video through browser and VS Code paths', async () => {
     expect(v.downloadLastRecording()).toBe(false);
@@ -445,8 +463,8 @@ describe('Viewer Film Maker controls', () => {
 });
 
 describe('Viewer streaming - PCD', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   function makeBinaryPCD(points: Array<[number, number, number, number]>): Uint8Array {
@@ -577,8 +595,8 @@ describe('Viewer streaming - PCD', () => {
 });
 
 describe('Viewer PLY parsing', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   function asciiPLY(withColors = true, withIntensity = true): Uint8Array {
@@ -653,8 +671,8 @@ describe('Viewer PLY parsing', () => {
 });
 
 describe('Viewer LAS parsing', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   function makeLAS(version: [number, number] = [1, 2], format = 0, n = 2, withRGB = false): Uint8Array {
@@ -845,8 +863,8 @@ describe('Viewer measurement & mouse/keyboard events', () => {
 });
 
 describe('Viewer drag and drop & loadFile', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   it('handleDrop with no dataTransfer does nothing', async () => {
@@ -874,8 +892,8 @@ describe('Viewer drag and drop & loadFile', () => {
 });
 
 describe('Viewer global error handlers + window resize + animation', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   it('onWindowResize updates renderer & camera', () => {

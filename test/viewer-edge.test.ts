@@ -17,6 +17,7 @@ vi.mock('three', async () => {
 
 import * as THREE from 'three';
 import { Viewer } from '../src/viewer';
+import { CloudViewer } from '../src/cloud_viewer';
 
 function makeContainer() {
   const c = document.createElement('div'); c.id = 'app'; document.body.appendChild(c); return c;
@@ -24,8 +25,8 @@ function makeContainer() {
 function cleanup() { document.body.innerHTML = ''; }
 
 describe('Viewer remaining branch coverage', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanup);
 
   it('measurement: actually hit a point', () => {

@@ -34,6 +34,7 @@ export class RealtimeViewer extends Viewer {
     private readonly mapItemName = 'map';
     private readonly scanItemName = 'scan';
     private readonly odomItemName = 'odom';
+    realtimeMaxPoints: number = 5_000_000;
 
     constructor(containerId: string) {
         super(containerId);

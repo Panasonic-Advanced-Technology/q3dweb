@@ -1,4 +1,4 @@
-import { Viewer } from './viewer';
+import { CloudViewer } from './cloud_viewer';
 import { FilmMaker, KeyFrame } from './viewer/filmMaker';
 import { recoverCenterEuler } from './utils/maths';
 import {
@@ -16,7 +16,7 @@ import {
  * Its settings panel includes an item dropdown (inherited) plus a persistent film maker
  * section (keyframe list, add/delete/play/record controls).
  */
-export class FilmMakerViewer extends Viewer {
+export class FilmMakerViewer extends CloudViewer {
     filmMaker: FilmMaker = new FilmMaker();
     /** Always true — enables Space/Delete keyboard shortcuts for keyframe editing. */
     get filmMakerTabActive(): boolean { return true; }
@@ -39,11 +39,19 @@ export class FilmMakerViewer extends Viewer {
     private filmMakerSpinAng: HTMLInputElement | null = null;
     private filmMakerSpinStop: HTMLInputElement | null = null;
 
+    constructor(containerId: string) {
+        super(containerId);
+        // Fields are now initialized — install the film maker section in the panel.
+        this.installFilmMakerSection();
+    }
+
     /**
-     * Injects the film maker controls (keyframe list + add/delete/play buttons) into the
-     * settings panel, between the item dropdown and the per-item content area.
+     * Inserts the film maker controls (keyframe list + add/delete/play buttons) into the
+     * settings panel between the item dropdown and the per-item content area.
+     * Called from the constructor after field initialization.
      */
-    protected override buildAppControls(panel: HTMLElement): void {
+    private installFilmMakerSection(): void {
+        if (!this.settingsPanel || !this.settingsContent) return;
         const section = document.createElement('div');
         section.style.cssText = 'margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #444;';
         section.setAttribute('data-role', 'film-maker');
@@ -75,7 +83,8 @@ export class FilmMakerViewer extends Viewer {
         this.setFilmMakerPlayButtonState(this.isPlayingFilm);
         this.refreshFilmMakerListUI();
         syncFilmMakerSpinboxes(this.filmMaker, this.filmMakerSpinLin, this.filmMakerSpinAng, this.filmMakerSpinStop);
-        panel.appendChild(section);
+        // Insert before the content area so it appears between the dropdown and item settings
+        this.settingsPanel.insertBefore(section, this.settingsContent);
     }
 
     addKeyFrameFromCamera(): KeyFrame {
