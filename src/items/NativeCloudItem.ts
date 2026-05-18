@@ -6,6 +6,8 @@ export interface NativeCloudItemOptions {
     colorMode?: ColorMode;
     pointSize?: number;
     alpha?: number;
+    vmin?: number;
+    vmax?: number;
 }
 
 export class NativeCloudItem extends THREE.Object3D {
@@ -13,14 +15,16 @@ export class NativeCloudItem extends THREE.Object3D {
     private colorMode: ColorMode;
     private pointSize: number;
     private alpha: number;
-    private dataMin = Number.POSITIVE_INFINITY;
-    private dataMax = Number.NEGATIVE_INFINITY;
+    private vmin: number;
+    private vmax: number;
 
     constructor(options: NativeCloudItemOptions = {}) {
         super();
         this.colorMode = options.colorMode ?? 'FLAT';
         this.pointSize = options.pointSize ?? 1;
         this.alpha = options.alpha ?? 1;
+        this.vmin = options.vmin ?? 0;
+        this.vmax = options.vmax ?? 255;
     }
 
     setColorMode(colorMode: ColorMode): void {
@@ -33,15 +37,21 @@ export class NativeCloudItem extends THREE.Object3D {
         }
     }
 
+    getPointSize(): number { return this.pointSize; }
+
     setAlpha(alpha: number): void {
         if (!Number.isFinite(alpha)) return;
         this.alpha = Math.max(0, Math.min(1, alpha));
     }
 
+    setVmin(v: number): void { this.vmin = v; }
+    setVmax(v: number): void { this.vmax = v; }
+
+    getVmin(): number { return this.vmin; }
+    getVmax(): number { return this.vmax; }
+
     reset(maxPoints: number): void {
         this.backend.reset(maxPoints);
-        this.dataMin = Number.POSITIVE_INFINITY;
-        this.dataMax = Number.NEGATIVE_INFINITY;
     }
 
     appendPoints(
@@ -54,11 +64,6 @@ export class NativeCloudItem extends THREE.Object3D {
         if (values.length === 0) return;
 
         this.backend.append(renderer, positions, values, maxPoints);
-        for (let i = 0; i < values.length; i++) {
-            const value = values[i];
-            if (value < this.dataMin) this.dataMin = value;
-            if (value > this.dataMax) this.dataMax = value;
-        }
     }
 
     draw(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera): void {
@@ -66,8 +71,8 @@ export class NativeCloudItem extends THREE.Object3D {
             renderer,
             camera,
             this.colorMode,
-            Number.isFinite(this.dataMin) ? this.dataMin : 0,
-            Number.isFinite(this.dataMax) ? this.dataMax : 255,
+            this.vmin,
+            this.vmax,
             this.pointSize,
             this.alpha,
         );

@@ -4,6 +4,8 @@
  */
 
 import * as THREE from 'three';
+import { NativeCloudItem } from '../items/NativeCloudItem';
+import type { ColorMode } from '../utils/realtimeTypes';
 
 // ========== Primitive UI builders ==========
 
@@ -178,6 +180,47 @@ export function buildCloudItemSettings(
             mat.uniforms.vmax.value = v; mat.needsUpdate = true; onRender();
         }));
     }
+}
+
+// ========== NativeCloudItem settings ==========
+
+/** Build the per-item settings panel for NativeCloudItem (WebGL-backend based). */
+export function buildNativeCloudItemSettings(
+    item: NativeCloudItem,
+    container: HTMLElement,
+    onRender: () => void,
+    onColorModeChange?: (mode: ColorMode) => void,
+): void {
+    container.appendChild(makeLabel('Size:'));
+    container.appendChild(makeNumberInput(item.getPointSize(), 0, 100, 1, v => {
+        item.setPointSize(v); onRender();
+    }));
+
+    container.appendChild(makeLabel('Alpha:'));
+    container.appendChild(makeNumberInput(1, 0, 1, 0.01, v => {
+        item.setAlpha(v); onRender();
+    }));
+
+    container.appendChild(makeLabel('Color Mode:'));
+    container.appendChild(makeSelectInput(
+        [{ label: 'Intensity', value: 'I' }, { label: 'RGB', value: 'RGB' }, { label: 'Flat', value: 'FLAT' }],
+        'FLAT',
+        v => {
+            item.setColorMode(v as ColorMode);
+            onColorModeChange?.(v as ColorMode);
+            onRender();
+        },
+    ));
+
+    container.appendChild(makeLabel('Vmin:'));
+    container.appendChild(makeNumberInput(item.getVmin(), -100000, 100000, 1, v => {
+        item.setVmin(v); onRender();
+    }));
+
+    container.appendChild(makeLabel('Vmax:'));
+    container.appendChild(makeNumberInput(item.getVmax(), -100000, 100000, 1, v => {
+        item.setVmax(v); onRender();
+    }));
 }
 
 // ========== Film Maker settings panel builder ==========
