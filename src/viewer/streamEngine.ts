@@ -229,7 +229,7 @@ export function processChunk(v: any, chunkData: Uint8Array, _offset: number): vo
             v.fullBuffer.set(chunkData, v.fullBufferWriteOffset);
             v.fullBufferWriteOffset += chunkData.byteLength;
         }
-        if (!v.streamAborted && v.loadingOverlay) v.loadingOverlay.innerHTML = pHtml((v.streamLoadedSize / v.streamTotalSize) * 100);
+        if (!v.streamAborted && v.loadingOverlay) v.loadingOverlay.innerHTML = pHtml(progress);
     } catch (e) { console.error('Chunk processing failed', e); }
 }
 

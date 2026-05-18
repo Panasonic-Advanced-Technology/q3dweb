@@ -26,6 +26,7 @@ import { Viewer } from '../src/viewer';
 import { CloudViewer } from '../src/cloud_viewer';
 import { FilmMakerViewer } from '../src/film_maker_viewer';
 import { RealtimeViewer } from '../src/realtime_viewer';
+import { inferPointCloudFilename, parseCloudUrlOptions } from '../src/cloudUrlOptions';
 import { parseRealtimeUrlOptions } from '../src/realtimeUrlOptions';
 import { installViewerModeSelector, normalizeViewerMode } from '../src/viewerMode';
 
@@ -576,6 +577,56 @@ describe('realtime URL options', () => {
     expect(options.odomTopicName).toBe('/odom_alias');
     expect(options.maxPointsPerScan).toBeUndefined();
     expect(options.maxAccumulatedPoints).toBe(2_500_000);
+  });
+});
+
+describe('cloud URL options', () => {
+  it('parses point cloud URL aliases and optional filename', () => {
+    const options = parseCloudUrlOptions(new URLSearchParams({
+      cloudUrl: 'https://example.com/data/sample.las',
+      filename: 'sample.las',
+    }));
+
+    expect(options).toEqual({
+      pointCloudUrl: 'https://example.com/data/sample.las',
+      filename: 'sample.las',
+    });
+  });
+
+  it('infers filenames from URLs with query strings', () => {
+    expect(inferPointCloudFilename('https://example.com/clouds/mihara%20binary.e57?token=abc'))
+      .toBe('mihara binary.e57');
+  });
+});
+
+describe('CloudViewer URL loading', () => {
+  let v: CloudViewer;
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
+  afterEach(() => {
+    (globalThis as any).fetch = originalFetch;
+    cleanupContainers();
+  });
+
+  function makeAsciiPCD(): Uint8Array {
+    const pcd =
+      'VERSION 0.7\nFIELDS x y z intensity\nSIZE 4 4 4 4\nTYPE F F F F\nCOUNT 1 1 1 1\nWIDTH 2\nHEIGHT 1\nVIEWPOINT 0 0 0 1 0 0 0\nPOINTS 2\nDATA ascii\n' +
+      '0 0 0 10\n1 1 1 20\n';
+    return new TextEncoder().encode(pcd);
+  }
+
+  it('loads a remote point cloud through fetch streaming', async () => {
+    const data = makeAsciiPCD();
+    (globalThis as any).fetch = vi.fn().mockResolvedValue(new Response(data, {
+      headers: { 'content-length': String(data.byteLength) },
+    }));
+
+    await v.loadUrl('https://example.com/clouds/sample.pcd');
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('https://example.com/clouds/sample.pcd');
+    expect(v.streamFilename).toBe('sample.pcd');
+    expect(v.items.cloud).toBeDefined();
   });
 });
 

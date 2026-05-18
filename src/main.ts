@@ -5,6 +5,7 @@ import { CloudViewer } from './cloud_viewer';
 import { installViewerModeSelector, normalizeViewerMode } from './viewerMode';
 import { configureSamplingHeapBudget } from './parsers/sampling';
 import { parseRealtimeUrlOptions } from './realtimeUrlOptions';
+import { parseCloudUrlOptions } from './cloudUrlOptions';
 
 function toFloat32Array(data: unknown): Float32Array {
     if (data instanceof Float32Array) return data;
@@ -41,6 +42,7 @@ try {
     const params = new URLSearchParams(window.location.search);
     const mode = normalizeViewerMode(params.get('mode'));
     const realtimeOptions = mode === 'realtime' ? parseRealtimeUrlOptions(params) : undefined;
+    const cloudOptions = mode === 'cloud' ? parseCloudUrlOptions(params) : undefined;
     const viewer: CloudViewer | RealtimeViewer =
         mode === 'realtime'   ? new RealtimeViewer('app', realtimeOptions) :
         mode === 'film_maker' ? new FilmMakerViewer('app') :
@@ -54,6 +56,9 @@ try {
         } else {
             console.log('Realtime mode enabled. Configure settings in the panel, or provide ?ros=ws://host:9090&cloudTopic=/points&odomTopic=/odom to auto-connect.');
         }
+    } else if (mode === 'cloud' && viewer instanceof CloudViewer && cloudOptions?.pointCloudUrl) {
+        void viewer.loadUrl(cloudOptions.pointCloudUrl, cloudOptions.filename);
+        console.log(`Cloud mode enabled, loading point cloud URL: ${cloudOptions.pointCloudUrl}`);
     }
 
     // Expose viewer on window for E2E tests and debugging.

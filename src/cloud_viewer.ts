@@ -11,6 +11,7 @@ import {
     loadFile as _loadFile, handleDrop as _handleDrop, parseHeader as _parseHeader,
     checkMemoryBudget as _checkMemoryBudget,
 } from './viewer/streamEngine';
+import { loadUrl as _loadUrl } from './viewer/remoteCloudLoader';
 import {
     renderPoints as _renderPoints, resetRealtimeCloud as _resetRealtime,
     appendRealtimePoints as _appendRealtime,
@@ -67,6 +68,7 @@ export class CloudViewer extends Viewer {
     finalizeStream(): void { _finalizeStream(this); }
     loadData(content: Uint8Array, filename?: string): void { _loadData(this, content, filename); }
     async loadFile(file: File, append: boolean = false): Promise<void> { return _loadFile(this, file, append); }
+    async loadUrl(sourceUrl: string, filename?: string): Promise<void> { return _loadUrl(this, sourceUrl, filename); }
     async handleDrop(e: DragEvent): Promise<void> { await _handleDrop(this, e); }
     readPackedRGB(view: DataView, byteOffset: number, type: string, size: number): number { return _readPackedRGB(view, byteOffset, type, size); }
     parseAsciiPackedRGB(token: string, type: string, size: number): number { return _parseAsciiPackedRGB(token, type, size); }
