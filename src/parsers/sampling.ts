@@ -1,4 +1,30 @@
-export const LARGE_FILE_SAMPLING_THRESHOLD_BYTES = 2 * 1024 * 1024 * 1024;
+import {
+    computeSamplingThresholdBytes,
+    configureHostHeapBudget,
+    DEFAULT_HEAP_LIMIT_BYTES,
+    detectHeapLimitBytes,
+    detectHeapUsedBytes,
+} from '../utils/heapBudget';
+
+export const DEFAULT_LARGE_FILE_SAMPLING_THRESHOLD_BYTES = DEFAULT_HEAP_LIMIT_BYTES;
+export let LARGE_FILE_SAMPLING_THRESHOLD_BYTES = computeSamplingThresholdBytes();
+
+export function configureSamplingHeapBudget(heapLimitBytes?: number, heapUsedBytes?: number): number {
+    configureHostHeapBudget(heapLimitBytes, heapUsedBytes);
+    return refreshLargeFileSamplingThresholdBytes();
+}
+
+export function refreshLargeFileSamplingThresholdBytes(): number {
+    LARGE_FILE_SAMPLING_THRESHOLD_BYTES = computeSamplingThresholdBytes(
+        detectHeapLimitBytes(),
+        detectHeapUsedBytes(),
+    );
+    return LARGE_FILE_SAMPLING_THRESHOLD_BYTES;
+}
+
+export function getLargeFileSamplingThresholdBytes(): number {
+    return refreshLargeFileSamplingThresholdBytes();
+}
 
 export function computePointSampleRatio(
     pointCount: number | undefined,
@@ -12,8 +38,9 @@ export function computePointSampleRatio(
     const byPointBudget = safePointCount > safeMaxPoints
         ? Math.ceil(safePointCount / safeMaxPoints)
         : 1;
-    const bySourceSize = sourceBytes > LARGE_FILE_SAMPLING_THRESHOLD_BYTES
-        ? Math.ceil(sourceBytes / LARGE_FILE_SAMPLING_THRESHOLD_BYTES)
+    const sourceThreshold = getLargeFileSamplingThresholdBytes();
+    const bySourceSize = sourceBytes > sourceThreshold
+        ? Math.ceil(sourceBytes / sourceThreshold)
         : 1;
     return Math.max(1, byPointBudget, bySourceSize);
 }

@@ -2,9 +2,9 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const __wbg_points_free: (a: number, b: number) => void;
-export const parsePointChunksSampled: (a: any, b: number, c: number) => [number, number, number];
+export const parsePointChunksSampled: (a: any, b: number, c: number, d: number) => [number, number, number];
 export const parsePoints: (a: any) => [number, number, number];
-export const parsePointsSampled: (a: any, b: number, c: number) => [number, number, number];
+export const parsePointsSampled: (a: any, b: number, c: number, d: number) => [number, number, number];
 export const points_colors: (a: number) => any;
 export const points_hasColor: (a: number) => number;
 export const points_hasIntensity: (a: number) => number;

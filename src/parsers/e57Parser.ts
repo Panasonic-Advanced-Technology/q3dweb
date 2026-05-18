@@ -5,6 +5,7 @@
 
 import type { ParsedCloud } from './pcdParser';
 import { normalizeIntensity } from './lasParser';
+import { getLargeFileSamplingThresholdBytes } from './sampling';
 
 type E57Input = Uint8Array | readonly Uint8Array[];
 
@@ -36,15 +37,16 @@ export async function parseE57(data: E57Input, maxPoints: number, sourceBytes: n
     const mod: any = await import('../../vendor/e57-wasm/pkg/e57_wasm.js');
     const wasmUrl = (await import('../../vendor/e57-wasm/pkg/e57_wasm_bg.wasm?url')).default;
     await mod.default({ module_or_path: wasmUrl });
+    const samplingThresholdBytes = getLargeFileSamplingThresholdBytes();
 
     const pts = isChunkedInput(data)
         ? (typeof mod.parsePointChunksSampled === 'function'
-            ? mod.parsePointChunksSampled(data, maxPoints, sourceBytes)
+            ? mod.parsePointChunksSampled(data, maxPoints, sourceBytes, samplingThresholdBytes)
             : (typeof mod.parsePointsSampled === 'function'
-                ? mod.parsePointsSampled(mergeChunks(data, inputBytes), maxPoints, sourceBytes)
+                ? mod.parsePointsSampled(mergeChunks(data, inputBytes), maxPoints, sourceBytes, samplingThresholdBytes)
                 : mod.parsePoints(mergeChunks(data, inputBytes))))
         : (typeof mod.parsePointsSampled === 'function'
-            ? mod.parsePointsSampled(data, maxPoints, sourceBytes)
+            ? mod.parsePointsSampled(data, maxPoints, sourceBytes, samplingThresholdBytes)
             : mod.parsePoints(data));
     const positions    = pts.positions as Float32Array;
     const intensity    = pts.intensities as Float32Array;

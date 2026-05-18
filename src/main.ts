@@ -3,6 +3,7 @@ import { FilmMakerViewer } from './film_maker_viewer';
 import { RealtimeViewer } from './realtime_viewer';
 import { CloudViewer } from './cloud_viewer';
 import { installViewerModeSelector, normalizeViewerMode } from './viewerMode';
+import { configureSamplingHeapBudget } from './parsers/sampling';
 
 function toFloat32Array(data: unknown): Float32Array {
     if (data instanceof Float32Array) return data;
@@ -25,6 +26,10 @@ function toUint8Array(data: unknown): Uint8Array {
     }
     if (Array.isArray(data)) return new Uint8Array(data);
     return new Uint8Array(0);
+}
+
+function applyHostHeapBudget(message: any): void {
+    configureSamplingHeapBudget(message.hostHeapLimitBytes, message.hostHeapUsedBytes);
 }
 
 // Declare VS Code API
@@ -74,9 +79,11 @@ try {
             switch (message.type) {
                 case 'loadData':
                 case 'loadPCD':
+                    applyHostHeapBudget(message);
                     cv?.loadData(message.value, message.filename);
                     break;
                 case 'startStream':
+                    applyHostHeapBudget(message);
                     cv?.startStream(message.totalSize, message.filename);
                     break;
                 case 'chunk':

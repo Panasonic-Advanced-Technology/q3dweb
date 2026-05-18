@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { GNSSMapItem } from '../items/GNSSMapItem';
-import { detectHeapLimit, detectHeapUsed, estimateMemoryRequirement, formatBytes } from '../utils/memoryCheck';
 import {
     PCDBinaryState, parsePCDHeader, processPCDBinaryChunk, parsePCDAscii, getFieldSpec,
 } from '../parsers/pcdParser';
@@ -16,7 +15,25 @@ import {
     LASBounds, normalizeIntensity, parseLASMetadata, parseLAZ, processLASRecords,
 } from '../parsers/lasParser';
 import { parseE57 } from '../parsers/e57Parser';
-import { computePointSampleRatio, estimateSampledPointCount } from '../parsers/sampling';
+import {
+    computePointSampleRatio,
+    estimateSampledPointCount,
+} from '../parsers/sampling';
+import {
+    abortStream,
+    checkMemoryBudget,
+    ensureSingleBufferInputBudget,
+    ensureStreamedPointBudget,
+} from './loadBudget';
+
+export {
+    abortStream,
+    checkMemoryBudget,
+    ensureSingleBufferInputBudget,
+    ensureStreamedPointBudget,
+    estimateSingleBufferInputBytes,
+    estimateVisiblePointBufferBytes,
+} from './loadBudget';
 
 export type FormatType = 'pcd' | 'ply' | 'las' | 'laz' | 'e57' | 'unknown';
 
@@ -35,50 +52,6 @@ export function shouldDeferInitialMemoryCheck(format: string): boolean {
 
 export function shouldUseSingleBufferParser(format: string): boolean {
     return format === 'laz';
-}
-
-export function estimateVisiblePointBufferBytes(pointCount: number, hasRGB: boolean): number {
-    return pointCount * (3 * 4 + 4 + (hasRGB ? 3 : 0)) + 32 * 1024 * 1024;
-}
-
-export function ensureStreamedPointBudget(v: any, pointCount: number, hasRGB: boolean, format: string, filename?: string): boolean {
-    if (v.skipMemoryCheck) return true;
-    const estimated = estimateVisiblePointBufferBytes(pointCount, hasRGB);
-    const heapLimit = detectHeapLimit(), heapUsed = detectHeapUsed();
-    const budget = Math.max(heapLimit - heapUsed, 0) || heapLimit;
-    const ratio = budget > 0 ? estimated / budget : 0;
-    if (ratio < 0.6) return true;
-    const label = filename ? `"${filename}"` : 'this file';
-    const detail = `Estimated memory for ${format.toUpperCase()} of ${label}: ${formatBytes(estimated)} for ${pointCount.toLocaleString()} pts. Available: ${formatBytes(budget)}.`;
-    if (ratio >= 0.9) { console.warn('[memoryCheck] blocked:', detail); if (typeof alert === 'function') alert(detail); abortStream(v, detail); return false; }
-    console.warn('[memoryCheck] large load warning:', detail);
-    if (typeof confirm === 'function' && !confirm(`${detail}\n\nLoad anyway?`)) { abortStream(v, detail); return false; }
-    return true;
-}
-
-export function checkMemoryBudget(v: any, fileSize: number, format: string, filename?: string): boolean {
-    if (v.skipMemoryCheck) return true;
-    const result = estimateMemoryRequirement(fileSize, format);
-    if (result.level === 'ok') return true;
-    const label = filename ? `"${filename}"` : 'this file';
-    const header = result.level === 'block' ? `Cannot open ${label}: likely exceeds available memory.` : `Opening ${label} may exhaust browser memory.`;
-    const detail = `${header}\n\n${result.message}`;
-    if (result.level === 'block') { console.warn('[memoryCheck] blocked:', detail); if (typeof alert === 'function') alert(detail); return false; }
-    console.warn('[memoryCheck] large file warning:', detail);
-    if (typeof confirm === 'function') return confirm(`${detail}\n\nLoad anyway?`);
-    return true;
-}
-
-export function abortStream(v: any, message: string): void {
-    v.streamAborted = true;
-    v.leftoverChunk = null; v.chunkList = []; v.fullBuffer = null;
-    v.fullBufferWriteOffset = 0; v.posBuffer = null; v.valBuffer = null;
-    v.rgbBuffer = null; v.lasStream = null;
-    v.pcdAsciiStream = null; v.plyStream = null;
-    if (v.loadingOverlay) {
-        v.loadingOverlay.style.display = 'flex';
-        v.loadingOverlay.innerHTML = `<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Error: ${message}</div>`;
-    }
 }
 
 export function startStream(v: any, totalSize: number, filename?: string): void {
@@ -318,6 +291,7 @@ export function finalizeStream(v: any): void {
                 v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
             }).catch(onErr);
         } else if (v.currentFormat === 'laz' || v.currentFormat === 'ply') {
+            if (v.currentFormat === 'laz' && !ensureSingleBufferInputBudget(v, v.streamTotalSize || v.fullBufferWriteOffset, 'laz', v.streamFilename)) return;
             const assembled = assembleChunkList(v);
             if (assembled.byteLength === 0) throw new Error(`Empty ${v.currentFormat.toUpperCase()} stream`);
             console.log(`${v.currentFormat.toUpperCase()} assembled bytes: ${assembled.byteLength}`);
@@ -385,6 +359,7 @@ export async function loadFile(v: any, file: File, append: boolean = false): Pro
         if (!append) v.removeItem('cloud');
         startStream(v, file.size, file.name);
         if (shouldUseSingleBufferParser(fmt)) {
+            if (!ensureSingleBufferInputBudget(v, file.size, fmt, file.name)) return;
             const content = new Uint8Array(await file.arrayBuffer());
             v.streamLoadedSize = file.size;
             if (v.loadingOverlay) {

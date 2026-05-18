@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  configureSamplingHeapBudget,
   computePointSampleRatio,
   estimateSampledPointCount,
-  LARGE_FILE_SAMPLING_THRESHOLD_BYTES,
+  getLargeFileSamplingThresholdBytes,
 } from '../src/parsers/sampling';
 import {
   shouldDeferInitialMemoryCheck,
@@ -10,8 +11,17 @@ import {
 } from '../src/viewer/streamEngine';
 
 describe('parser sampling policy', () => {
+  beforeEach(() => {
+    configureSamplingHeapBudget(4 * 1024 * 1024 * 1024, 0);
+  });
+
+  afterEach(() => {
+    configureSamplingHeapBudget(undefined, undefined);
+  });
+
   it('keeps ratio 1 below point and source budgets', () => {
-    expect(computePointSampleRatio(100, 1_000, LARGE_FILE_SAMPLING_THRESHOLD_BYTES)).toBe(1);
+    expect(getLargeFileSamplingThresholdBytes()).toBe(2 * 1024 * 1024 * 1024);
+    expect(computePointSampleRatio(100, 1_000, getLargeFileSamplingThresholdBytes())).toBe(1);
   });
 
   it('uses point count budget when visible points exceed max', () => {
@@ -20,8 +30,16 @@ describe('parser sampling policy', () => {
   });
 
   it('forces thinning when source file is larger than 2GiB', () => {
-    expect(computePointSampleRatio(100, 1_000, LARGE_FILE_SAMPLING_THRESHOLD_BYTES + 1)).toBe(2);
-    expect(computePointSampleRatio(100_000, 1_000, LARGE_FILE_SAMPLING_THRESHOLD_BYTES * 5)).toBe(100);
+    const threshold = getLargeFileSamplingThresholdBytes();
+    expect(computePointSampleRatio(100, 1_000, threshold + 1)).toBe(2);
+    expect(computePointSampleRatio(100_000, 1_000, threshold * 5)).toBe(100);
+  });
+
+  it('derives source-size threshold from available heap', () => {
+    configureSamplingHeapBudget(1024 * 1024 * 1024, 256 * 1024 * 1024);
+    const threshold = getLargeFileSamplingThresholdBytes();
+    expect(threshold).toBe(384 * 1024 * 1024);
+    expect(computePointSampleRatio(100, 1_000, threshold + 1)).toBe(2);
   });
 
   it('routes LAZ/E57 through parsers without eager memory checks', () => {

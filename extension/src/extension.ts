@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as v8 from 'v8';
 
 export function activate(context: vscode.ExtensionContext) {
     // Register the custom editor provider
@@ -138,6 +139,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
 
         // Use a nonce to whitelist which scripts can be run
         const nonce = getNonce();
+        const heapBudget = getNodeHeapBudget();
 
         return /* html */`
             <!DOCTYPE html>
@@ -155,6 +157,10 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
             </head>
             <body>
                 <div id="app"></div>
+                <script nonce="${nonce}">
+                    globalThis.__Q3DWEB_HOST_HEAP_LIMIT_BYTES = ${heapBudget.hostHeapLimitBytes};
+                    globalThis.__Q3DWEB_HOST_HEAP_USED_BYTES = ${heapBudget.hostHeapUsedBytes};
+                </script>
                 <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
             </body>
             </html>`;
@@ -172,8 +178,9 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
                  const chunkSize = 1 * 1024 * 1024; // 1MB chunks for reliable webview messaging
                  const buffer = Buffer.alloc(chunkSize);
                  const fd = fs.openSync(filePath, 'r');
+                 const heapBudget = getNodeHeapBudget();
                  
-                 const startDelivered = await webviewPanel.webview.postMessage({ type: 'startStream', totalSize, filename: path.basename(filePath) });
+                 const startDelivered = await webviewPanel.webview.postMessage({ type: 'startStream', totalSize, filename: path.basename(filePath), ...heapBudget });
                  if (!startDelivered) {
                      console.warn('Webview is not ready to receive startStream message.');
                      fs.closeSync(fd);
@@ -212,16 +219,26 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
              } else {
                  // Fallback for non-file schemes (e.g. remote)
                  const fileData = await vscode.workspace.fs.readFile(document.uri);
+                 const heapBudget = getNodeHeapBudget();
                  webviewPanel.webview.postMessage({
                      type: 'loadData',
                      value: fileData,
-                     filename: path.basename(document.uri.fsPath)
+                     filename: path.basename(document.uri.fsPath),
+                     ...heapBudget,
                  });
              }
         } catch (e) {
             console.error('Failed to read file', e);
         }
     }
+}
+
+function getNodeHeapBudget(): { hostHeapLimitBytes: number; hostHeapUsedBytes: number } {
+    const heapStats = v8.getHeapStatistics();
+    return {
+        hostHeapLimitBytes: heapStats.heap_size_limit,
+        hostHeapUsedBytes: process.memoryUsage().heapUsed,
+    };
 }
 
 function getNonce() {

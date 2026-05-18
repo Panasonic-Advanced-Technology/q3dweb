@@ -68,10 +68,11 @@ if (Symbol.dispose) Points.prototype[Symbol.dispose] = Points.prototype.free;
  * @param {Array<any>} chunks
  * @param {number} max_points
  * @param {number} source_bytes
+ * @param {number} sampling_threshold_bytes
  * @returns {Points}
  */
-export function parsePointChunksSampled(chunks, max_points, source_bytes) {
-    const ret = wasm.parsePointChunksSampled(chunks, max_points, source_bytes);
+export function parsePointChunksSampled(chunks, max_points, source_bytes, sampling_threshold_bytes) {
+    const ret = wasm.parsePointChunksSampled(chunks, max_points, source_bytes, sampling_threshold_bytes);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -98,10 +99,11 @@ export function parsePoints(data) {
  * @param {Uint8Array} data
  * @param {number} max_points
  * @param {number} source_bytes
+ * @param {number} sampling_threshold_bytes
  * @returns {Points}
  */
-export function parsePointsSampled(data, max_points, source_bytes) {
-    const ret = wasm.parsePointsSampled(data, max_points, source_bytes);
+export function parsePointsSampled(data, max_points, source_bytes, sampling_threshold_bytes) {
+    const ret = wasm.parsePointsSampled(data, max_points, source_bytes, sampling_threshold_bytes);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }

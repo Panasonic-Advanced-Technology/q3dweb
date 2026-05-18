@@ -4,7 +4,15 @@ use reader::{JsChunkedReader, JsUint8ArrayReader};
 use std::io::{Read, Seek};
 use wasm_bindgen::prelude::*;
 
-const LARGE_FILE_SAMPLING_THRESHOLD_BYTES: f64 = 2.0 * 1024.0 * 1024.0 * 1024.0;
+const DEFAULT_SAMPLING_THRESHOLD_BYTES: f64 = 2.0 * 1024.0 * 1024.0 * 1024.0;
+
+fn safe_sampling_threshold_bytes(value: f64) -> f64 {
+    if value.is_finite() && value > 0.0 {
+        value
+    } else {
+        DEFAULT_SAMPLING_THRESHOLD_BYTES
+    }
+}
 
 fn color_to_u8(value: f32) -> u8 {
     let scaled = (value * 255.0).round();
@@ -64,7 +72,12 @@ impl Points {
 /// intensities (0..255 normalized by the library based on the intensity limits).
 #[wasm_bindgen(js_name = parsePoints)]
 pub fn parse_points(data: js_sys::Uint8Array) -> Result<Points, JsError> {
-    parse_points_inner(JsUint8ArrayReader::new(data), None, 0.0)
+    parse_points_inner(
+        JsUint8ArrayReader::new(data),
+        None,
+        0.0,
+        DEFAULT_SAMPLING_THRESHOLD_BYTES,
+    )
 }
 
 /// Parse the first point cloud of an E57 file with source-size aware sampling.
@@ -73,11 +86,13 @@ pub fn parse_points_sampled(
     data: js_sys::Uint8Array,
     max_points: usize,
     source_bytes: f64,
+    sampling_threshold_bytes: f64,
 ) -> Result<Points, JsError> {
     parse_points_inner(
         JsUint8ArrayReader::new(data),
         Some(max_points),
         source_bytes,
+        sampling_threshold_bytes,
     )
 }
 
@@ -87,11 +102,13 @@ pub fn parse_point_chunks_sampled(
     chunks: js_sys::Array,
     max_points: usize,
     source_bytes: f64,
+    sampling_threshold_bytes: f64,
 ) -> Result<Points, JsError> {
     parse_points_inner(
         JsChunkedReader::new(chunks)?,
         Some(max_points),
         source_bytes,
+        sampling_threshold_bytes,
     )
 }
 
@@ -99,6 +116,7 @@ fn parse_points_inner<R>(
     input: R,
     max_points: Option<usize>,
     source_bytes: f64,
+    sampling_threshold_bytes: f64,
 ) -> Result<Points, JsError>
 where
     R: Read + Seek,
@@ -125,12 +143,12 @@ where
         }
         None => 1,
     };
-    let source_ratio =
-        if source_bytes.is_finite() && source_bytes > LARGE_FILE_SAMPLING_THRESHOLD_BYTES {
-            (source_bytes / LARGE_FILE_SAMPLING_THRESHOLD_BYTES).ceil() as usize
-        } else {
-            1
-        };
+    let source_threshold = safe_sampling_threshold_bytes(sampling_threshold_bytes);
+    let source_ratio = if source_bytes.is_finite() && source_bytes > source_threshold {
+        (source_bytes / source_threshold).ceil() as usize
+    } else {
+        1
+    };
     let sample_ratio = point_ratio.max(source_ratio).max(1);
 
     let iter = reader

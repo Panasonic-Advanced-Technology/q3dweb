@@ -16,7 +16,7 @@ export class Points {
 /**
  * Parse chunked E57 input without assembling one large JavaScript ArrayBuffer.
  */
-export function parsePointChunksSampled(chunks: Array<any>, max_points: number, source_bytes: number): Points;
+export function parsePointChunksSampled(chunks: Array<any>, max_points: number, source_bytes: number, sampling_threshold_bytes: number): Points;
 
 /**
  * Parse the first point cloud of an E57 file.
@@ -28,16 +28,16 @@ export function parsePoints(data: Uint8Array): Points;
 /**
  * Parse the first point cloud of an E57 file with source-size aware sampling.
  */
-export function parsePointsSampled(data: Uint8Array, max_points: number, source_bytes: number): Points;
+export function parsePointsSampled(data: Uint8Array, max_points: number, source_bytes: number, sampling_threshold_bytes: number): Points;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_points_free: (a: number, b: number) => void;
-    readonly parsePointChunksSampled: (a: any, b: number, c: number) => [number, number, number];
+    readonly parsePointChunksSampled: (a: any, b: number, c: number, d: number) => [number, number, number];
     readonly parsePoints: (a: any) => [number, number, number];
-    readonly parsePointsSampled: (a: any, b: number, c: number) => [number, number, number];
+    readonly parsePointsSampled: (a: any, b: number, c: number, d: number) => [number, number, number];
     readonly points_colors: (a: number) => any;
     readonly points_hasColor: (a: number) => number;
     readonly points_hasIntensity: (a: number) => number;
