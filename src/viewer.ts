@@ -15,6 +15,10 @@ import {
     updateMeasurementMarker as _updateMeasureMarker,
 } from './viewer/measurement';
 import { CloudItem } from './items/CloudItem';
+
+const wrapAngle = (a: number): number =>
+    ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+
 interface SettingBuilder { addSetting(container: HTMLElement): void; }
 export class Viewer {
     container: HTMLElement;
@@ -111,11 +115,11 @@ export class Viewer {
         this.camera.position.copy(this.cameraCenter.clone().add(offset));
         this.camera.up.copy(new THREE.Vector3(0, 1, 0).applyMatrix4(Rwc));
         this.camera.lookAt(this.cameraCenter);
-        this.updateProjectionMatrixLikeQ3DViewer();
+        this.updateProjection();
         this.requestRender();
     }
 
-    private updateProjectionMatrixLikeQ3DViewer(): void {
+    private updateProjection(): void {
         const w = Math.max(this.container.clientWidth, 1), h = Math.max(this.container.clientHeight, 1);
         const near = 40 * 0.001, far = 40 * 10000;
         const r = near * Math.tan(0.5 * THREE.MathUtils.degToRad(this.camera.fov));
@@ -127,16 +131,17 @@ export class Viewer {
 
     rotateCam(rx: number, ry: number, rz: number) {
         this.euler[0] = Math.max(0, Math.min(Math.PI, this.euler[0] + rx));
-        this.euler[1] = ((this.euler[1] + ry + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-        this.euler[2] = ((this.euler[2] + rz + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+        this.euler[1] = wrapAngle(this.euler[1] + ry);
+        this.euler[2] = wrapAngle(this.euler[2] + rz);
         this.updateCamera();
     }
 
     rotateKeepCamPos(rx: number, ry: number, rz: number) {
-        const ne: [number, number, number] = [this.euler[0] + rx, this.euler[1] + ry, this.euler[2] + rz];
-        ne[0] = Math.max(0, Math.min(Math.PI, ne[0]));
-        ne[1] = ((ne[1] + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-        ne[2] = ((ne[2] + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+        const ne: [number, number, number] = [
+            Math.max(0, Math.min(Math.PI, this.euler[0] + rx)),
+            wrapAngle(this.euler[1] + ry),
+            wrapAngle(this.euler[2] + rz),
+        ];
         const RwcOld = eulerToMatrix4(this.euler[0], this.euler[1], this.euler[2]);
         const tco = new THREE.Vector3(0, 0, this.cameraDist);
         const twc = this.cameraCenter.clone().add(tco.clone().applyMatrix4(RwcOld));
@@ -275,7 +280,7 @@ export class Viewer {
 
     onWindowResize() {
         this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
-        this.updateProjectionMatrixLikeQ3DViewer();
+        this.updateProjection();
         this.renderer.setPixelRatio(this.rendererPixelRatio);
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
         this.syncAllCloudItemViewports();

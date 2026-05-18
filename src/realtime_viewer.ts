@@ -4,6 +4,7 @@ import { CloudItem } from './items/CloudItem';
 import { AxisItem } from './items/AxisItem';
 import { NativeCloudItem } from './items/NativeCloudItem';
 import { decodePointCloud2, inferColorModeFromFields } from './utils/pointCloud2Decode';
+import { makeLabel, makeTextInput, makeNumberInput, makeButton } from './viewer/settingsUI';
 import type {
     ColorMode,
     DecodedCloudChunk,
@@ -39,6 +40,45 @@ export class RealtimeViewer extends Viewer {
     constructor(containerId: string) {
         super(containerId);
         this.setupRealtimeItems();
+        this.installRealtimeSection();
+    }
+
+    /** Inserts the realtime connection panel above the item settings area. */
+    private installRealtimeSection(): void {
+        if (!this.settingsPanel || !this.settingsContent) return;
+        const section = document.createElement('div');
+        section.style.cssText = 'margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #444;';
+        section.setAttribute('data-role', 'realtime');
+
+        section.appendChild(makeLabel('ROS Bridge URL'));
+        const rosInput = makeTextInput('ws://localhost:9090', () => {});
+
+        section.appendChild(rosInput);
+        section.appendChild(makeLabel('Cloud Topic'));
+        const cloudTopicInput = makeTextInput(this.cloudTopicName, v => { this.cloudTopicName = v; });
+        section.appendChild(cloudTopicInput);
+
+        section.appendChild(makeLabel('Odom Topic'));
+        const odomTopicInput = makeTextInput(this.odomTopicName, v => { this.odomTopicName = v; });
+        section.appendChild(odomTopicInput);
+
+        section.appendChild(makeLabel('Max Points / Scan'));
+        const maxScanInput = makeNumberInput(this.maxPointsPerScan, 1, 1_000_000, 100, v => { this.maxPointsPerScan = Math.floor(v); });
+        section.appendChild(maxScanInput);
+
+        section.appendChild(makeLabel('Max Accumulated Points'));
+        const maxCloudInput = makeNumberInput(this.realtimeMaxPoints, 10_000, 50_000_000, 100_000, v => { this.realtimeMaxPoints = Math.floor(v); });
+        section.appendChild(maxCloudInput);
+
+        const connectBtn = makeButton('Connect', () => {
+            const url = rosInput.value.trim();
+            if (!url) return;
+            this.connectRosbridge(url);
+            connectBtn.textContent = 'Reconnect';
+        });
+        section.appendChild(connectBtn);
+
+        this.settingsPanel.insertBefore(section, this.settingsContent);
     }
 
     setRealtimeOptions(options: RealtimeTopicOptions): void {

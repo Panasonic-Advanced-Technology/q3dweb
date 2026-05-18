@@ -148,12 +148,11 @@ export class FilmMakerViewer extends CloudViewer {
         this.filmMakerPlayBtn.style.borderColor = isPlaying ? '#d66' : '#666';
     }
 
-    private get _filmCtx(): FilmPlaybackContext { return this as any; }
     togglePlayback(): void { this.isPlayingFilm ? this.stopPlayback() : this.startPlayback(); }
-    startPlayback(): boolean { return _startPlayback(this._filmCtx); }
-    stopPlayback(): void { _stopPlayback(this._filmCtx); }
-    tickFilmPlayback(timestamp?: number): void { _tickPlayback(this._filmCtx, timestamp); }
-    startRecording(): void { _startRecording(this._filmCtx); }
-    stopRecording(): void { _stopRecording(this._filmCtx); }
-    downloadLastRecording(): boolean { return _downloadLastRecording(this._filmCtx, (this as any).vscode); }
+    startPlayback(): boolean { return _startPlayback(this as unknown as FilmPlaybackContext); }
+    stopPlayback(): void { _stopPlayback(this as unknown as FilmPlaybackContext); }
+    tickFilmPlayback(timestamp?: number): void { _tickPlayback(this as unknown as FilmPlaybackContext, timestamp); }
+    startRecording(): void { _startRecording(this as unknown as FilmPlaybackContext); }
+    stopRecording(): void { _stopRecording(this as unknown as FilmPlaybackContext); }
+    downloadLastRecording(): boolean { return _downloadLastRecording(this as unknown as FilmPlaybackContext, (this as any).vscode); }
 }

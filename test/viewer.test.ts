@@ -24,7 +24,7 @@ vi.mock('three', async () => {
 import * as THREE from 'three';
 import { Viewer } from '../src/viewer';
 import { CloudViewer } from '../src/cloud_viewer';
-import { FilmMakerViewer } from '../src/filmMakerViewer';
+import { FilmMakerViewer } from '../src/film_maker_viewer';
 
 function makeContainer(id = 'app'): HTMLElement {
   const c = document.createElement('div');

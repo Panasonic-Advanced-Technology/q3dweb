@@ -1,5 +1,5 @@
 import './style.css'
-import { FilmMakerViewer } from './filmMakerViewer';
+import { FilmMakerViewer } from './film_maker_viewer';
 import { RealtimeViewer } from './realtime_viewer';
 import { CloudViewer } from './cloud_viewer';
 
@@ -39,35 +39,12 @@ try {
                                 new CloudViewer('app');  // default: no param or ?mode=cloud
 
     if (mode === 'realtime' && viewer instanceof RealtimeViewer) {
-        const topicName = params.get('topic') ?? undefined;
-        const odomTopicName = params.get('odomTopic') ?? undefined;
-        const maxPointsPerScanRaw = Number(params.get('maxScan'));
-        const maxAccumulatedPointsRaw = Number(params.get('maxCloud'));
-        const maxPointsPerScan = Number.isFinite(maxPointsPerScanRaw) && maxPointsPerScanRaw > 0
-            ? Math.floor(maxPointsPerScanRaw)
-            : undefined;
-        const maxAccumulatedPoints = Number.isFinite(maxAccumulatedPointsRaw) && maxAccumulatedPointsRaw > 0
-            ? Math.floor(maxAccumulatedPointsRaw)
-            : undefined;
-        viewer.setRealtimeOptions({
-            topicName,
-            odomTopicName,
-            maxPointsPerScan,
-            maxAccumulatedPoints,
-        });
-
         const rosWsUrl = params.get('ros');
         if (rosWsUrl) {
-            viewer.connectRosbridge(rosWsUrl, {
-                topicName,
-                odomTopicName,
-                maxPointsPerScan,
-                maxAccumulatedPoints,
-                autoFitOnFirstChunk: true,
-            });
+            viewer.connectRosbridge(rosWsUrl);
             console.log(`Realtime mode enabled, connecting to rosbridge: ${rosWsUrl}`);
         } else {
-            console.log('Realtime mode enabled. Provide ?ros=ws://host:9090 to auto-connect.');
+            console.log('Realtime mode enabled. Configure topics in the settings panel, or provide ?ros=ws://host:9090 to auto-connect.');
         }
     }
 
