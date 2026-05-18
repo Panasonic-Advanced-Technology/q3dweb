@@ -41,6 +41,12 @@ function cleanupContainers() {
   document.body.innerHTML = '';
 }
 
+function toArrayBuffer(data: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  return copy.buffer as ArrayBuffer;
+}
+
 describe('Viewer construction & errors', () => {
   afterEach(cleanupContainers);
 
@@ -618,7 +624,7 @@ describe('CloudViewer URL loading', () => {
 
   it('loads a remote point cloud through fetch streaming', async () => {
     const data = makeAsciiPCD();
-    (globalThis as any).fetch = vi.fn().mockResolvedValue(new Response(data, {
+    (globalThis as any).fetch = vi.fn().mockResolvedValue(new Response(toArrayBuffer(data), {
       headers: { 'content-length': String(data.byteLength) },
     }));
 
@@ -698,7 +704,7 @@ describe('Viewer streaming - PCD', () => {
           },
         };
       };
-      const f = new File([data], 'foo.pcd');
+      const f = new File([toArrayBuffer(data)], 'foo.pcd');
       await v.loadFile(f);
       expect(v.items.cloud).toBeDefined();
       expect(checkSpy).not.toHaveBeenCalled();
@@ -1007,7 +1013,7 @@ describe('Viewer LAS parsing', () => {
           },
         };
       };
-      const f = new File([data], 'foo.las');
+      const f = new File([toArrayBuffer(data)], 'foo.las');
       await v.loadFile(f);
       expect(v.items.cloud).toBeDefined();
       expect(checkSpy).not.toHaveBeenCalled();
@@ -1027,7 +1033,30 @@ describe('Viewer LAS parsing', () => {
 describe('Viewer measurement & mouse/keyboard events', () => {
   let v: Viewer;
   beforeEach(() => { makeContainer(); v = new Viewer('app'); });
-  afterEach(cleanupContainers);
+  afterEach(() => { vi.useRealTimers(); cleanupContainers(); });
+
+  function makeTouchEvent(type: string, touches: Array<{ x: number; y: number }>): TouchEvent {
+    const event = new Event(type, { bubbles: true, cancelable: true }) as TouchEvent;
+    const touchList = touches.map((point, index) => ({
+      identifier: index,
+      target: v.renderer.domElement,
+      clientX: point.x,
+      clientY: point.y,
+      pageX: point.x,
+      pageY: point.y,
+      screenX: point.x,
+      screenY: point.y,
+    })) as unknown as TouchList;
+    Object.defineProperty(event, 'touches', { value: touchList });
+    Object.defineProperty(event, 'targetTouches', { value: touchList });
+    Object.defineProperty(event, 'changedTouches', { value: touchList });
+    return event;
+  }
+
+  function installTouchViewport(): void {
+    Object.defineProperty(v.container, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(v.container, 'clientHeight', { value: 600, configurable: true });
+  }
 
   it('removeMeasurementPoint with empty list is safe', () => {
     v.removeMeasurementPoint();
@@ -1080,6 +1109,47 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     canvas.dispatchEvent(new MouseEvent('mousemove'));
   });
 
+  it('touch gestures rotate, pan, and pinch zoom', () => {
+    installTouchViewport();
+    const canvas = v.renderer.domElement;
+    expect(canvas.style.touchAction).toBe('none');
+
+    const beforeEuler = [...v.euler];
+    canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }]));
+    canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 140, y: 120 }]));
+    canvas.dispatchEvent(makeTouchEvent('touchend', []));
+    expect(v.euler).not.toEqual(beforeEuler);
+
+    const beforeCenter = v.cameraCenter.clone();
+    const beforeDist = v.cameraDist;
+    canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }, { x: 200, y: 100 }]));
+    canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 120, y: 120 }, { x: 240, y: 120 }]));
+    canvas.dispatchEvent(makeTouchEvent('touchend', []));
+    expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
+    expect(v.cameraDist).toBeLessThan(beforeDist);
+  });
+
+  it('touch long press and two-finger tap drive measurement shortcuts', () => {
+    vi.useFakeTimers();
+    const canvas = v.renderer.domElement;
+    const addSpy = vi.spyOn(v, 'addMeasurementPoint');
+    const removeSpy = vi.spyOn(v, 'removeMeasurementPoint');
+
+    canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 120, y: 120 }]));
+    vi.advanceTimersByTime(600);
+    expect(addSpy).toHaveBeenCalledTimes(1);
+    canvas.dispatchEvent(makeTouchEvent('touchend', []));
+
+    v.selectedPoints = [new THREE.Vector3(1, 2, 3)];
+    canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }, { x: 150, y: 100 }]));
+    canvas.dispatchEvent(makeTouchEvent('touchend', []));
+    expect(removeSpy).toHaveBeenCalledTimes(1);
+    expect(v.selectedPoints).toHaveLength(0);
+
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
+  });
+
   it('keyboard events', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift' }));
@@ -1110,13 +1180,13 @@ describe('Viewer drag and drop & loadFile', () => {
 
   it('loadFile with .pcd reads stream', async () => {
     const data = new TextEncoder().encode('VERSION 0.7\nFIELDS x y z\nSIZE 4 4 4\nTYPE F F F\nCOUNT 1 1 1\nWIDTH 1\nHEIGHT 1\nPOINTS 1\nDATA ascii\n0 0 0\n');
-    const f = new File([data], 'foo.pcd');
+    const f = new File([toArrayBuffer(data)], 'foo.pcd');
     await v.loadFile(f);
   });
 
   it('loadFile append=true does not remove cloud', async () => {
     const data = new TextEncoder().encode('VERSION 0.7\nFIELDS x y z\nSIZE 4 4 4\nTYPE F F F\nCOUNT 1 1 1\nWIDTH 1\nHEIGHT 1\nPOINTS 1\nDATA ascii\n0 0 0\n');
-    const f = new File([data], 'foo.pcd');
+    const f = new File([toArrayBuffer(data)], 'foo.pcd');
     await v.loadFile(f, true);
   });
 });
