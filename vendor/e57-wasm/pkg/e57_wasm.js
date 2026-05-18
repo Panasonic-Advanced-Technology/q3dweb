@@ -19,7 +19,7 @@ export class Points {
         wasm.__wbg_points_free(ptr, 0);
     }
     /**
-     * @returns {Float32Array}
+     * @returns {Uint8Array}
      */
     get colors() {
         const ret = wasm.points_colors(this.__wbg_ptr);
@@ -64,16 +64,44 @@ export class Points {
 if (Symbol.dispose) Points.prototype[Symbol.dispose] = Points.prototype.free;
 
 /**
+ * Parse chunked E57 input without assembling one large JavaScript ArrayBuffer.
+ * @param {Array<any>} chunks
+ * @param {number} max_points
+ * @param {number} source_bytes
+ * @returns {Points}
+ */
+export function parsePointChunksSampled(chunks, max_points, source_bytes) {
+    const ret = wasm.parsePointChunksSampled(chunks, max_points, source_bytes);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return Points.__wrap(ret[0]);
+}
+
+/**
  * Parse the first point cloud of an E57 file.
- * Returns positions (xyz interleaved), colors (rgb 0..1 interleaved) and
- * intensities (0..1 normalized by the library based on the intensity limits).
+ * Returns recentered positions (xyz interleaved), colors (rgb 0..255 interleaved) and
+ * intensities (0..255 normalized by the library based on the intensity limits).
  * @param {Uint8Array} data
  * @returns {Points}
  */
 export function parsePoints(data) {
-    const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.parsePoints(ptr0, len0);
+    const ret = wasm.parsePoints(data);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return Points.__wrap(ret[0]);
+}
+
+/**
+ * Parse the first point cloud of an E57 file with source-size aware sampling.
+ * @param {Uint8Array} data
+ * @param {number} max_points
+ * @param {number} source_bytes
+ * @returns {Points}
+ */
+export function parsePointsSampled(data, max_points, source_bytes) {
+    const ret = wasm.parsePointsSampled(data, max_points, source_bytes);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -89,8 +117,41 @@ function __wbg_get_imports() {
         __wbg___wbindgen_throw_6b64449b9b9ed33c: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
+        __wbg_get_unchecked_17f53dad852b9588: function(arg0, arg1) {
+            const ret = arg0[arg1 >>> 0];
+            return ret;
+        },
+        __wbg_instanceof_Uint8Array_152ba1f289edcf3f: function(arg0) {
+            let result;
+            try {
+                result = arg0 instanceof Uint8Array;
+            } catch (_) {
+                result = false;
+            }
+            const ret = result;
+            return ret;
+        },
+        __wbg_length_3d4ecd04bd8d22f1: function(arg0) {
+            const ret = arg0.length;
+            return ret;
+        },
+        __wbg_length_9f1775224cf1d815: function(arg0) {
+            const ret = arg0.length;
+            return ret;
+        },
+        __wbg_new_from_slice_b5ea43e23f6008c0: function(arg0, arg1) {
+            const ret = new Uint8Array(getArrayU8FromWasm0(arg0, arg1));
+            return ret;
+        },
         __wbg_new_from_slice_b6858b485924da4e: function(arg0, arg1) {
             const ret = new Float32Array(getArrayF32FromWasm0(arg0, arg1));
+            return ret;
+        },
+        __wbg_prototypesetcall_a6b02eb00b0f4ce2: function(arg0, arg1, arg2) {
+            Uint8Array.prototype.set.call(getArrayU8FromWasm0(arg0, arg1), arg2);
+        },
+        __wbg_subarray_f8ca46a25b1f5e0d: function(arg0, arg1, arg2) {
+            const ret = arg0.subarray(arg1 >>> 0, arg2 >>> 0);
             return ret;
         },
         __wbindgen_init_externref_table: function() {
@@ -118,6 +179,11 @@ function getArrayF32FromWasm0(ptr, len) {
     return getFloat32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
 }
 
+function getArrayU8FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
+}
+
 let cachedFloat32ArrayMemory0 = null;
 function getFloat32ArrayMemory0() {
     if (cachedFloat32ArrayMemory0 === null || cachedFloat32ArrayMemory0.byteLength === 0) {
@@ -139,13 +205,6 @@ function getUint8ArrayMemory0() {
     return cachedUint8ArrayMemory0;
 }
 
-function passArray8ToWasm0(arg, malloc) {
-    const ptr = malloc(arg.length * 1, 1) >>> 0;
-    getUint8ArrayMemory0().set(arg, ptr / 1);
-    WASM_VECTOR_LEN = arg.length;
-    return ptr;
-}
-
 function takeFromExternrefTable0(idx) {
     const value = wasm.__wbindgen_externrefs.get(idx);
     wasm.__externref_table_dealloc(idx);
@@ -165,8 +224,6 @@ function decodeText(ptr, len) {
     }
     return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
-
-let WASM_VECTOR_LEN = 0;
 
 let wasmModule, wasm;
 function __wbg_finalize_init(instance, module) {

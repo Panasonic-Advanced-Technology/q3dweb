@@ -30,7 +30,11 @@ export function detectFormat(filename?: string): FormatType {
 }
 
 export function shouldDeferInitialMemoryCheck(format: string): boolean {
-    return format === 'pcd' || format === 'las' || format === 'ply';
+    return format === 'pcd' || format === 'las' || format === 'ply' || format === 'laz' || format === 'e57';
+}
+
+export function shouldUseSingleBufferParser(format: string): boolean {
+    return format === 'laz';
 }
 
 export function estimateVisiblePointBufferBytes(pointCount: number, hasRGB: boolean): number {
@@ -188,8 +192,8 @@ export function processChunk(v: any, chunkData: Uint8Array, _offset: number): vo
             return;
         }
         if (v.currentFormat !== 'pcd') {
-            const copy = new Uint8Array(chunkData.byteLength); copy.set(chunkData);
-            v.chunkList.push(copy); v.fullBufferWriteOffset += chunkData.byteLength;
+            const chunk = v.currentFormat === 'e57' ? chunkData : new Uint8Array(chunkData);
+            v.chunkList.push(chunk); v.fullBufferWriteOffset += chunkData.byteLength;
             if (v.loadingOverlay) v.loadingOverlay.innerHTML = pHtml(progress);
             return;
         }
@@ -304,7 +308,16 @@ export function finalizeStream(v: any): void {
             if (result.values.length > 0) normalizeIntensity(result.values as Float32Array);
             v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
             v.plyStream = null; v.leftoverChunk = null;
-        } else if ((v.currentFormat === 'laz' || v.currentFormat === 'e57') || v.currentFormat === 'ply') {
+        } else if (v.currentFormat === 'e57') {
+            const chunks = v.chunkList;
+            if (chunks.length === 0) throw new Error('Empty E57 stream');
+            console.log(`E57 chunked bytes: ${v.streamTotalSize || v.fullBufferWriteOffset}`);
+            v.chunkList = []; v.fullBuffer = null;
+            void parseE57(chunks, v.MAX_POINTS_VISUAL, v.streamTotalSize || v.fullBufferWriteOffset).then((r) => {
+                v.pointsLoaded = r.values.length;
+                v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
+            }).catch(onErr);
+        } else if (v.currentFormat === 'laz' || v.currentFormat === 'ply') {
             const assembled = assembleChunkList(v);
             if (assembled.byteLength === 0) throw new Error(`Empty ${v.currentFormat.toUpperCase()} stream`);
             console.log(`${v.currentFormat.toUpperCase()} assembled bytes: ${assembled.byteLength}`);
@@ -371,6 +384,26 @@ export async function loadFile(v: any, file: File, append: boolean = false): Pro
     try {
         if (!append) v.removeItem('cloud');
         startStream(v, file.size, file.name);
+        if (shouldUseSingleBufferParser(fmt)) {
+            const content = new Uint8Array(await file.arrayBuffer());
+            v.streamLoadedSize = file.size;
+            if (v.loadingOverlay) {
+                v.loadingOverlay.style.display = 'flex';
+                v.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Downsampling...</div>';
+            }
+            if (fmt === 'laz') {
+                const result = await parseLAZ(content, v.MAX_POINTS_VISUAL, file.size);
+                v.pointsLoaded = result.values.length;
+                v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
+                if (result.originLatLon && result.bounds) addLASOverlay(v, result.originLatLon, result.bounds);
+            } else {
+                const result = await parseE57(content, v.MAX_POINTS_VISUAL, file.size);
+                v.pointsLoaded = result.values.length;
+                v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
+            }
+            v.chunkList = []; v.fullBuffer = null;
+            return;
+        }
         // @ts-ignore
         const reader = file.stream().getReader();
         while (true) {

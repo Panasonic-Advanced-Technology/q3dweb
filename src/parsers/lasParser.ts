@@ -40,6 +40,44 @@ export interface ParsedLAS extends ParsedCloud {
     bounds: LASBounds | null;
 }
 
+type LASPointRecordMeta = Pick<LASMetadata,
+    'xScale' | 'yScale' | 'zScale' | 'xOff' | 'yOff' | 'zOff' |
+    'shiftX' | 'shiftY' | 'hasRGB' | 'rgbOffset'
+>;
+
+function appendLASPointRecord(
+    view: DataView,
+    recordStart: number,
+    meta: LASPointRecordMeta,
+    positions: Float32Array,
+    intensities: Float32Array,
+    rgbColors: Uint8Array | null,
+    outputIndex: number,
+): void {
+    const rawX = view.getInt32(recordStart, true);
+    const rawY = view.getInt32(recordStart + 4, true);
+    const rawZ = view.getInt32(recordStart + 8, true);
+    const base = outputIndex * 3;
+    positions[base]     = rawX * meta.xScale + meta.xOff - meta.shiftX;
+    positions[base + 1] = rawY * meta.yScale + meta.yOff - meta.shiftY;
+    positions[base + 2] = rawZ * meta.zScale + meta.zOff;
+    intensities[outputIndex] = view.getUint16(recordStart + 12, true);
+
+    if (rgbColors && meta.hasRGB && meta.rgbOffset !== -1) {
+        let redValue = view.getUint16(recordStart + meta.rgbOffset, true);
+        let greenValue = view.getUint16(recordStart + meta.rgbOffset + 2, true);
+        let blueValue = view.getUint16(recordStart + meta.rgbOffset + 4, true);
+        if (redValue > 255 || greenValue > 255 || blueValue > 255) {
+            redValue = Math.floor(redValue / 256);
+            greenValue = Math.floor(greenValue / 256);
+            blueValue = Math.floor(blueValue / 256);
+        }
+        rgbColors[base] = redValue;
+        rgbColors[base + 1] = greenValue;
+        rgbColors[base + 2] = blueValue;
+    }
+}
+
 /** Normalize raw integer intensities to 0-255, matching q3dviewer behaviour. */
 export function normalizeIntensity(values: Float32Array): void {
     let maxIntensity = 0;
@@ -145,22 +183,7 @@ export function parseLAS(data: Uint8Array, maxPoints: number, sourceBytes: numbe
         const recordStart = meta.offsetToPointData + i * meta.pointDataRecordLength;
         if (recordStart + meta.pointDataRecordLength > data.byteLength) break;
 
-        const rawX = view.getInt32(recordStart,     true);
-        const rawY = view.getInt32(recordStart + 4, true);
-        const rawZ = view.getInt32(recordStart + 8, true);
-        const base = parsedPoints * 3;
-        positions[base]     = rawX * meta.xScale + meta.xOff - meta.shiftX;
-        positions[base + 1] = rawY * meta.yScale + meta.yOff - meta.shiftY;
-        positions[base + 2] = rawZ * meta.zScale + meta.zOff;
-        intensities[parsedPoints] = view.getUint16(recordStart + 12, true);
-
-        if (rgbColors && meta.rgbOffset !== -1) {
-            let r = view.getUint16(recordStart + meta.rgbOffset,     true);
-            let g = view.getUint16(recordStart + meta.rgbOffset + 2, true);
-            let b = view.getUint16(recordStart + meta.rgbOffset + 4, true);
-            if (r > 255 || g > 255 || b > 255) { r = Math.floor(r / 256); g = Math.floor(g / 256); b = Math.floor(b / 256); }
-            rgbColors[base] = r; rgbColors[base + 1] = g; rgbColors[base + 2] = b;
-        }
+        appendLASPointRecord(view, recordStart, meta, positions, intensities, rgbColors, parsedPoints);
         parsedPoints++;
     }
 
@@ -174,7 +197,7 @@ export function parseLAS(data: Uint8Array, maxPoints: number, sourceBytes: numbe
     };
 }
 
-/** Decompress a LAZ file via laz-perf WASM, then reuse parseLAS. */
+/** Decompress a LAZ file via laz-perf WASM while storing only sampled points. */
 export async function parseLAZ(data: Uint8Array, maxPoints: number, sourceBytes: number = data.byteLength): Promise<ParsedLAS> {
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
@@ -194,26 +217,48 @@ export async function parseLAZ(data: Uint8Array, maxPoints: number, sourceBytes:
     LazPerf.HEAPU8.set(data, dataPtr);
     try {
         laszip.open(dataPtr, data.byteLength);
-        const count    = laszip.getCount();
-        const pointLen = laszip.getPointLength();
+        const count    = Number(laszip.getCount());
+        const pointLen = Number(laszip.getPointLength());
         console.log(`LAZ: ${count} points, pointLen=${pointLen}, fmt=${laszip.getPointFormat()}`);
 
-        const synthetic = new Uint8Array(offsetToPointData + count * pointLen);
-        synthetic.set(data.subarray(0, offsetToPointData), 0);
-        synthetic[104] = uncompressedFormat;
-        new DataView(synthetic.buffer).setUint16(105, pointLen, true);
+        const metadataBytes = new Uint8Array(data.subarray(0, offsetToPointData));
+        metadataBytes[104] = uncompressedFormat;
+        new DataView(metadataBytes.buffer).setUint16(105, pointLen, true);
+        const meta = { ...parseLASMetadata(metadataBytes), numberOfPoints: count, pointDataRecordLength: pointLen };
+        const sampleRatio = computePointSampleRatio(count, maxPoints, sourceBytes);
+        const estimatedVisPoints = estimateSampledPointCount(count, sampleRatio, maxPoints);
+
+        const positions    = new Float32Array(estimatedVisPoints * 3);
+        const intensities  = new Float32Array(estimatedVisPoints);
+        const rgbColors    = meta.hasRGB && meta.rgbOffset !== -1 ? new Uint8Array(estimatedVisPoints * 3) : null;
 
         const pointPtr = LazPerf._malloc(pointLen);
         try {
-            let writeOff = offsetToPointData;
-            for (let i = 0; i < count; i++) {
+            let pointBuffer = LazPerf.HEAPU8.buffer;
+            let pointView = new DataView(pointBuffer, pointPtr, pointLen);
+            let parsedPoints = 0;
+            for (let rawPointIndex = 0; rawPointIndex < count; rawPointIndex++) {
                 laszip.getPoint(pointPtr);
-                synthetic.set(LazPerf.HEAPU8.subarray(pointPtr, pointPtr + pointLen), writeOff);
-                writeOff += pointLen;
+                if (pointBuffer !== LazPerf.HEAPU8.buffer) {
+                    pointBuffer = LazPerf.HEAPU8.buffer;
+                    pointView = new DataView(pointBuffer, pointPtr, pointLen);
+                }
+                if (rawPointIndex % sampleRatio !== 0) continue;
+                if (parsedPoints >= estimatedVisPoints) break;
+                appendLASPointRecord(pointView, 0, meta, positions, intensities, rgbColors, parsedPoints);
+                parsedPoints++;
             }
-        } finally { LazPerf._free(pointPtr); }
 
-        return parseLAS(synthetic, maxPoints, sourceBytes);
+            normalizeIntensity(intensities.subarray(0, parsedPoints));
+            console.log(`LAZ: loaded ${parsedPoints}/${count} pts (ratio 1:${sampleRatio})`);
+            return {
+                positions: positions.subarray(0, parsedPoints * 3),
+                values:    intensities.subarray(0, parsedPoints),
+                rgb:       rgbColors ? rgbColors.subarray(0, parsedPoints * 3) : undefined,
+                originLatLon: meta.originLatLon,
+                bounds:       meta.bounds,
+            };
+        } finally { LazPerf._free(pointPtr); }
     } finally {
         try { laszip.delete(); } catch { /* ignore */ }
         LazPerf._free(dataPtr);
