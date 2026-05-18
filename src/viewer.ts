@@ -41,6 +41,9 @@ export class Viewer {
     ctrlPressed: boolean = false;
     centerPointMesh: THREE.Points | null = null;
     settingsPanel: HTMLElement | null = null;
+    settingsPanelMinimized: boolean = false;
+    settingsPanelTitle: HTMLElement | null = null;
+    settingsPanelToggleButton: HTMLButtonElement | null = null;
     settingsContent: HTMLElement | null = null;
     settingsItemSelect: HTMLSelectElement | null = null;
     statusElement: HTMLElement | null = null;
@@ -53,11 +56,13 @@ export class Viewer {
     colorStr: string = 'black';
 
     rendererPixelRatio: number = 1;
+    isTouchPrimaryDevice: boolean = false;
 
     constructor(containerId: string) {
         const container = document.getElementById(containerId);
         if (!container) throw new Error(`Container ${containerId} not found`);
         this.container = container;
+        this.isTouchPrimaryDevice = this.detectTouchPrimaryDevice();
         this.loadingOverlay = document.createElement('div');
         this.loadingOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;justify-content:center;align-items:center;z-index:1001;';
         this.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Loading...</div>';
@@ -153,17 +158,33 @@ export class Viewer {
     translateCam(trans: THREE.Vector3) { this.cameraCenter.add(trans); this.updateCamera(); }
     updateDist(delta: number) { this.cameraDist = Math.max(0.1, this.cameraDist + delta); this.updateCamera(); }
     updateMovement() { updateCameraMovement(this as any); }
-    addMeasurementPoint(e: MouseEvent) { _addMeasure(e, this as any); }
-    removeMeasurementPoint() { _removeMeasure(this as any); }
+    addMeasurementPoint(e: MouseEvent) { if (!this.isTouchPrimaryDevice) _addMeasure(e, this as any); }
+    removeMeasurementPoint() { if (!this.isTouchPrimaryDevice) _removeMeasure(this as any); }
     updateMeasurementMarker() { _updateMeasureMarker(this as any); }
 
     createSettingsPanel() {
         const panel = document.createElement('div');
         panel.style.cssText = 'position:absolute;top:10px;left:10px;background:rgba(20,20,20,0.92);color:#eee;padding:12px;border-radius:8px;font-family:monospace;font-size:12px;z-index:1100;width:260px;display:block;max-height:calc(100% - 20px);overflow-y:auto;border:1px solid #555;';
+        panel.setAttribute('data-minimized', 'false');
         const title = document.createElement('div');
-        title.style.cssText = 'font-size:14px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #555;padding-bottom:4px;';
-        title.textContent = 'Settings (M to toggle)';
+        title.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:14px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #555;padding-bottom:4px;';
+        title.setAttribute('data-role', 'settings-panel-header');
+        const toggleButton = document.createElement('button');
+        toggleButton.type = 'button';
+        toggleButton.textContent = '-';
+        toggleButton.title = 'Minimize menu';
+        toggleButton.setAttribute('aria-label', 'Minimize menu');
+        toggleButton.setAttribute('data-role', 'settings-minimize-button');
+        toggleButton.style.cssText = 'flex:0 0 30px;width:30px;height:30px;line-height:26px;background:#333;color:#eee;border:1px solid #666;border-radius:4px;cursor:pointer;font-size:18px;font-family:monospace;padding:0;touch-action:manipulation;';
+        toggleButton.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSettingsPanel(); });
+        const titleText = document.createElement('span');
+        titleText.textContent = 'Settings';
+        titleText.setAttribute('data-role', 'settings-panel-title');
+        title.appendChild(toggleButton);
+        title.appendChild(titleText);
         panel.appendChild(title);
+        this.settingsPanelTitle = titleText;
+        this.settingsPanelToggleButton = toggleButton;
         const select = document.createElement('select');
         select.style.cssText = 'width:100%;margin-bottom:8px;background:#333;color:#eee;border:1px solid #666;padding:4px;border-radius:3px;';
         select.setAttribute('data-role', 'settings-item-select');
@@ -180,10 +201,37 @@ export class Viewer {
     }
 
     toggleSettingsPanel() {
-        if (!this.settingsPanel) return;
-        const visible = this.settingsPanel.style.display !== 'none';
-        this.settingsPanel.style.display = visible ? 'none' : 'block';
-        if (!visible) this.onSettingsItemSelected(this.settingsItemSelect?.value ?? '__main_win__');
+        this.setSettingsPanelMinimized(!this.settingsPanelMinimized);
+        if (!this.settingsPanelMinimized) this.onSettingsItemSelected(this.settingsItemSelect?.value ?? '__main_win__');
+    }
+
+    private setSettingsPanelMinimized(minimized: boolean): void {
+        if (!this.settingsPanel || !this.settingsPanelToggleButton) return;
+        this.settingsPanelMinimized = minimized;
+        this.settingsPanel.setAttribute('data-minimized', minimized ? 'true' : 'false');
+        for (let i = 1; i < this.settingsPanel.children.length; i++) {
+            (this.settingsPanel.children[i] as HTMLElement).style.display = minimized ? 'none' : '';
+        }
+        this.settingsPanel.style.width = minimized ? '40px' : '260px';
+        this.settingsPanel.style.height = minimized ? '40px' : '';
+        this.settingsPanel.style.padding = minimized ? '0' : '12px';
+        this.settingsPanel.style.maxHeight = minimized ? '40px' : 'calc(100% - 20px)';
+        this.settingsPanel.style.overflow = minimized ? 'hidden' : 'auto';
+        this.settingsPanel.style.background = minimized ? 'transparent' : 'rgba(20,20,20,0.92)';
+        this.settingsPanel.style.border = minimized ? '0' : '1px solid #555';
+        const header = this.settingsPanel.children[0] as HTMLElement;
+        header.style.justifyContent = minimized ? 'center' : '';
+        header.style.marginBottom = minimized ? '0' : '8px';
+        header.style.borderBottom = minimized ? '0' : '1px solid #555';
+        header.style.paddingBottom = minimized ? '0' : '4px';
+        if (this.settingsPanelTitle) this.settingsPanelTitle.style.display = minimized ? 'none' : '';
+        this.settingsPanelToggleButton.textContent = minimized ? '+' : '-';
+        this.settingsPanelToggleButton.title = minimized ? 'Expand menu' : 'Minimize menu';
+        this.settingsPanelToggleButton.setAttribute('aria-label', this.settingsPanelToggleButton.title);
+        this.settingsPanelToggleButton.style.width = minimized ? '40px' : '30px';
+        this.settingsPanelToggleButton.style.height = minimized ? '40px' : '30px';
+        this.settingsPanelToggleButton.style.lineHeight = minimized ? '36px' : '26px';
+        this.settingsPanelToggleButton.style.border = minimized ? '0' : '1px solid #666';
     }
 
     refreshSettingsItemList(preferredSelection?: string) {
@@ -201,7 +249,7 @@ export class Viewer {
         const desired = preferredSelection ?? prev;
         const exists = desired && Array.from(this.settingsItemSelect.options).some(o => o.value === desired);
         this.settingsItemSelect.value = exists ? desired! : '__main_win__';
-        if (this.settingsPanel?.style.display !== 'none')
+        if (!this.settingsPanelMinimized)
             this.onSettingsItemSelected(this.settingsItemSelect.value);
     }
 
@@ -228,6 +276,13 @@ export class Viewer {
     }
 
     getBaseRendererPixelRatio(): number { return Math.max(window.devicePixelRatio || 1, 1); }
+    private detectTouchPrimaryDevice(): boolean {
+        const touchPoints = navigator.maxTouchPoints ?? 0;
+        if (touchPoints <= 0) return false;
+        const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches === true;
+        const noHover = window.matchMedia?.('(hover: none)').matches === true;
+        return coarsePointer || noHover;
+    }
     private getCloudViewportHeight(): number { return Math.max(this.container.clientHeight * this.rendererPixelRatio, 1); }
     protected syncCloudItemViewport(item: THREE.Object3D) { if (item instanceof CloudItem) item.updateViewport(this.getCloudViewportHeight()); }
     protected syncAllCloudItemViewports() { Object.values(this.items).forEach(i => this.syncCloudItemViewport(i)); }

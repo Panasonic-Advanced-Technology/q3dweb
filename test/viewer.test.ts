@@ -157,12 +157,37 @@ describe('Viewer settings panel', () => {
   beforeEach(() => { makeContainer(); v = new Viewer('app'); });
   afterEach(cleanupContainers);
 
-  it('toggleSettingsPanel hides and shows', () => {
+  it('toggleSettingsPanel minimizes and expands', () => {
     expect(v.settingsPanel?.style.display).toBe('block');
-    v.toggleSettingsPanel();
-    expect(v.settingsPanel?.style.display).toBe('none');
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
     v.toggleSettingsPanel();
     expect(v.settingsPanel?.style.display).toBe('block');
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('true');
+    expect(v.settingsPanel?.style.width).toBe('40px');
+    expect(v.settingsPanel?.style.padding).toBe('0px');
+    expect(v.settingsPanel?.style.background).toBe('transparent');
+    expect(v.settingsPanel?.style.border).toBe('0px');
+    expect(v.settingsItemSelect?.style.display).toBe('none');
+    v.toggleSettingsPanel();
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
+    expect(v.settingsPanel?.style.display).toBe('block');
+    expect(v.settingsPanel?.style.width).toBe('260px');
+    expect(v.settingsPanel?.style.background).toBe('rgba(20, 20, 20, 0.92)');
+    expect(v.settingsPanel?.style.border).toBe('1px solid rgb(85, 85, 85)');
+    expect(v.settingsItemSelect?.style.display).not.toBe('none');
+  });
+
+  it('settings minimize button toggles the panel', () => {
+    const button = v.settingsPanel!.querySelector('[data-role="settings-minimize-button"]') as HTMLButtonElement;
+    expect(button).toBeDefined();
+    button.click();
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('true');
+    expect(button.textContent).toBe('+');
+    expect(button.style.border).toBe('0px');
+    button.click();
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
+    expect(button.textContent).toBe('-');
+    expect(button.style.border).toBe('1px solid rgb(102, 102, 102)');
   });
 
   it('refreshSettingsItemList preserves preferred selection', () => {
@@ -1053,6 +1078,15 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     return event;
   }
 
+  function makePointerEvent(type: string, pointerId: number, x: number, y: number): PointerEvent {
+    const event = new Event(type, { bubbles: true, cancelable: true }) as PointerEvent;
+    Object.defineProperty(event, 'pointerId', { value: pointerId });
+    Object.defineProperty(event, 'pointerType', { value: 'touch' });
+    Object.defineProperty(event, 'clientX', { value: x });
+    Object.defineProperty(event, 'clientY', { value: y });
+    return event;
+  }
+
   function installTouchViewport(): void {
     Object.defineProperty(v.container, 'clientWidth', { value: 800, configurable: true });
     Object.defineProperty(v.container, 'clientHeight', { value: 600, configurable: true });
@@ -1110,44 +1144,109 @@ describe('Viewer measurement & mouse/keyboard events', () => {
   });
 
   it('touch gestures rotate, pan, and pinch zoom', () => {
-    installTouchViewport();
-    const canvas = v.renderer.domElement;
-    expect(canvas.style.touchAction).toBe('none');
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      delete (window as any).PointerEvent;
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+      expect(canvas.style.touchAction).toBe('none');
 
-    const beforeEuler = [...v.euler];
-    canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }]));
-    canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 140, y: 120 }]));
-    canvas.dispatchEvent(makeTouchEvent('touchend', []));
-    expect(v.euler).not.toEqual(beforeEuler);
+      const beforeEuler = [...v.euler];
+      canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 140, y: 120 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchend', []));
+      expect(v.euler).not.toEqual(beforeEuler);
 
-    const beforeCenter = v.cameraCenter.clone();
-    const beforeDist = v.cameraDist;
-    canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }, { x: 200, y: 100 }]));
-    canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 120, y: 120 }, { x: 240, y: 120 }]));
-    canvas.dispatchEvent(makeTouchEvent('touchend', []));
-    expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
-    expect(v.cameraDist).toBeLessThan(beforeDist);
+      const beforeCenter = v.cameraCenter.clone();
+      const beforeDist = v.cameraDist;
+      canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }, { x: 200, y: 100 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 120, y: 120 }, { x: 240, y: 120 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchend', []));
+      expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
+      expect(v.cameraDist).toBeLessThan(beforeDist);
+    } finally {
+      if (originalPointerEvent !== undefined) (window as any).PointerEvent = originalPointerEvent;
+    }
   });
 
-  it('touch long press and two-finger tap drive measurement shortcuts', () => {
-    vi.useFakeTimers();
+  it('pointer touch gestures rotate, pan, and pinch zoom', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+
+      const canvas = v.renderer.domElement;
+      const beforeEuler = [...v.euler];
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 140, 120));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 140, 120));
+      expect(v.euler).not.toEqual(beforeEuler);
+
+      const beforeCenter = v.cameraCenter.clone();
+      const beforeDist = v.cameraDist;
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 200, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 120, 120));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 240, 120));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 120, 120));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 240, 120));
+      expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
+      expect(v.cameraDist).toBeLessThan(beforeDist);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('touch input does not drive measurement shortcuts', () => {
     const canvas = v.renderer.domElement;
     const addSpy = vi.spyOn(v, 'addMeasurementPoint');
     const removeSpy = vi.spyOn(v, 'removeMeasurementPoint');
 
     canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 120, y: 120 }]));
-    vi.advanceTimersByTime(600);
-    expect(addSpy).toHaveBeenCalledTimes(1);
     canvas.dispatchEvent(makeTouchEvent('touchend', []));
+    expect(addSpy).not.toHaveBeenCalled();
 
-    v.selectedPoints = [new THREE.Vector3(1, 2, 3)];
     canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }, { x: 150, y: 100 }]));
     canvas.dispatchEvent(makeTouchEvent('touchend', []));
-    expect(removeSpy).toHaveBeenCalledTimes(1);
-    expect(v.selectedPoints).toHaveLength(0);
+    expect(removeSpy).not.toHaveBeenCalled();
 
     addSpy.mockRestore();
     removeSpy.mockRestore();
+  });
+
+  it('primary touch devices disable measurement APIs', () => {
+    const originalMatchMedia = window.matchMedia;
+    const originalMaxTouchPoints = navigator.maxTouchPoints;
+    try {
+      cleanupContainers();
+      Object.defineProperty(navigator, 'maxTouchPoints', { value: 5, configurable: true });
+      (window as any).matchMedia = vi.fn((query: string) => ({
+        matches: query.includes('pointer: coarse') || query.includes('hover: none'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+      makeContainer();
+      v = new Viewer('app');
+      expect(v.isTouchPrimaryDevice).toBe(true);
+      v.selectedPoints = [new THREE.Vector3(1, 2, 3)];
+      v.removeMeasurementPoint();
+      expect(v.selectedPoints).toHaveLength(1);
+    } finally {
+      window.matchMedia = originalMatchMedia;
+      Object.defineProperty(navigator, 'maxTouchPoints', { value: originalMaxTouchPoints, configurable: true });
+    }
   });
 
   it('keyboard events', () => {

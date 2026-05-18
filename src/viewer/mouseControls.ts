@@ -38,18 +38,12 @@ interface TouchPoint { x: number; y: number; }
 interface TouchGestureState {
     mode: 'none' | 'single' | 'multi';
     lastPoint: TouchPoint | null;
-    startCenter: TouchPoint | null;
     lastCenter: TouchPoint | null;
     lastDistance: number;
-    moved: boolean;
-    longPressTimer: number | null;
-    longPressTriggered: boolean;
 }
 
 const TOUCH_ROTATE_SPEED = 0.2 * Math.PI / 180;
 const TOUCH_PINCH_ZOOM_SPEED = 0.005;
-const TOUCH_LONG_PRESS_MS = 550;
-const TOUCH_MOVE_CANCEL_PX = 12;
 
 function isEditable(t: EventTarget | null): boolean {
     if (!t) return false;
@@ -72,22 +66,6 @@ function getTouchPoint(touch: Touch): TouchPoint {
     return { x: touch.clientX, y: touch.clientY };
 }
 
-function getTouchCenter(touches: TouchList): TouchPoint {
-    const a = touches[0];
-    const b = touches[1];
-    return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
-}
-
-function getTouchDistance(touches: TouchList): number {
-    const a = touches[0];
-    const b = touches[1];
-    return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-}
-
-function distance(a: TouchPoint, b: TouchPoint): number {
-    return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
 function translateFromScreenDelta(ctx: InputContext, dx: number, dy: number): void {
     const Rwc = eulerToMatrix4(ctx.euler[0], ctx.euler[1], ctx.euler[2]);
     const Kinv = getCameraK(ctx).clone().invert();
@@ -97,51 +75,85 @@ function translateFromScreenDelta(ctx: InputContext, dx: number, dy: number): vo
     ctx.translateCam(sv);
 }
 
-function createTouchMouseEvent(point: TouchPoint): MouseEvent {
-    return new MouseEvent('mousedown', {
-        clientX: point.x,
-        clientY: point.y,
-        button: 0,
-        bubbles: true,
-        cancelable: true,
-    });
+function centerOfPoints(points: TouchPoint[]): TouchPoint {
+    return { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 };
+}
+
+function distanceBetweenPoints(points: TouchPoint[]): number {
+    return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+}
+
+function isTouchLikePointer(e: PointerEvent): boolean {
+    return e.pointerType === 'touch' || e.pointerType === 'pen';
 }
 
 export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void {
     const touchState: TouchGestureState = {
         mode: 'none',
         lastPoint: null,
-        startCenter: null,
         lastCenter: null,
         lastDistance: 0,
-        moved: false,
-        longPressTimer: null,
-        longPressTriggered: false,
     };
+    const activeTouchPointers = new Map<number, TouchPoint>();
 
-    const clearLongPress = () => {
-        if (touchState.longPressTimer !== null) window.clearTimeout(touchState.longPressTimer);
-        touchState.longPressTimer = null;
-    };
-
-    const resetTouchState = () => {
-        clearLongPress();
+    const resetTouchState = (): void => {
         touchState.mode = 'none';
         touchState.lastPoint = null;
-        touchState.startCenter = null;
         touchState.lastCenter = null;
         touchState.lastDistance = 0;
-        touchState.moved = false;
-        touchState.longPressTriggered = false;
     };
 
-    const startLongPress = (point: TouchPoint) => {
-        clearLongPress();
-        touchState.longPressTimer = window.setTimeout(() => {
-            touchState.longPressTriggered = true;
-            ctx.addMeasurementPoint(createTouchMouseEvent(point));
+    const startTouchGesture = (points: TouchPoint[]): void => {
+        if (points.length === 1) {
+            touchState.mode = 'single';
+            touchState.lastPoint = points[0];
+            touchState.lastCenter = null;
+            touchState.lastDistance = 0;
+            return;
+        }
+        if (points.length >= 2) {
+            touchState.mode = 'multi';
+            touchState.lastPoint = null;
+            touchState.lastCenter = centerOfPoints(points);
+            touchState.lastDistance = distanceBetweenPoints(points);
+        }
+    };
+
+    const moveTouchGesture = (points: TouchPoint[]): void => {
+        if (points.length === 1 && touchState.mode === 'single' && touchState.lastPoint) {
+            const point = points[0];
+            const dx = point.x - touchState.lastPoint.x;
+            const dy = point.y - touchState.lastPoint.y;
+            touchState.lastPoint = point;
+            ctx.rotateCam(-dy * TOUCH_ROTATE_SPEED, 0, -dx * TOUCH_ROTATE_SPEED);
+            ctx.showCenter = true;
             ctx.requestRender();
-        }, TOUCH_LONG_PRESS_MS);
+            return;
+        }
+
+        if (points.length >= 2) {
+            const center = centerOfPoints(points);
+            const pinchDistance = distanceBetweenPoints(points);
+            if (touchState.mode !== 'multi' || !touchState.lastCenter) {
+                startTouchGesture(points);
+                return;
+            }
+
+            const dx = center.x - touchState.lastCenter.x;
+            const dy = center.y - touchState.lastCenter.y;
+            const pinchDelta = pinchDistance - touchState.lastDistance;
+            if (dx !== 0 || dy !== 0) translateFromScreenDelta(ctx, dx, dy);
+            if (pinchDelta !== 0) ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
+            touchState.lastCenter = center;
+            touchState.lastDistance = pinchDistance;
+            ctx.showCenter = true;
+            ctx.requestRender();
+        }
+    };
+
+    const remainingTouchGesture = (points: TouchPoint[]): void => {
+        if (points.length === 0) resetTouchState();
+        else startTouchGesture(points);
     };
 
     canvas.style.touchAction = 'none';
@@ -157,109 +169,57 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
         (canvas as HTMLElement & { focus?: () => void }).focus?.();
     });
 
-    canvas.addEventListener('touchstart', (e: TouchEvent) => {
-        if (e.touches.length === 0) return;
-        e.preventDefault();
-        (canvas as HTMLElement & { focus?: () => void }).focus?.();
-        ctx.mousePos = null;
-        ctx.mouseButton = -1;
+    if ('PointerEvent' in window) {
+        canvas.addEventListener('pointerdown', (e: PointerEvent) => {
+            if (!isTouchLikePointer(e)) return;
+            e.preventDefault();
+            (canvas as HTMLElement & { focus?: () => void }).focus?.();
+            (canvas as HTMLElement & { setPointerCapture?: (pointerId: number) => void }).setPointerCapture?.(e.pointerId);
+            activeTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            ctx.mousePos = null;
+            ctx.mouseButton = -1;
+            startTouchGesture(Array.from(activeTouchPointers.values()));
+        }, { passive: false });
 
-        if (e.touches.length === 1) {
-            const point = getTouchPoint(e.touches[0]);
-            touchState.mode = 'single';
-            touchState.lastPoint = point;
-            touchState.startCenter = point;
-            touchState.lastCenter = null;
-            touchState.lastDistance = 0;
-            touchState.moved = false;
-            touchState.longPressTriggered = false;
-            startLongPress(point);
-            return;
-        }
+        canvas.addEventListener('pointermove', (e: PointerEvent) => {
+            if (!isTouchLikePointer(e) || !activeTouchPointers.has(e.pointerId)) return;
+            e.preventDefault();
+            activeTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            moveTouchGesture(Array.from(activeTouchPointers.values()));
+        }, { passive: false });
 
-        clearLongPress();
-        touchState.mode = 'multi';
-        touchState.lastPoint = null;
-        touchState.startCenter = getTouchCenter(e.touches);
-        touchState.lastCenter = touchState.startCenter;
-        touchState.lastDistance = getTouchDistance(e.touches);
-        touchState.moved = false;
-        touchState.longPressTriggered = false;
-    }, { passive: false });
+        const endPointer = (e: PointerEvent) => {
+            if (!isTouchLikePointer(e) || !activeTouchPointers.has(e.pointerId)) return;
+            e.preventDefault();
+            activeTouchPointers.delete(e.pointerId);
+            remainingTouchGesture(Array.from(activeTouchPointers.values()));
+        };
+        canvas.addEventListener('pointerup', endPointer, { passive: false });
+        canvas.addEventListener('pointercancel', endPointer, { passive: false });
+        canvas.addEventListener('lostpointercapture', endPointer, { passive: false });
+    } else {
+        canvas.addEventListener('touchstart', (e: TouchEvent) => {
+            if (e.touches.length === 0) return;
+            e.preventDefault();
+            (canvas as HTMLElement & { focus?: () => void }).focus?.();
+            ctx.mousePos = null;
+            ctx.mouseButton = -1;
+            startTouchGesture(Array.from(e.touches, getTouchPoint));
+        }, { passive: false });
 
-    canvas.addEventListener('touchmove', (e: TouchEvent) => {
-        if (e.touches.length === 0) return;
-        e.preventDefault();
+        canvas.addEventListener('touchmove', (e: TouchEvent) => {
+            if (e.touches.length === 0) return;
+            e.preventDefault();
+            moveTouchGesture(Array.from(e.touches, getTouchPoint));
+        }, { passive: false });
 
-        if (e.touches.length === 1 && touchState.mode === 'single' && touchState.lastPoint) {
-            const point = getTouchPoint(e.touches[0]);
-            const dx = point.x - touchState.lastPoint.x;
-            const dy = point.y - touchState.lastPoint.y;
-            if (touchState.startCenter && distance(touchState.startCenter, point) > TOUCH_MOVE_CANCEL_PX) {
-                touchState.moved = true;
-                clearLongPress();
-            }
-            touchState.lastPoint = point;
-            if (!touchState.longPressTriggered) {
-                ctx.rotateCam(-dy * TOUCH_ROTATE_SPEED, 0, -dx * TOUCH_ROTATE_SPEED);
-                ctx.showCenter = true;
-                ctx.requestRender();
-            }
-            return;
-        }
+        canvas.addEventListener('touchend', (e: TouchEvent) => {
+            e.preventDefault();
+            remainingTouchGesture(Array.from(e.touches, getTouchPoint));
+        }, { passive: false });
 
-        if (e.touches.length >= 2) {
-            clearLongPress();
-            const center = getTouchCenter(e.touches);
-            const pinchDistance = getTouchDistance(e.touches);
-            if (touchState.mode !== 'multi' || !touchState.lastCenter) {
-                touchState.mode = 'multi';
-                touchState.startCenter = center;
-                touchState.lastCenter = center;
-                touchState.lastDistance = pinchDistance;
-                touchState.moved = false;
-                return;
-            }
-
-            const dx = center.x - touchState.lastCenter.x;
-            const dy = center.y - touchState.lastCenter.y;
-            const pinchDelta = pinchDistance - touchState.lastDistance;
-            if (touchState.startCenter && (distance(touchState.startCenter, center) > TOUCH_MOVE_CANCEL_PX || Math.abs(pinchDelta) > TOUCH_MOVE_CANCEL_PX)) {
-                touchState.moved = true;
-            }
-            if (dx !== 0 || dy !== 0) translateFromScreenDelta(ctx, dx, dy);
-            if (pinchDelta !== 0) ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
-            touchState.lastCenter = center;
-            touchState.lastDistance = pinchDistance;
-            ctx.showCenter = true;
-            ctx.requestRender();
-        }
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', (e: TouchEvent) => {
-        e.preventDefault();
-        clearLongPress();
-
-        if (touchState.mode === 'multi' && !touchState.moved && e.touches.length === 0) {
-            ctx.removeMeasurementPoint();
-        }
-
-        if (e.touches.length === 1) {
-            const point = getTouchPoint(e.touches[0]);
-            touchState.mode = 'single';
-            touchState.lastPoint = point;
-            touchState.startCenter = point;
-            touchState.lastCenter = null;
-            touchState.lastDistance = 0;
-            touchState.moved = true;
-            touchState.longPressTriggered = false;
-            return;
-        }
-
-        resetTouchState();
-    }, { passive: false });
-
-    canvas.addEventListener('touchcancel', () => resetTouchState(), { passive: false });
+        canvas.addEventListener('touchcancel', () => resetTouchState(), { passive: false });
+    }
 
     canvas.addEventListener('mousemove', (e: MouseEvent) => {
         if (ctx.mousePos === null || ctx.ctrlPressed) return;
