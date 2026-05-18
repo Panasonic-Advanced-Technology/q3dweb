@@ -2,6 +2,7 @@ import './style.css'
 import { FilmMakerViewer } from './film_maker_viewer';
 import { RealtimeViewer } from './realtime_viewer';
 import { CloudViewer } from './cloud_viewer';
+import { installViewerModeSelector, normalizeViewerMode } from './viewerMode';
 
 function toFloat32Array(data: unknown): Float32Array {
     if (data instanceof Float32Array) return data;
@@ -32,11 +33,12 @@ declare function acquireVsCodeApi(): any;
 // Initialize Viewer
 try {
     const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
+    const mode = normalizeViewerMode(params.get('mode'));
     const viewer: CloudViewer | RealtimeViewer =
         mode === 'realtime'   ? new RealtimeViewer('app') :
         mode === 'film_maker' ? new FilmMakerViewer('app') :
                                 new CloudViewer('app');  // default: no param or ?mode=cloud
+    installViewerModeSelector(viewer, mode);
 
     if (mode === 'realtime' && viewer instanceof RealtimeViewer) {
         const rosWsUrl = params.get('ros');

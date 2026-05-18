@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { Viewer } from './viewer';
-import type { ViewerMode } from './viewer';
 import { CloudItem } from './items/CloudItem';
 import { AxisItem } from './items/AxisItem';
 import { NativeCloudItem } from './items/NativeCloudItem';
@@ -43,8 +42,6 @@ export class RealtimeViewer extends Viewer {
         this.setupRealtimeItems();
         this.installRealtimeSection();
     }
-
-    protected getViewerMode(): ViewerMode { return 'realtime'; }
 
     /** Inserts the realtime connection panel above the item dropdown and settings area. */
     private installRealtimeSection(): void {

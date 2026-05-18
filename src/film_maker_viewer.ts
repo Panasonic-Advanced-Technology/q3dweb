@@ -1,5 +1,4 @@
 import { CloudViewer } from './cloud_viewer';
-import type { ViewerMode } from './viewer';
 import { FilmMaker, KeyFrame } from './viewer/filmMaker';
 import { recoverCenterEuler } from './utils/maths';
 import {
@@ -45,8 +44,6 @@ export class FilmMakerViewer extends CloudViewer {
         // Fields are now initialized — install the film maker section in the panel.
         this.installFilmMakerSection();
     }
-
-    protected getViewerMode(): ViewerMode { return 'film_maker'; }
 
     /**
     * Inserts the film maker controls (keyframe list + add/delete/play buttons) into the
