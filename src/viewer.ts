@@ -1,112 +1,37 @@
 import * as THREE from 'three';
-import { CloudItem, CloudShaderMaterial } from './items/CloudItem';
 import { AxisItem } from './items/AxisItem';
 import { GridItem } from './items/GridItem';
 import { Text2DItem } from './items/Text2DItem';
-import { Text3DItem, Text3DData } from './items/Text3DItem';
-import { GNSSMapItem } from './items/GNSSMapItem';
-import { FilmMaker, KeyFrame } from './filmMaker';
-import { recoverCenterEuler } from './utils/maths';
-import { parseLASGeoInfo, readLASBounds } from './utils/lasGeo';
-import { projToLatLon, registerWKT, convertByKey } from './utils/projConvert';
+import { Text3DItem } from './items/Text3DItem';
+import { eulerToMatrix4 } from './utils/maths';
 import {
-    detectHeapLimit,
-    detectHeapUsed,
-    estimateMemoryRequirement,
-    formatBytes,
-} from './utils/memoryCheck';
+    makeLabel, makeTextInput, makeCheckbox, buildCloudItemSettings,
+} from './viewer/settingsUI';
+import {
+    setupMouseControls as _setupMouse, setupKeyboardControls as _setupKeys, updateCameraMovement,
+} from './viewer/mouseControls';
+import {
+    addMeasurementPoint as _addMeasure, removeMeasurementPoint as _removeMeasure,
+    updateMeasurementMarker as _updateMeasureMarker,
+} from './viewer/measurement';
+import { CloudItem } from './items/CloudItem';
 
-// Minimal PCD Header Parser for Streaming
-interface PCDHeader {
-    data: 'ascii' | 'binary' | 'binary_compressed';
-    headerLen: number;
-    width: number;
-    height: number;
-    points: number;
-    rowSize: number;
-    offset: { [key: string]: number };
-    fields?: string[];
-    counts?: number[];
-    types?: string[];
-    sizes?: number[];
-}
+const wrapAngle = (a: number): number =>
+    ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
 
-interface LASBounds {
-    minX: number;
-    maxX: number;
-    minY: number;
-    maxY: number;
-    minZ: number;
-    maxZ: number;
-}
-
-interface LASMetadata {
-    versionMajor: number;
-    versionMinor: number;
-    offsetToPointData: number;
-    pointDataRecordFormat: number;
-    pointDataRecordLength: number;
-    numberOfPoints: number;
-    xScale: number;
-    yScale: number;
-    zScale: number;
-    xOff: number;
-    yOff: number;
-    zOff: number;
-    hasRGB: boolean;
-    rgbOffset: number;
-    shiftX: number;
-    shiftY: number;
-    originLatLon: [number, number] | null;
-    bounds: LASBounds | null;
-}
-
-interface LASStreamState extends LASMetadata {
-    rawPointIndex: number;
-}
-
-function eulerToMatrix(roll: number, pitch: number, yaw: number): THREE.Matrix4 {
-    const cx = Math.cos(roll), sx = Math.sin(roll);
-    const cy = Math.cos(pitch), sy = Math.sin(pitch);
-    const cz = Math.cos(yaw), sz = Math.sin(yaw);
-    const m = new THREE.Matrix4();
-    m.set(
-        cz*cy,  cz*sy*sx - sz*cx,  cz*sy*cx + sz*sx,  0,
-        sz*cy,  sz*sy*sx + cz*cx,  sz*sy*cx - cz*sx,  0,
-       -sy,     cy*sx,             cy*cx,              0,
-        0,      0,                 0,                   1
-    );
-    return m;
-}
-
-/** Interface for settings that items can provide */
-interface SettingBuilder {
-    addSetting(container: HTMLElement): void;
-}
-
-/** True if the event target is an input/textarea/select — used to suppress global keyboard shortcuts. */
-function isEditable(t: EventTarget | null): boolean {
-    if (!t) return false;
-    const el = t as HTMLElement;
-    const tag = el.tagName?.toUpperCase?.();
-    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true;
-}
-
+interface SettingBuilder { addSetting(container: HTMLElement): void; }
 export class Viewer {
     container: HTMLElement;
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
     renderer: THREE.WebGLRenderer;
-    items: {[name: string]: THREE.Object3D} = {};
-    /** Items that should not appear in settings */
+    items: { [name: string]: THREE.Object3D } = {};
     hiddenSettingItems: Set<string> = new Set();
 
-    // Camera state (matching q3dviewer)
     euler: [number, number, number] = [Math.PI / 3, 0, Math.PI / 4];
     cameraCenter: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
     cameraDist: number = 40;
 
-    // Keyboard / Mouse state
     activeKeys: Set<string> = new Set();
     showCenter: boolean = false;
     enableShowCenter: boolean = true;
@@ -115,185 +40,80 @@ export class Viewer {
     shiftPressed: boolean = false;
     ctrlPressed: boolean = false;
     centerPointMesh: THREE.Points | null = null;
-
-    // Settings panel
     settingsPanel: HTMLElement | null = null;
     settingsContent: HTMLElement | null = null;
     settingsItemSelect: HTMLSelectElement | null = null;
-
-    // Status & UI
     statusElement: HTMLElement | null = null;
     loadingOverlay: HTMLElement;
-
-    // Measurement (Ctrl+click like cloud_viewer)
     selectedPoints: THREE.Vector3[] = [];
     text2dItem: Text2DItem | null = null;
 
-    // Supported extensions
-    static readonly SUPPORTED_EXTENSIONS = ['.pcd', '.ply', '.las', '.laz', '.e57'];
-
-    // When true, skip the heap-size safety check before loading a file.
-    // Useful for automated tests and headless environments.
-    skipMemoryCheck: boolean = false;
-
-    // Streaming state
-    currentFormat: 'pcd' | 'ply' | 'las' | 'laz' | 'e57' | 'unknown' = 'pcd';
-    streamFilename: string | undefined = undefined;
-    streamTotalSize: number = 0;
-    streamLoadedSize: number = 0;
-    streamAborted: boolean = false;
-    pcdHeader: PCDHeader | null = null;
-    lasStream: LASStreamState | null = null;
-    isBinary: boolean = false;
-    leftoverChunk: Uint8Array | null = null;
-    pointsLoaded: number = 0;
-    targetSampleRatio: number = 1;
-    fullBufferWriteOffset: number = 0;
-    chunkList: Uint8Array[] = [];
-
-    // Visualization Buffers
-    MAX_POINTS_VISUAL = 15_000_000;
-    posBuffer: Float32Array | null = null;
-    valBuffer: Float32Array | null = null;
-    rgbBuffer: Uint8Array | null = null;
-    fullBuffer: Uint8Array | null = null;
-    posIndex: number = 0;
-
-    // Data range
-    dataMin: number = 0;
-    dataMax: number = 255;
-
-    // Rendering
     renderRequested: boolean = false;
     animationFrameId: number = 0;
-
-    // Background color string for settings
     colorStr: string = 'black';
 
-    // Film Maker
-    filmMaker: FilmMaker = new FilmMaker();
-    /** When the Film Maker tab is active, Space/Delete bind to add/delete keyframes. */
-    filmMakerTabActive: boolean = false;
-    /** Playback state. */
-    private filmPlaybackIndex: number = 0;
-    private filmPlaybackRequestId: number | null = null;
-    private filmPlaybackLastTimestamp: number | null = null;
-    private filmPlaybackAccumulatorMs: number = 0;
-    isPlayingFilm: boolean = false;
-    isRecordingFilm: boolean = false;
-    private mediaRecorder: MediaRecorder | null = null;
-    private recordedChunks: Blob[] = [];
-    lastRecordedBlob: Blob | null = null;
-    videoFileName: string = 'q3dweb.mp4';
-    videoMimeType: string = 'video/mp4;codecs=h264';
-    recordingVideoBitsPerSecond: number = 32_000_000;
-    recordingPixelRatioMin: number = 2;
-    private filmMakerListEl: HTMLElement | null = null;
-    private filmMakerPlayBtn: HTMLButtonElement | null = null;
-    private rendererPixelRatio: number = 1;
+    rendererPixelRatio: number = 1;
 
     constructor(containerId: string) {
         const container = document.getElementById(containerId);
         if (!container) throw new Error(`Container ${containerId} not found`);
         this.container = container;
-
-        // Loading Overlay (Center)
         this.loadingOverlay = document.createElement('div');
-        this.loadingOverlay.style.cssText = `
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); display: none;
-            justify-content: center; align-items: center; z-index: 1001;
-        `;
-        this.loadingOverlay.innerHTML = '<div style="color: white; font-size: 24px; font-family: sans-serif; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 8px;">Loading...</div>';
+        this.loadingOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;justify-content:center;align-items:center;z-index:1001;';
+        this.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Loading...</div>';
         this.container.appendChild(this.loadingOverlay);
-
         this.installGlobalErrorHandler();
-
-        // Scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x000000);
-
-        // Camera
         this.camera = new THREE.PerspectiveCamera(60, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
-        this.camera.position.set(10, 10, 10);
         this.camera.up.set(0, 0, 1);
-
-        // Renderer
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.rendererPixelRatio = this.getBaseRendererPixelRatio();
         this.renderer.setPixelRatio(this.rendererPixelRatio);
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-        // Make the canvas focusable so clicking it steals focus from form inputs,
-        // ensuring keyboard shortcuts (e.g. M to toggle settings) work as expected.
         this.renderer.domElement.tabIndex = 0;
         this.renderer.domElement.style.outline = 'none';
         this.container.appendChild(this.renderer.domElement);
-
-        // Camera controls
-        this.setupMouseControls();
-        this.setupKeyboardControls();
+        _setupMouse(this.renderer.domElement, this as any);
+        _setupKeys(this as any);
         this.updateCamera();
-
-        // Default items (matching cloud_viewer)
         this.addDefaultItems();
-
-        // Center point visualization
         this.createCenterPoint();
-
-        // Settings panel (toggled by 'm' key)
         this.createSettingsPanel();
-
-        // Drag and Drop
-        this.setupDragDrop();
-
-        // Resize handler
         window.addEventListener('resize', this.onWindowResize.bind(this), false);
-
-        // Animation loop
         this.startAnimationLoop();
     }
-
-    // ========== Default Items (matching cloud_viewer) ==========
 
     addDefaultItems() {
         const grid = new GridItem({ size: 1000, spacing: 20 });
         grid.renderCb = () => this.requestRender();
         this.addItem('grid', grid);
-
-        const axis = new AxisItem({ size: 0.5, width: 5 });
-        this.addItem('axis', axis);
+        this.addItem('axis', new AxisItem({ size: 0.5, width: 5 }));
         this.hiddenSettingItems.add('axis');
-
-        // Text2DItem for distance display (top-right overlay)
         this.text2dItem = new Text2DItem(this.container, {
-            text: '',
-            color: '#b3ffb3',
-            fontSize: 14,
-            anchor: 'top-right',
-            pos: [16, 16],
-            background: 'rgba(0,0,0,0.55)',
-            padding: '8px 12px',
+            text: '', color: '#b3ffb3', fontSize: 14, anchor: 'top-right',
+            pos: [16, 16], background: 'rgba(0,0,0,0.55)', padding: '8px 12px',
         });
         this.text2dItem.hide();
         this.hiddenSettingItems.add('text');
-
-        // Marker (Text3DItem) for measurement points
-        const marker = new Text3DItem();
-        this.addItem('marker', marker);
+        this.addItem('marker', new Text3DItem());
         this.hiddenSettingItems.add('marker');
     }
 
-    // ========== Camera Control Methods (matching q3dviewer) ==========
+    createCenterPoint() {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+        this.centerPointMesh = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xff0000, size: 8, sizeAttenuation: false }));
+        this.centerPointMesh.visible = false;
+        this.scene.add(this.centerPointMesh);
+    }
 
     updateCamera() {
         const [roll, pitch, yaw] = this.euler;
-        const Rwc = eulerToMatrix(roll, pitch, yaw);
-        const offset = new THREE.Vector3(0, 0, this.cameraDist);
-        offset.applyMatrix4(Rwc);
-        const camPos = this.cameraCenter.clone().add(offset);
-        this.camera.position.copy(camPos);
-        const up = new THREE.Vector3(0, 1, 0).applyMatrix4(Rwc);
-        this.camera.up.copy(up);
+        const Rwc = eulerToMatrix4(roll, pitch, yaw);
+        const offset = new THREE.Vector3(0, 0, this.cameraDist).applyMatrix4(Rwc);
+        this.camera.position.copy(this.cameraCenter.clone().add(offset));
+        this.camera.up.copy(new THREE.Vector3(0, 1, 0).applyMatrix4(Rwc));
         this.camera.lookAt(this.cameraCenter);
 
         this.updateProjectionMatrixLikeQ3DViewer();
@@ -318,23 +138,19 @@ export class Viewer {
     }
 
     rotateCam(rx: number, ry: number, rz: number) {
-        this.euler[0] += rx;
-        this.euler[1] += ry;
-        this.euler[2] += rz;
-        this.euler[0] = Math.max(0, Math.min(Math.PI, this.euler[0]));
-        this.euler[1] = ((this.euler[1] + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-        this.euler[2] = ((this.euler[2] + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+        this.euler[0] = Math.max(0, Math.min(Math.PI, this.euler[0] + rx));
+        this.euler[1] = wrapAngle(this.euler[1] + ry);
+        this.euler[2] = wrapAngle(this.euler[2] + rz);
         this.updateCamera();
     }
 
     rotateKeepCamPos(rx: number, ry: number, rz: number) {
-        const newEuler: [number, number, number] = [
-            this.euler[0] + rx, this.euler[1] + ry, this.euler[2] + rz
+        const ne: [number, number, number] = [
+            Math.max(0, Math.min(Math.PI, this.euler[0] + rx)),
+            wrapAngle(this.euler[1] + ry),
+            wrapAngle(this.euler[2] + rz),
         ];
-        newEuler[0] = Math.max(0, Math.min(Math.PI, newEuler[0]));
-        newEuler[1] = ((newEuler[1] + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-        newEuler[2] = ((newEuler[2] + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-        const RwcOld = eulerToMatrix(this.euler[0], this.euler[1], this.euler[2]);
+        const RwcOld = eulerToMatrix4(this.euler[0], this.euler[1], this.euler[2]);
         const tco = new THREE.Vector3(0, 0, this.cameraDist);
         const twc = this.cameraCenter.clone().add(tco.clone().applyMatrix4(RwcOld));
         const RwcNew = eulerToMatrix(newEuler[0], newEuler[1], newEuler[2]);
@@ -534,132 +350,29 @@ export class Viewer {
         this.requestRender();
     }
 
-    // ========== Keyboard Controls ==========
-
-    setupKeyboardControls() {
-        window.addEventListener('keydown', (e: KeyboardEvent) => {
-            this.activeKeys.add(e.key.toLowerCase());
-            if (e.key === 'Shift') this.shiftPressed = true;
-            if (e.key === 'Control' || e.key === 'Meta') this.ctrlPressed = true;
-            if (e.key.toLowerCase() === 'm') {
-                // Skip M when user is typing in a text input, but NOT for
-                // <select> (isEditable treats SELECT as editable). Also
-                // suppress the native <select> type-ahead which would
-                // otherwise jump to "main win..." because it starts with 'm'.
-                const tag = (e.target as HTMLElement | null)?.tagName?.toUpperCase?.();
-                if (tag === 'INPUT' || tag === 'TEXTAREA'
-                    || (e.target as HTMLElement | null)?.isContentEditable === true) {
-                    return;
-                }
-                if (tag === 'SELECT') {
-                    e.preventDefault();
-                    (e.target as HTMLSelectElement).blur();
-                }
-                this.toggleSettingsPanel();
-            }
-
-            // Film Maker shortcuts (only when the Film Maker tab is active and the
-            // focus is not an editable field).
-            if (this.filmMakerTabActive && !isEditable(e.target)) {
-                if (e.key === ' ' || e.code === 'Space') {
-                    e.preventDefault();
-                    this.addKeyFrameFromCamera();
-                } else if (e.key === 'Delete') {
-                    e.preventDefault();
-                    this.deleteCurrentKeyFrame();
-                }
-            }
-        });
-
-        window.addEventListener('keyup', (e: KeyboardEvent) => {
-            this.activeKeys.delete(e.key.toLowerCase());
-            if (e.key === 'Shift') this.shiftPressed = false;
-            if (e.key === 'Control' || e.key === 'Meta') this.ctrlPressed = false;
-        });
-    }
-
-    updateMovement() {
-        if (this.activeKeys.size === 0) return;
-        const rotSpeed = 0.5;
-        const transSpeed = Math.max(this.cameraDist * 0.005, 0.1);
-
-        if (this.activeKeys.has('arrowup')) {
-            if (this.shiftPressed) this.rotateKeepCamPos(rotSpeed * Math.PI / 180, 0, 0);
-            else this.rotateCam(rotSpeed * Math.PI / 180, 0, 0);
-        }
-        if (this.activeKeys.has('arrowdown')) {
-            if (this.shiftPressed) this.rotateKeepCamPos(-rotSpeed * Math.PI / 180, 0, 0);
-            else this.rotateCam(-rotSpeed * Math.PI / 180, 0, 0);
-        }
-        if (this.activeKeys.has('arrowleft')) {
-            if (this.shiftPressed) this.rotateKeepCamPos(0, 0, rotSpeed * Math.PI / 180);
-            else this.rotateCam(0, 0, rotSpeed * Math.PI / 180);
-        }
-        if (this.activeKeys.has('arrowright')) {
-            if (this.shiftPressed) this.rotateKeepCamPos(0, 0, -rotSpeed * Math.PI / 180);
-            else this.rotateCam(0, 0, -rotSpeed * Math.PI / 180);
-        }
-
-        if (this.activeKeys.has('z') || this.activeKeys.has('x')) {
-            const Rwc = eulerToMatrix(this.euler[0], this.euler[1], this.euler[2]);
-            if (this.activeKeys.has('z')) this.translateCam(new THREE.Vector3(0, 0, -transSpeed).applyMatrix4(Rwc));
-            if (this.activeKeys.has('x')) this.translateCam(new THREE.Vector3(0, 0, transSpeed).applyMatrix4(Rwc));
-        }
-
-        if (this.activeKeys.has('w') || this.activeKeys.has('a') ||
-            this.activeKeys.has('s') || this.activeKeys.has('d')) {
-            const Rz = eulerToMatrix(0, 0, this.euler[2]);
-            if (this.activeKeys.has('w')) this.translateCam(new THREE.Vector3(0, transSpeed, 0).applyMatrix4(Rz));
-            if (this.activeKeys.has('s')) this.translateCam(new THREE.Vector3(0, -transSpeed, 0).applyMatrix4(Rz));
-            if (this.activeKeys.has('a')) this.translateCam(new THREE.Vector3(-transSpeed, 0, 0).applyMatrix4(Rz));
-            if (this.activeKeys.has('d')) this.translateCam(new THREE.Vector3(transSpeed, 0, 0).applyMatrix4(Rz));
-        }
-    }
-
-    // ========== Center Point Visualization ==========
-
-    createCenterPoint() {
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
-        const mat = new THREE.PointsMaterial({ color: 0xff0000, size: 8, sizeAttenuation: false });
-        this.centerPointMesh = new THREE.Points(geo, mat);
-        this.centerPointMesh.visible = false;
-        this.scene.add(this.centerPointMesh);
-    }
-
-    // ========== Settings Panel (matching q3dviewer SettingWindow) ==========
+    translateCam(trans: THREE.Vector3) { this.cameraCenter.add(trans); this.updateCamera(); }
+    updateDist(delta: number) { this.cameraDist = Math.max(0.1, this.cameraDist + delta); this.updateCamera(); }
+    updateMovement() { updateCameraMovement(this as any); }
+    addMeasurementPoint(e: MouseEvent) { _addMeasure(e, this as any); }
+    removeMeasurementPoint() { _removeMeasure(this as any); }
+    updateMeasurementMarker() { _updateMeasureMarker(this as any); }
 
     createSettingsPanel() {
         const panel = document.createElement('div');
-        panel.style.cssText = `
-            position: absolute; top: 10px; left: 10px;
-            background: rgba(20,20,20,0.92); color: #eee;
-            padding: 12px; border-radius: 8px;
-            font-family: monospace; font-size: 12px;
-            z-index: 1100; width: 260px;
-            display: block; max-height: calc(100% - 20px); overflow-y: auto;
-            border: 1px solid #555;
-        `;
-
-        // Title
+        panel.style.cssText = 'position:absolute;top:10px;left:10px;background:rgba(20,20,20,0.92);color:#eee;padding:12px;border-radius:8px;font-family:monospace;font-size:12px;z-index:1100;width:260px;display:block;max-height:calc(100% - 20px);overflow-y:auto;border:1px solid #555;';
         const title = document.createElement('div');
-        title.style.cssText = 'font-size: 14px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #555; padding-bottom: 4px;';
+        title.style.cssText = 'font-size:14px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #555;padding-bottom:4px;';
         title.textContent = 'Settings (M to toggle)';
         panel.appendChild(title);
-
-        // Item selector (combo box matching SettingWindow)
         const select = document.createElement('select');
-        select.style.cssText = 'width: 100%; margin-bottom: 8px; background: #333; color: #eee; border: 1px solid #666; padding: 4px; border-radius: 3px;';
+        select.style.cssText = 'width:100%;margin-bottom:8px;background:#333;color:#eee;border:1px solid #666;padding:4px;border-radius:3px;';
         select.onchange = () => this.onSettingsItemSelected(select.value);
         panel.appendChild(select);
         this.settingsItemSelect = select;
-
-        // Item settings content (matches SettingWindow.layout)
         const content = document.createElement('div');
-        content.style.cssText = 'border: 1px solid #444; border-radius: 4px; padding: 8px;';
+        content.style.cssText = 'border:1px solid #444;border-radius:4px;padding:8px;';
         panel.appendChild(content);
         this.settingsContent = content;
-
         this.container.appendChild(panel);
         this.settingsPanel = panel;
         this.refreshSettingsItemList();
@@ -669,478 +382,105 @@ export class Viewer {
         if (!this.settingsPanel) return;
         const visible = this.settingsPanel.style.display !== 'none';
         this.settingsPanel.style.display = visible ? 'none' : 'block';
-        if (!visible) {
-            // Re-opening: if the previously-selected tab no longer exists
-            // (e.g. the item was removed while the panel was hidden),
-            // gracefully fall back to main_win. Otherwise keep whatever
-            // content is already rendered so the user sees exactly what
-            // they left behind (active tab, scroll position, in-progress
-            // input values, etc.).
-            const current = this.settingsItemSelect?.value;
-            const exists = !!current && Array.from(this.settingsItemSelect!.options).some(o => o.value === current);
-            if (!exists && this.settingsItemSelect) {
-                this.settingsItemSelect.value = '__main_win__';
-                this.onSettingsItemSelected('__main_win__');
-            }
-        }
+        if (!visible) this.onSettingsItemSelected(this.settingsItemSelect?.value ?? '__main_win__');
     }
 
     refreshSettingsItemList(preferredSelection?: string) {
         if (!this.settingsItemSelect) return;
-        const previousSelection = this.settingsItemSelect.value;
-        this.rebuildSettingsItemOptions();
-        const desired = preferredSelection ?? previousSelection;
-        const exists = desired && Array.from(this.settingsItemSelect.options).some(opt => opt.value === desired);
-        this.settingsItemSelect.value = exists ? desired! : '__main_win__';
-        // Skip the content rebuild while the panel is hidden: we want the
-        // user to see the same sub-panel they had open before closing, not
-        // a freshly-rendered one. The rebuild will still happen the next
-        // time the selector's onchange fires or when the panel is re-opened
-        // with a stale selection.
-        const visible = this.settingsPanel?.style.display !== 'none';
-        if (visible) {
-            this.onSettingsItemSelected(this.settingsItemSelect.value);
-        }
-    }
-
-    /** Rebuild only the <option>s in the selector, without re-triggering onSettingsItemSelected. */
-    private rebuildSettingsItemOptions() {
-        if (!this.settingsItemSelect) return;
+        const prev = this.settingsItemSelect.value;
         this.settingsItemSelect.innerHTML = '';
-
         const mainOpt = document.createElement('option');
-        mainOpt.value = '__main_win__';
-        mainOpt.textContent = 'Viewer';
+        mainOpt.value = '__main_win__'; mainOpt.textContent = 'Viewer';
         this.settingsItemSelect.appendChild(mainOpt);
-
-        const filmOpt = document.createElement('option');
-        filmOpt.value = '__film_maker__';
-        filmOpt.textContent = 'Film Maker';
-        this.settingsItemSelect.appendChild(filmOpt);
-
         for (const name of Object.keys(this.items)) {
             if (this.hiddenSettingItems.has(name)) continue;
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = name;
-            this.settingsItemSelect.appendChild(opt);
+            const o = document.createElement('option'); o.value = name; o.textContent = name;
+            this.settingsItemSelect.appendChild(o);
         }
+        const desired = preferredSelection ?? prev;
+        const exists = desired && Array.from(this.settingsItemSelect.options).some(o => o.value === desired);
+        this.settingsItemSelect.value = exists ? desired! : '__main_win__';
+        if (this.settingsPanel?.style.display !== 'none')
+            this.onSettingsItemSelected(this.settingsItemSelect.value);
     }
 
     onSettingsItemSelected(name: string) {
         if (!this.settingsContent) return;
         this.settingsContent.innerHTML = '';
-        this.filmMakerTabActive = name === '__film_maker__';
-
         if (name === '__main_win__') {
-            this.buildMainWinSettings(this.settingsContent);
+            this.settingsContent.appendChild(makeLabel('Set background color:'));
+            const inp = makeTextInput(this.colorStr, (val) => {
+                try { this.scene.background = new THREE.Color(val); this.colorStr = val; this.requestRender(); } catch { /* ignore */ }
+            });
+            inp.title = 'Use hex color, i.e. #FF4500';
+            this.settingsContent.appendChild(inp);
+            this.settingsContent.appendChild(makeCheckbox('Show Center Point', this.enableShowCenter, (v) => { this.enableShowCenter = v; }));
             return;
         }
-        if (name === '__film_maker__') {
-            this.buildFilmMakerSettings(this.settingsContent);
-            return;
-        }
-
         const item = this.items[name];
         if (!item) return;
-        this.buildItemSettings(item, this.settingsContent);
-    }
-
-    /** Build settings for "main win" matching GLWidget.add_setting */
-    buildMainWinSettings(container: HTMLElement) {
-        container.appendChild(this.makeLabel('Set background color:'));
-        const colorInput = this.makeTextInput(this.colorStr, (val) => {
-            try {
-                const c = new THREE.Color(val);
-                this.scene.background = c;
-                this.colorStr = val;
-                this.requestRender();
-            } catch { /* ignore invalid */ }
-        });
-        colorInput.title = 'Use hex color, i.e. #FF4500';
-        container.appendChild(colorInput);
-
-        container.appendChild(this.makeCheckbox('Show Center Point', this.enableShowCenter, (v) => {
-            this.enableShowCenter = v;
-        }));
-    }
-
-    /** Build per-item settings matching each item's add_setting() */
-    buildItemSettings(item: THREE.Object3D, container: HTMLElement) {
         if ('addSetting' in item && typeof (item as any).addSetting === 'function') {
-            (item as any as SettingBuilder).addSetting(container);
-            return;
+            (item as any as SettingBuilder).addSetting(this.settingsContent); return;
         }
-
-        // CloudItem settings (matching cloud_item.py add_setting)
         const mat = (item as any).material;
-        if (mat && mat.uniforms) {
-            this.buildCloudItemSettings(item, mat, container);
-        }
+        if (mat?.uniforms) buildCloudItemSettings(item, mat, this.settingsContent, this.getBaseRendererPixelRatio(), () => this.requestRender());
     }
 
-    /** Build CloudItem settings matching cloud_item.py add_setting */
-    buildCloudItemSettings(item: THREE.Object3D, mat: any, container: HTMLElement) {
-        const geometry = (item as any).geometry as THREE.BufferGeometry | undefined;
-        const pointCount = geometry?.getAttribute('position')?.count;
-        const pointTypeUniform = mat.uniforms.pointType;
-        const pointSizeUniform = mat.uniforms.pointSize;
-        const pixelRatio = this.getBaseRendererPixelRatio();
-        const isPixelPointType = (value: number) => value < 0.5;
-        const getSizeLabelText = () => {
-            if (!pointTypeUniform) return 'Size:';
-            return isPixelPointType(pointTypeUniform.value) ? 'Size (pixel):' : 'Size (cm):';
-        };
-        const getPointSizeInputValue = () => {
-            if (!pointSizeUniform) return 0;
-            return pointTypeUniform && isPixelPointType(pointTypeUniform.value)
-                ? pointSizeUniform.value / pixelRatio
-                : pointSizeUniform.value;
-        };
-        const setStoredPointSize = (value: number) => {
-            if (!pointSizeUniform) return;
-            pointSizeUniform.value = pointTypeUniform && isPixelPointType(pointTypeUniform.value)
-                ? value * pixelRatio
-                : value;
-        };
-        let sizeLabel: HTMLElement | null = null;
-        let sizeInput: HTMLInputElement | null = null;
+    getBaseRendererPixelRatio(): number { return Math.max(window.devicePixelRatio || 1, 1); }
+    private getCloudViewportHeight(): number { return Math.max(this.container.clientHeight * this.rendererPixelRatio, 1); }
+    protected syncCloudItemViewport(item: THREE.Object3D) { if (item instanceof CloudItem) item.updateViewport(this.getCloudViewportHeight()); }
+    protected syncAllCloudItemViewports() { Object.values(this.items).forEach(i => this.syncCloudItemViewport(i)); }
 
-        if (typeof pointCount === 'number') {
-            container.appendChild(this.makeLabel('Points:'));
-            container.appendChild(this.makeStaticValue(`${pointCount.toLocaleString()} pts`));
-        }
-
-        if (pointTypeUniform) {
-            container.appendChild(this.makeLabel('Point Type:'));
-            container.appendChild(this.makeSelectInput(
-                [
-                    { label: 'pixels', value: '0' },
-                    { label: 'flat squares', value: '1' },
-                    { label: 'spheres', value: '2' },
-                ],
-                String(pointTypeUniform.value),
-                (value) => {
-                    const nextPointType = parseInt(value, 10);
-                    const wasPixelPoint = isPixelPointType(pointTypeUniform.value);
-                    const willPixelPoint = isPixelPointType(nextPointType);
-
-                    if (pointSizeUniform) {
-                        if (wasPixelPoint && !willPixelPoint) {
-                            pointSizeUniform.value /= pixelRatio;
-                        } else if (!wasPixelPoint && willPixelPoint) {
-                            pointSizeUniform.value *= pixelRatio;
-                        }
-                    }
-
-                    pointTypeUniform.value = nextPointType;
-                    if (sizeLabel) sizeLabel.textContent = getSizeLabelText();
-                    if (sizeInput) sizeInput.value = getPointSizeInputValue().toString();
-                    mat.needsUpdate = true;
-                    this.requestRender();
-                }
-            ));
-        }
-
-        if (pointSizeUniform) {
-            sizeLabel = this.makeLabel(getSizeLabelText());
-            container.appendChild(sizeLabel);
-            sizeInput = this.makeNumberInput(
-                getPointSizeInputValue(), 0, 100, 1,
-                (v) => { setStoredPointSize(v); mat.needsUpdate = true; this.requestRender(); }
-            );
-            container.appendChild(sizeInput);
-        }
-
-        if (mat.uniforms.alpha) {
-            container.appendChild(this.makeLabel('Alpha:'));
-            container.appendChild(this.makeNumberInput(
-                mat.uniforms.alpha.value, 0, 1, 0.01,
-                (v) => {
-                    mat.uniforms.alpha.value = v;
-                    if (v >= 0.99) { mat.transparent = false; mat.depthWrite = true; }
-                    else { mat.transparent = true; mat.depthWrite = false; }
-                    mat.needsUpdate = true;
-                    this.requestRender();
-                }
-            ));
-        }
-
-        if (mat.uniforms.colorMode) {
-            container.appendChild(this.makeLabel('Color Mode:'));
-            container.appendChild(this.makeSelectInput(
-                [
-                    { label: 'Intensity', value: '0' },
-                    { label: 'RGB', value: '1' },
-                    { label: 'Flat', value: '2' },
-                ],
-                String(mat.uniforms.colorMode.value),
-                (value) => {
-                    mat.uniforms.colorMode.value = parseInt(value, 10);
-                    mat.needsUpdate = true;
-                    this.requestRender();
-                }
-            ));
-        }
-
-        if (mat.uniforms.vmin && mat.uniforms.vmax) {
-            container.appendChild(this.makeLabel('Vmin:'));
-            container.appendChild(this.makeNumberInput(
-                mat.uniforms.vmin.value, -100000, 100000, 1,
-                (v) => { mat.uniforms.vmin.value = v; mat.needsUpdate = true; this.requestRender(); }
-            ));
-            container.appendChild(this.makeLabel('Vmax:'));
-            container.appendChild(this.makeNumberInput(
-                mat.uniforms.vmax.value, -100000, 100000, 1,
-                (v) => { mat.uniforms.vmax.value = v; mat.needsUpdate = true; this.requestRender(); }
-            ));
-        }
-    }
-
-    // ========== Settings UI Helpers ==========
-
-    private makeLabel(text: string): HTMLElement {
-        const lbl = document.createElement('div');
-        lbl.textContent = text;
-        lbl.style.cssText = 'margin: 6px 0 2px 0; font-size: 11px; color: #ccc;';
-        return lbl;
-    }
-
-    private makeStaticValue(text: string): HTMLElement {
-        const value = document.createElement('div');
-        value.textContent = text;
-        value.style.cssText = 'width: 100%; box-sizing: border-box; background: #252525; color: #eee; border: 1px solid #444; padding: 3px 6px; border-radius: 3px; margin-bottom: 4px;';
-        return value;
-    }
-
-    private makeTextInput(defaultVal: string, onChange: (val: string) => void): HTMLInputElement {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = defaultVal;
-        input.style.cssText = 'width: 100%; box-sizing: border-box; background: #333; color: #eee; border: 1px solid #666; padding: 3px 6px; border-radius: 3px; margin-bottom: 4px;';
-        input.onchange = () => onChange(input.value);
-        return input;
-    }
-
-    private makeSelectInput(options: Array<{ label: string; value: string }>, selectedValue: string, onChange: (value: string) => void): HTMLSelectElement {
-        const select = document.createElement('select');
-        select.style.cssText = 'width: 100%; box-sizing: border-box; background: #333; color: #eee; border: 1px solid #666; padding: 3px 6px; border-radius: 3px; margin-bottom: 4px;';
-        for (const option of options) {
-            const el = document.createElement('option');
-            el.value = option.value;
-            el.textContent = option.label;
-            el.selected = option.value === selectedValue;
-            select.appendChild(el);
-        }
-        select.onchange = () => onChange(select.value);
-        return select;
-    }
-
-    private makeNumberInput(value: number, min: number, max: number, step: number, onChange: (v: number) => void): HTMLInputElement {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.value = value.toString();
-        input.min = min.toString();
-        input.max = max.toString();
-        input.step = step.toString();
-        input.style.cssText = 'width: 100%; box-sizing: border-box; background: #333; color: #eee; border: 1px solid #666; padding: 3px 6px; border-radius: 3px; margin-bottom: 4px;';
-        input.onchange = () => { const v = parseFloat(input.value); if (!isNaN(v)) onChange(v); };
-        return input;
-    }
-
-    private makeCheckbox(label: string, checked: boolean, onChange: (v: boolean) => void): HTMLElement {
-        const row = document.createElement('div');
-        row.style.cssText = 'display: flex; align-items: center; margin: 6px 0;';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = checked;
-        cb.onchange = () => onChange(cb.checked);
-        const lbl = document.createElement('label');
-        lbl.textContent = label;
-        lbl.style.marginLeft = '6px';
-        row.appendChild(cb);
-        row.appendChild(lbl);
-        return row;
-    }
-
-    // ========== Film Maker ==========
-
-    /** Compute the current camera Twc (world-from-camera) from camera.matrixWorld. */
-    private currentCameraTwc(): THREE.Matrix4 {
-        this.camera.updateMatrixWorld();
-        return this.camera.matrixWorld.clone();
-    }
-
-    addKeyFrameFromCamera(): KeyFrame {
-        const Twc = this.currentCameraTwc();
-        const kf = this.filmMaker.addKeyFrame(Twc);
-        this.scene.add(kf.item);
-        this.refreshFilmMakerList();
-        this.highlightSelectedKeyFrame();
-        this.requestRender();
-        return kf;
-    }
-
-    deleteCurrentKeyFrame(): void {
-        const idx = this.filmMaker.currentIndex;
-        const removed = this.filmMaker.deleteKeyFrame(idx);
-        if (removed) {
-            this.scene.remove(removed.item);
-            this.refreshFilmMakerList();
-            this.highlightSelectedKeyFrame();
-            this.requestRender();
-        }
-    }
-
-    selectKeyFrame(index: number): void {
-        this.filmMaker.select(index);
-        this.highlightSelectedKeyFrame();
-        this.syncFilmMakerSpinboxes();
-        this.requestRender();
-    }
-
-    /** Jump the orbit camera to the selected keyframe's pose. */
-    jumpToKeyFrame(index: number): void {
-        const kf = this.filmMaker.keyFrames[index];
-        if (!kf) return;
-        const { center, euler } = recoverCenterEuler(kf.Twc, this.cameraDist);
-        this.cameraCenter.copy(center);
-        this.euler = [euler[0], euler[1], euler[2]];
-        this.updateCamera();
-    }
-
-    private highlightSelectedKeyFrame() {
-        const sel = this.filmMaker.currentIndex;
-        this.filmMaker.keyFrames.forEach((kf, i) => {
-            if (i === sel) {
-                kf.item.setColor('#ff0000');
-                kf.item.setLineWidth(5);
-            } else {
-                kf.item.setColor('#0000ff');
-                kf.item.setLineWidth(3);
-            }
-        });
-    }
-
-    private refreshFilmMakerList() {
-        if (!this.filmMakerListEl) return;
-        this.filmMakerListEl.innerHTML = '';
-        const sel = this.filmMaker.currentIndex;
-        this.filmMaker.keyFrames.forEach((_kf, i) => {
-            const row = document.createElement('div');
-            row.textContent = `Frame ${i + 1}`;
-            row.dataset.index = String(i);
-            row.style.cssText = `padding: 3px 6px; cursor: pointer; border-radius: 3px; margin-bottom: 2px; ${
-                i === sel ? 'background:#a33;color:#fff;' : 'background:#252525;color:#eee;'
-            }`;
-            row.addEventListener('click', () => {
-                this.selectKeyFrame(i);
-                this.refreshFilmMakerList();
-            });
-            row.addEventListener('dblclick', () => {
-                this.jumpToKeyFrame(i);
-            });
-            this.filmMakerListEl!.appendChild(row);
-        });
-    }
-
-    private filmMakerSpinLin: HTMLInputElement | null = null;
-    private filmMakerSpinAng: HTMLInputElement | null = null;
-    private filmMakerSpinStop: HTMLInputElement | null = null;
-
-    private syncFilmMakerSpinboxes() {
-        const kf = this.filmMaker.keyFrames[this.filmMaker.currentIndex];
-        if (!kf) return;
-        if (this.filmMakerSpinLin) this.filmMakerSpinLin.value = kf.linVel.toString();
-        if (this.filmMakerSpinAng) this.filmMakerSpinAng.value = (kf.angVel * 180 / Math.PI).toFixed(2);
-        if (this.filmMakerSpinStop) this.filmMakerSpinStop.value = kf.stopTime.toString();
-    }
-
-    private buildFilmMakerSettings(container: HTMLElement) {
-        // Buttons
-        const addBtn = this.makeButton('Add Key Frame (Space)', () => this.addKeyFrameFromCamera());
-        container.appendChild(addBtn);
-        const delBtn = this.makeButton('Delete Key Frame (Delete)', () => this.deleteCurrentKeyFrame());
-        container.appendChild(delBtn);
-
-        const playBtn = this.makeButton('Play', () => this.togglePlayback());
-        this.filmMakerPlayBtn = playBtn;
-        this.setFilmMakerPlayButtonState(this.isPlayingFilm);
-        container.appendChild(playBtn);
-
-        // Record checkbox
-        const recordRow = this.makeCheckbox('Record', this.isRecordingFilm, (v) => {
-            this.isRecordingFilm = v;
-        });
-        container.appendChild(recordRow);
-
-        // Video filename
-        container.appendChild(this.makeLabel('Video File Name:'));
-        container.appendChild(this.makeTextInput(this.videoFileName, (val) => { this.videoFileName = val; }));
-
-        // Codec / mimeType
-        container.appendChild(this.makeLabel('Codec (MediaRecorder mimeType):'));
-        const codecs = [
-            'video/mp4;codecs=h264',
-            'video/mp4;codecs=avc1',
-            'video/webm;codecs=vp9',
-            'video/webm;codecs=vp8',
-            'video/webm;codecs=h264',
-        ];
-        container.appendChild(this.makeSelectInput(
-            codecs.map((c) => ({ label: c, value: c })),
-            this.videoMimeType,
-            (val) => { this.videoMimeType = val; },
-        ));
-
-        // Download last recording button
-        const dlBtn = this.makeButton('Download Last Recording', () => this.downloadLastRecording());
-        container.appendChild(dlBtn);
-
-        // Key frame list
-        container.appendChild(this.makeLabel('Key Frames (double-click to jump):'));
-        const list = document.createElement('div');
-        list.style.cssText = 'max-height: 180px; overflow-y: auto; border: 1px solid #444; padding: 4px; border-radius: 3px; margin-bottom: 6px;';
-        this.filmMakerListEl = list;
-        container.appendChild(list);
-        this.refreshFilmMakerList();
-
-        // Velocity / stop-time spinboxes
-        container.appendChild(this.makeLabel('Linear Velocity (m/s):'));
-        this.filmMakerSpinLin = this.makeNumberInput(10, 0, 1000, 0.1, (v) => {
-            this.filmMaker.setLinVel(this.filmMaker.currentIndex, v);
-        });
-        container.appendChild(this.filmMakerSpinLin);
-
-        container.appendChild(this.makeLabel('Angular Velocity (deg/s):'));
-        this.filmMakerSpinAng = this.makeNumberInput(60, 0, 360, 0.1, (v) => {
-            this.filmMaker.setAngVel(this.filmMaker.currentIndex, v * Math.PI / 180);
-        });
-        container.appendChild(this.filmMakerSpinAng);
-
-        container.appendChild(this.makeLabel('Stop Time (s):'));
-        this.filmMakerSpinStop = this.makeNumberInput(0, 0, 100, 0.1, (v) => {
-            this.filmMaker.setStopTime(this.filmMaker.currentIndex, v);
-        });
-        container.appendChild(this.filmMakerSpinStop);
-
-        this.syncFilmMakerSpinboxes();
-    }
-
-    private makeButton(label: string, onClick: () => void): HTMLButtonElement {
-        const btn = document.createElement('button');
-        btn.textContent = label;
-        btn.style.cssText = 'width: 100%; box-sizing: border-box; background: #333; color: #eee; border: 1px solid #666; padding: 5px; border-radius: 3px; margin-bottom: 4px; cursor: pointer;';
-        btn.addEventListener('click', onClick);
-        return btn;
-    }
-
-    private getBaseRendererPixelRatio(): number {
-        return Math.max(window.devicePixelRatio || 1, 1);
-    }
-
-    private applyRendererResolution(pixelRatio: number): void {
+    applyRendererResolution(pixelRatio: number): void {
         this.rendererPixelRatio = Math.max(pixelRatio, 1);
+        this.renderer.setPixelRatio(this.rendererPixelRatio);
+        this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+        this.syncAllCloudItemViewports();
+        this.requestRender();
+    }
+
+    restoreRendererResolution(): void {
+        const base = this.getBaseRendererPixelRatio();
+        if (Math.abs(this.rendererPixelRatio - base) > 1e-6) this.applyRendererResolution(base);
+    }
+
+    installGlobalErrorHandler() {
+        window.addEventListener('error', (ev) => {
+            console.error('Global error:', ev.error);
+            if (this.statusElement) { this.statusElement.textContent = `Global Error: ${ev.message}`; this.statusElement.style.backgroundColor = 'rgba(255,0,0,0.8)'; }
+        });
+        window.addEventListener('unhandledrejection', (ev) => {
+            console.error('Unhandled rejection:', ev.reason);
+            if (this.statusElement) { this.statusElement.textContent = `Async Error: ${ev.reason}`; this.statusElement.style.backgroundColor = 'rgba(255,0,0,0.8)'; }
+        });
+    }
+
+    addItem(name: string, object: THREE.Object3D) {
+        if (this.items[name]) this.removeItem(name);
+        this.items[name] = object;
+        this.scene.add(object);
+        this.syncCloudItemViewport(object);
+        this.refreshSettingsItemList(name === 'cloud' ? 'cloud' : this.settingsItemSelect?.value);
+    }
+
+    removeItem(name: string) {
+        const item = this.items[name];
+        if (item) {
+            const sel = this.settingsItemSelect?.value;
+            this.scene.remove(item);
+            if ((item as any).geometry?.dispose) (item as any).geometry.dispose();
+            const mats = (item as any).material ? (Array.isArray((item as any).material) ? (item as any).material : [(item as any).material]) : [];
+            mats.forEach((m: any) => { if (typeof m.dispose === 'function') m.dispose(); });
+            delete this.items[name];
+            this.refreshSettingsItemList(sel === name ? '__main_win__' : sel);
+        }
+    }
+
+    clearItems() { Object.keys(this.items).forEach(name => this.removeItem(name)); }
+
+    onWindowResize() {
+        this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+        this.updateProjection();
         this.renderer.setPixelRatio(this.rendererPixelRatio);
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
         this.syncAllCloudItemViewports();
@@ -2930,7 +2270,6 @@ export class Viewer {
         const loop = () => {
             this.animationFrameId = requestAnimationFrame(loop);
             this.updateMovement();
-
             if (this.enableShowCenter && this.showCenter && this.centerPointMesh) {
                 const pos = this.centerPointMesh.geometry.attributes.position;
                 (pos.array as Float32Array).set([this.cameraCenter.x, this.cameraCenter.y, this.cameraCenter.z]);
@@ -2938,17 +2277,11 @@ export class Viewer {
                 this.centerPointMesh.visible = true;
                 this.showCenter = false;
                 this.requestRender();
-                setTimeout(() => {
-                    if (this.centerPointMesh) this.centerPointMesh.visible = false;
-                    this.requestRender();
-                }, 500);
+                setTimeout(() => { if (this.centerPointMesh) this.centerPointMesh.visible = false; this.requestRender(); }, 500);
             }
         };
         loop();
     }
 
-    render() {
-        this.renderRequested = false;
-        this.renderer.render(this.scene, this.camera);
-    }
+    render() { this.renderRequested = false; this.renderer.render(this.scene, this.camera); }
 }

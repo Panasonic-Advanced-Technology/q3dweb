@@ -120,6 +120,21 @@ export function logSO3(R: THREE.Matrix3): THREE.Vector3 {
     return v.multiplyScalar(magnitude);
 }
 
+/** Euler (roll, pitch, yaw) → 4x4 rotation matrix (same convention as eulerToMatrix3 but returns Matrix4). */
+export function eulerToMatrix4(roll: number, pitch: number, yaw: number): THREE.Matrix4 {
+    const cx = Math.cos(roll), sx = Math.sin(roll);
+    const cy = Math.cos(pitch), sy = Math.sin(pitch);
+    const cz = Math.cos(yaw), sz = Math.sin(yaw);
+    const m = new THREE.Matrix4();
+    m.set(
+        cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx, 0,
+        sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx, 0,
+        -sy,     cy * sx,                cy * cx,                 0,
+        0,       0,                      0,                        1,
+    );
+    return m;
+}
+
 /** Euler (roll, pitch, yaw) → 3x3 rotation matrix Rz(yaw) * Ry(pitch) * Rx(roll). */
 export function eulerToMatrix3(roll: number, pitch: number, yaw: number): THREE.Matrix3 {
     const cx = Math.cos(roll), sx = Math.sin(roll);

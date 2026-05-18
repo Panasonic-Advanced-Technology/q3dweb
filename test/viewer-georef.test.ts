@@ -16,6 +16,7 @@ vi.mock('three', async () => {
 });
 
 import { Viewer } from '../src/viewer';
+import { CloudViewer } from '../src/cloud_viewer';
 
 function makeLASWithVLR(options: {
     recordID: number;
@@ -67,10 +68,10 @@ function makeLASWithVLR(options: {
 }
 
 describe('Viewer parseLAS georef branches', () => {
-    let v: Viewer;
+    let v: CloudViewer;
     beforeEach(() => {
         const c = document.createElement('div'); c.id = 'app'; document.body.appendChild(c);
-        v = new Viewer('app');
+        v = new CloudViewer('app');
     });
     afterEach(() => { document.body.innerHTML = ''; });
 

@@ -23,6 +23,8 @@ vi.mock('three', async () => {
 
 import * as THREE from 'three';
 import { Viewer } from '../src/viewer';
+import { CloudViewer } from '../src/cloud_viewer';
+import { FilmMakerViewer } from '../src/film_maker_viewer';
 
 function makeContainer(id = 'app'): HTMLElement {
   const c = document.createElement('div');
@@ -256,8 +258,8 @@ describe('Viewer settings panel', () => {
 });
 
 describe('Viewer Film Maker controls', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: FilmMakerViewer;
+  beforeEach(() => { makeContainer(); v = new FilmMakerViewer('app'); });
   afterEach(() => {
     v.stopPlayback();
     vi.useRealTimers();
@@ -276,38 +278,39 @@ describe('Viewer Film Maker controls', () => {
     return { first, second };
   }
 
-  it('builds the Film Maker tab and wires list, buttons, inputs, and shortcuts', () => {
-    v.onSettingsItemSelected('__film_maker__');
+  it('builds the Film Maker UI and wires list, buttons, inputs, and shortcuts', () => {
+    // Film maker UI is built during construction, always visible in panel
     expect(v.filmMakerTabActive).toBe(true);
-    expect(v.settingsContent?.textContent).toContain('Video File Name:');
+    const fm = v.settingsPanel!.querySelector('[data-role="film-maker"]') as HTMLElement;
+    expect(fm.textContent).toContain('Video File Name:');
 
-    const buttons = Array.from(v.settingsContent!.querySelectorAll('button'));
+    const buttons = Array.from(fm.querySelectorAll('button'));
     buttons[0].click();
     buttons[0].click();
     expect(v.filmMaker.keyFrames.length).toBe(2);
 
-    const rows = Array.from(v.settingsContent!.querySelectorAll('div[data-index]')) as HTMLElement[];
+    const rows = Array.from(fm.querySelectorAll('div[data-index]')) as HTMLElement[];
     expect(rows.map((row) => row.textContent)).toEqual(['Frame 1', 'Frame 2']);
     rows[0].click();
     expect(v.filmMaker.currentIndex).toBe(0);
     rows[1].dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 
-    const checkbox = v.settingsContent!.querySelector('input[type=checkbox]') as HTMLInputElement;
+    const checkbox = fm.querySelector('input[type=checkbox]') as HTMLInputElement;
     checkbox.checked = true;
     checkbox.onchange?.(new Event('change'));
     expect(v.isRecordingFilm).toBe(true);
 
-    const textInput = v.settingsContent!.querySelector('input[type=text]') as HTMLInputElement;
+    const textInput = fm.querySelector('input[type=text]') as HTMLInputElement;
     textInput.value = 'demo.webm';
     textInput.onchange?.(new Event('change'));
     expect(v.videoFileName).toBe('demo.webm');
 
-    const codecSelect = v.settingsContent!.querySelector('select') as HTMLSelectElement;
+    const codecSelect = fm.querySelector('select') as HTMLSelectElement;
     codecSelect.value = 'video/webm;codecs=vp8';
     codecSelect.onchange?.(new Event('change'));
     expect(v.videoMimeType).toBe('video/webm;codecs=vp8');
 
-    const numbers = Array.from(v.settingsContent!.querySelectorAll('input[type=number]')) as HTMLInputElement[];
+    const numbers = Array.from(fm.querySelectorAll('input[type=number]')) as HTMLInputElement[];
     numbers[0].value = '2.5';
     numbers[0].onchange?.(new Event('change'));
     numbers[1].value = '90';
@@ -335,17 +338,15 @@ describe('Viewer Film Maker controls', () => {
     expect(ignoredSpace.defaultPrevented).toBe(false);
   });
 
-  it('handles select-target M shortcut and stale settings selection fallback', () => {
-    v.onSettingsItemSelected('__film_maker__');
+  it('handles select-target M shortcut and panel re-show', () => {
     const select = v.settingsItemSelect!;
     const event = new KeyboardEvent('keydown', { key: 'm', bubbles: true, cancelable: true });
     select.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     expect(v.settingsPanel?.style.display).toBe('none');
 
-    (v as any).settingsItemSelect = { value: 'stale', options: [] };
+    // Re-show panel: should re-render the last active tab (Film Maker)
     v.toggleSettingsPanel();
-    expect(v.settingsItemSelect?.value).toBe('__main_win__');
     expect(v.settingsContent?.children.length).toBeGreaterThan(0);
   });
 
@@ -372,7 +373,6 @@ describe('Viewer Film Maker controls', () => {
     }
     (globalThis as any).MediaRecorder = FakeMediaRecorder;
 
-    v.onSettingsItemSelected('__film_maker__');
     addTwoKeyFrames();
     v.filmMaker.updateIntervalMs = 100;
     v.isRecordingFilm = true;
@@ -463,8 +463,8 @@ describe('Viewer Film Maker controls', () => {
 });
 
 describe('Viewer streaming - PCD', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   function makeBinaryPCD(points: Array<[number, number, number, number]>): Uint8Array {
@@ -595,8 +595,8 @@ describe('Viewer streaming - PCD', () => {
 });
 
 describe('Viewer PLY parsing', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   function asciiPLY(withColors = true, withIntensity = true): Uint8Array {
@@ -671,8 +671,8 @@ describe('Viewer PLY parsing', () => {
 });
 
 describe('Viewer LAS parsing', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   function makeLAS(version: [number, number] = [1, 2], format = 0, n = 2, withRGB = false): Uint8Array {
@@ -863,8 +863,8 @@ describe('Viewer measurement & mouse/keyboard events', () => {
 });
 
 describe('Viewer drag and drop & loadFile', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   it('handleDrop with no dataTransfer does nothing', async () => {
@@ -892,8 +892,8 @@ describe('Viewer drag and drop & loadFile', () => {
 });
 
 describe('Viewer global error handlers + window resize + animation', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   it('onWindowResize updates renderer & camera', () => {
