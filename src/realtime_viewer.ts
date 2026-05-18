@@ -4,7 +4,7 @@ import { CloudItem } from './items/CloudItem';
 import { AxisItem } from './items/AxisItem';
 import { NativeCloudItem } from './items/NativeCloudItem';
 import { decodePointCloud2, inferColorModeFromFields } from './utils/pointCloud2Decode';
-import { makeLabel, makeTextInput, makeNumberInput, makeButton } from './viewer/settingsUI';
+import { makeLabel, makeTextInput, makeNumberInput, makeButton, buildNativeCloudItemSettings } from './viewer/settingsUI';
 import type {
     ColorMode,
     DecodedCloudChunk,
@@ -85,6 +85,21 @@ export class RealtimeViewer extends Viewer {
         } else {
             this.settingsPanel.insertBefore(section, this.settingsContent);
         }
+    }
+
+    override onSettingsItemSelected(name: string): void {
+        const item = this.items[name];
+        if (item instanceof NativeCloudItem && this.settingsContent) {
+            this.settingsContent.innerHTML = '';
+            buildNativeCloudItemSettings(
+                item,
+                this.settingsContent,
+                () => this.requestRender(),
+                mode => { this.mapColorMode = mode; },
+            );
+            return;
+        }
+        super.onSettingsItemSelected(name);
     }
 
     setRealtimeOptions(options: RealtimeTopicOptions): void {
