@@ -126,7 +126,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
             const dx = point.x - touchState.lastPoint.x;
             const dy = point.y - touchState.lastPoint.y;
             touchState.lastPoint = point;
-            ctx.rotateCam(-dy * TOUCH_ROTATE_SPEED, 0, -dx * TOUCH_ROTATE_SPEED);
+            translateFromScreenDelta(ctx, dx, dy, TOUCH_PAN_SPEED);
             ctx.showCenter = true;
             ctx.requestRender();
             return;
@@ -143,7 +143,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
             const dx = center.x - touchState.lastCenter.x;
             const dy = center.y - touchState.lastCenter.y;
             const pinchDelta = pinchDistance - touchState.lastDistance;
-            if (dx !== 0 || dy !== 0) translateFromScreenDelta(ctx, dx, dy, TOUCH_PAN_SPEED);
+            if (dx !== 0 || dy !== 0) ctx.rotateCam(-dy * TOUCH_ROTATE_SPEED, 0, -dx * TOUCH_ROTATE_SPEED);
             if (pinchDelta !== 0) ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
             touchState.lastCenter = center;
             touchState.lastDistance = pinchDistance;
