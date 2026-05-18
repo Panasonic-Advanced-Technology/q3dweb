@@ -1,4 +1,5 @@
 import { CloudViewer } from './cloud_viewer';
+import type { ViewerMode } from './viewer';
 import { FilmMaker, KeyFrame } from './viewer/filmMaker';
 import { recoverCenterEuler } from './utils/maths';
 import {
@@ -13,8 +14,8 @@ import {
 
 /**
  * FilmMakerViewer extends the base Viewer with keyframe-based film/flythrough recording.
- * Its settings panel includes an item dropdown (inherited) plus a persistent film maker
- * section (keyframe list, add/delete/play/record controls).
+ * Its settings panel includes a persistent film maker section (keyframe list,
+ * add/delete/play/record controls) above the inherited item dropdown.
  */
 export class FilmMakerViewer extends CloudViewer {
     filmMaker: FilmMaker = new FilmMaker();
@@ -45,15 +46,17 @@ export class FilmMakerViewer extends CloudViewer {
         this.installFilmMakerSection();
     }
 
+    protected getViewerMode(): ViewerMode { return 'film_maker'; }
+
     /**
-     * Inserts the film maker controls (keyframe list + add/delete/play buttons) into the
-     * settings panel between the item dropdown and the per-item content area.
+    * Inserts the film maker controls (keyframe list + add/delete/play buttons) into the
+    * settings panel above the item dropdown and per-item content area.
      * Called from the constructor after field initialization.
      */
     private installFilmMakerSection(): void {
         if (!this.settingsPanel || !this.settingsContent) return;
         const section = document.createElement('div');
-        section.style.cssText = 'margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #444;';
+        section.style.cssText = 'margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #888;box-shadow:0 1px 0 rgba(0,0,0,0.9);';
         section.setAttribute('data-role', 'film-maker');
         const refs: FilmMakerUIRefs = buildFilmMakerSettings(section, {
             filmMaker: this.filmMaker,
@@ -83,8 +86,13 @@ export class FilmMakerViewer extends CloudViewer {
         this.setFilmMakerPlayButtonState(this.isPlayingFilm);
         this.refreshFilmMakerListUI();
         syncFilmMakerSpinboxes(this.filmMaker, this.filmMakerSpinLin, this.filmMakerSpinAng, this.filmMakerSpinStop);
-        // Insert before the content area so it appears between the dropdown and item settings
-        this.settingsPanel.insertBefore(section, this.settingsContent);
+        const itemSelect = this.settingsItemSelect;
+        if (itemSelect?.parentElement === this.settingsPanel) {
+            itemSelect.style.marginTop = '2px';
+            this.settingsPanel.insertBefore(section, itemSelect);
+        } else {
+            this.settingsPanel.insertBefore(section, this.settingsContent);
+        }
     }
 
     addKeyFrameFromCamera(): KeyFrame {

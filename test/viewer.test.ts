@@ -25,6 +25,7 @@ import * as THREE from 'three';
 import { Viewer } from '../src/viewer';
 import { CloudViewer } from '../src/cloud_viewer';
 import { FilmMakerViewer } from '../src/film_maker_viewer';
+import { RealtimeViewer } from '../src/realtime_viewer';
 
 function makeContainer(id = 'app'): HTMLElement {
   const c = document.createElement('div');
@@ -155,6 +156,30 @@ describe('Viewer settings panel', () => {
     expect(v.settingsPanel?.style.display).toBe('block');
   });
 
+  it('adds the viewer mode selector at the top of settings', () => {
+    const switchSpy = vi.spyOn(v as any, 'switchViewerMode').mockImplementation(() => {});
+    const modeSelect = v.settingsPanel!.querySelector('[data-role="viewer-mode-select"]') as HTMLSelectElement;
+    const itemSelect = v.settingsPanel!.querySelector('[data-role="settings-item-select"]') as HTMLSelectElement;
+
+    expect(modeSelect).toBe(v.settingsModeSelect);
+    expect(itemSelect).toBe(v.settingsItemSelect);
+    expect(Array.from(v.settingsPanel!.children).indexOf(modeSelect)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemSelect),
+    );
+
+    expect(Array.from(modeSelect.options).map((option) => option.textContent)).toEqual([
+      'cloud_viewer',
+      'film_maker',
+      'realtime_viewer',
+    ]);
+    expect(modeSelect.value).toBe('cloud');
+
+    modeSelect.value = 'film_maker';
+    modeSelect.onchange?.(new Event('change'));
+    expect(switchSpy).toHaveBeenCalledWith('film_maker');
+    expect(modeSelect.value).toBe('film_maker');
+  });
+
   it('refreshSettingsItemList preserves preferred selection', () => {
     const obj = new THREE.Object3D();
     v.addItem('myitem', obj);
@@ -281,8 +306,12 @@ describe('Viewer Film Maker controls', () => {
   it('builds the Film Maker UI and wires list, buttons, inputs, and shortcuts', () => {
     // Film maker UI is built during construction, always visible in panel
     expect(v.filmMakerTabActive).toBe(true);
+    expect(v.settingsModeSelect?.value).toBe('film_maker');
     const fm = v.settingsPanel!.querySelector('[data-role="film-maker"]') as HTMLElement;
     expect(fm.textContent).toContain('Video File Name:');
+    expect(Array.from(v.settingsPanel!.children).indexOf(fm)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(v.settingsItemSelect!),
+    );
 
     const buttons = Array.from(fm.querySelectorAll('button'));
     buttons[0].click();
@@ -459,6 +488,23 @@ describe('Viewer Film Maker controls', () => {
     } finally {
       (globalThis as any).confirm = originalConfirm;
     }
+  });
+});
+
+describe('RealtimeViewer settings layout', () => {
+  let v: RealtimeViewer;
+  beforeEach(() => { makeContainer(); v = new RealtimeViewer('app'); });
+  afterEach(cleanupContainers);
+
+  it('places realtime controls above the item selector with a clear boundary', () => {
+    const realtime = v.settingsPanel!.querySelector('[data-role="realtime"]') as HTMLElement;
+    expect(v.settingsModeSelect?.value).toBe('realtime');
+    expect(realtime.textContent).toContain('ROS Bridge URL');
+    expect(Array.from(v.settingsPanel!.children).indexOf(realtime)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(v.settingsItemSelect!),
+    );
+    expect(realtime.style.borderBottomWidth).toBe('2px');
+    expect(v.settingsItemSelect!.style.marginTop).toBe('2px');
   });
 });
 

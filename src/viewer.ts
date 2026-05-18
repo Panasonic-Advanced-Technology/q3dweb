@@ -20,6 +20,14 @@ const wrapAngle = (a: number): number =>
     ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
 
 interface SettingBuilder { addSetting(container: HTMLElement): void; }
+export type ViewerMode = 'cloud' | 'film_maker' | 'realtime';
+
+const VIEWER_MODE_OPTIONS: Array<{ value: ViewerMode; label: string }> = [
+    { value: 'cloud', label: 'cloud_viewer' },
+    { value: 'film_maker', label: 'film_maker' },
+    { value: 'realtime', label: 'realtime_viewer' },
+];
+
 export class Viewer {
     container: HTMLElement;
     scene: THREE.Scene;
@@ -43,6 +51,7 @@ export class Viewer {
     settingsPanel: HTMLElement | null = null;
     settingsContent: HTMLElement | null = null;
     settingsItemSelect: HTMLSelectElement | null = null;
+    settingsModeSelect: HTMLSelectElement | null = null;
     statusElement: HTMLElement | null = null;
     loadingOverlay: HTMLElement;
     selectedPoints: THREE.Vector3[] = [];
@@ -364,8 +373,11 @@ export class Viewer {
         title.style.cssText = 'font-size:14px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #555;padding-bottom:4px;';
         title.textContent = 'Settings (M to toggle)';
         panel.appendChild(title);
+        panel.appendChild(makeLabel('Viewer Mode:'));
+        panel.appendChild(this.createViewerModeSelect());
         const select = document.createElement('select');
         select.style.cssText = 'width:100%;margin-bottom:8px;background:#333;color:#eee;border:1px solid #666;padding:4px;border-radius:3px;';
+        select.setAttribute('data-role', 'settings-item-select');
         select.onchange = () => this.onSettingsItemSelected(select.value);
         panel.appendChild(select);
         this.settingsItemSelect = select;
@@ -376,6 +388,39 @@ export class Viewer {
         this.container.appendChild(panel);
         this.settingsPanel = panel;
         this.refreshSettingsItemList();
+    }
+
+    protected getViewerMode(): ViewerMode {
+        const mode = new URLSearchParams(window.location.search).get('mode');
+        return mode === 'film_maker' || mode === 'realtime' ? mode : 'cloud';
+    }
+
+    protected switchViewerMode(mode: ViewerMode): void {
+        const url = new URL(window.location.href);
+        url.searchParams.set('mode', mode);
+        window.location.assign(url.toString());
+    }
+
+    private createViewerModeSelect(): HTMLSelectElement {
+        const select = document.createElement('select');
+        select.setAttribute('data-role', 'viewer-mode-select');
+        select.style.cssText = 'width:100%;margin-bottom:8px;background:#333;color:#eee;border:1px solid #666;padding:4px;border-radius:3px;';
+        for (const option of VIEWER_MODE_OPTIONS) {
+            const item = document.createElement('option');
+            item.value = option.value;
+            item.textContent = option.label;
+            select.appendChild(item);
+        }
+        select.value = this.getViewerMode();
+        select.onchange = () => this.onViewerModeSelected(select.value as ViewerMode);
+        this.settingsModeSelect = select;
+        return select;
+    }
+
+    private onViewerModeSelected(mode: ViewerMode): void {
+        if (mode === this.getViewerMode()) return;
+        if (this.settingsModeSelect) this.settingsModeSelect.value = mode;
+        this.switchViewerMode(mode);
     }
 
     toggleSettingsPanel() {

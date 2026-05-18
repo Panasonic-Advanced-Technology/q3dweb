@@ -1,4 +1,5 @@
 import { Viewer } from './viewer';
+import type { ViewerMode } from './viewer';
 import {
     PCDHeader, getFieldSpec, readPackedRGB as _readPackedRGB,
     parseAsciiPackedRGB as _parseAsciiPackedRGB, readNumericValue as _readNumericValue,
@@ -54,6 +55,8 @@ export class CloudViewer extends Viewer {
         super(containerId);
         this.setupDragDrop();
     }
+
+    protected getViewerMode(): ViewerMode { return 'cloud'; }
 
     setupDragDrop() {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(n =>

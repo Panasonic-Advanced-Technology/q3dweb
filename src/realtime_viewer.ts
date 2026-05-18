@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Viewer } from './viewer';
+import type { ViewerMode } from './viewer';
 import { CloudItem } from './items/CloudItem';
 import { AxisItem } from './items/AxisItem';
 import { NativeCloudItem } from './items/NativeCloudItem';
@@ -43,11 +44,13 @@ export class RealtimeViewer extends Viewer {
         this.installRealtimeSection();
     }
 
-    /** Inserts the realtime connection panel above the item settings area. */
+    protected getViewerMode(): ViewerMode { return 'realtime'; }
+
+    /** Inserts the realtime connection panel above the item dropdown and settings area. */
     private installRealtimeSection(): void {
         if (!this.settingsPanel || !this.settingsContent) return;
         const section = document.createElement('div');
-        section.style.cssText = 'margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #444;';
+        section.style.cssText = 'margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #888;box-shadow:0 1px 0 rgba(0,0,0,0.9);';
         section.setAttribute('data-role', 'realtime');
 
         section.appendChild(makeLabel('ROS Bridge URL'));
@@ -78,7 +81,13 @@ export class RealtimeViewer extends Viewer {
         });
         section.appendChild(connectBtn);
 
-        this.settingsPanel.insertBefore(section, this.settingsContent);
+        const itemSelect = this.settingsItemSelect;
+        if (itemSelect?.parentElement === this.settingsPanel) {
+            itemSelect.style.marginTop = '2px';
+            this.settingsPanel.insertBefore(section, itemSelect);
+        } else {
+            this.settingsPanel.insertBefore(section, this.settingsContent);
+        }
     }
 
     setRealtimeOptions(options: RealtimeTopicOptions): void {
