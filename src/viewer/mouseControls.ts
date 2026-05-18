@@ -42,8 +42,9 @@ interface TouchGestureState {
     lastDistance: number;
 }
 
-const TOUCH_ROTATE_SPEED = 0.2 * Math.PI / 180;
-const TOUCH_PINCH_ZOOM_SPEED = 0.005;
+const TOUCH_ROTATE_SPEED = 0.45 * Math.PI / 180;
+const TOUCH_PAN_SPEED = 1.8;
+const TOUCH_PINCH_ZOOM_SPEED = 0.01;
 
 function isEditable(t: EventTarget | null): boolean {
     if (!t) return false;
@@ -66,10 +67,10 @@ function getTouchPoint(touch: Touch): TouchPoint {
     return { x: touch.clientX, y: touch.clientY };
 }
 
-function translateFromScreenDelta(ctx: InputContext, dx: number, dy: number): void {
+function translateFromScreenDelta(ctx: InputContext, dx: number, dy: number, distanceScale = 1): void {
     const Rwc = eulerToMatrix4(ctx.euler[0], ctx.euler[1], ctx.euler[2]);
     const Kinv = getCameraK(ctx).clone().invert();
-    const dist = Math.max(ctx.cameraDist, 0.5);
+    const dist = Math.max(ctx.cameraDist, 0.5) * distanceScale;
     const sv = new THREE.Vector3(-dx, dy, 0);
     sv.applyMatrix3(Kinv).multiplyScalar(dist).applyMatrix4(Rwc);
     ctx.translateCam(sv);
@@ -142,7 +143,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
             const dx = center.x - touchState.lastCenter.x;
             const dy = center.y - touchState.lastCenter.y;
             const pinchDelta = pinchDistance - touchState.lastDistance;
-            if (dx !== 0 || dy !== 0) translateFromScreenDelta(ctx, dx, dy);
+            if (dx !== 0 || dy !== 0) translateFromScreenDelta(ctx, dx, dy, TOUCH_PAN_SPEED);
             if (pinchDelta !== 0) ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
             touchState.lastCenter = center;
             touchState.lastDistance = pinchDistance;

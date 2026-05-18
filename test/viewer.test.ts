@@ -1159,6 +1159,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 140, y: 120 }]));
       canvas.dispatchEvent(makeTouchEvent('touchend', []));
       expect(v.euler).not.toEqual(beforeEuler);
+      expect(Math.abs(v.euler[2] - beforeEuler[2])).toBeGreaterThan(0.25);
 
       const beforeCenter = v.cameraCenter.clone();
       const beforeDist = v.cameraDist;
@@ -1166,7 +1167,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 120, y: 120 }, { x: 240, y: 120 }]));
       canvas.dispatchEvent(makeTouchEvent('touchend', []));
       expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
-      expect(v.cameraDist).toBeLessThan(beforeDist);
+      expect(v.cameraDist).toBeLessThan(beforeDist - 6);
     } finally {
       if (originalPointerEvent !== undefined) (window as any).PointerEvent = originalPointerEvent;
     }
@@ -1187,6 +1188,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       canvas.dispatchEvent(makePointerEvent('pointermove', 1, 140, 120));
       canvas.dispatchEvent(makePointerEvent('pointerup', 1, 140, 120));
       expect(v.euler).not.toEqual(beforeEuler);
+      expect(Math.abs(v.euler[2] - beforeEuler[2])).toBeGreaterThan(0.25);
 
       const beforeCenter = v.cameraCenter.clone();
       const beforeDist = v.cameraDist;
@@ -1198,6 +1200,39 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       canvas.dispatchEvent(makePointerEvent('pointerup', 2, 240, 120));
       expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
       expect(v.cameraDist).toBeLessThan(beforeDist);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('touch panning scales with distance from the rotation center', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+
+      const runPanAtDistance = (cameraDist: number) => {
+        v.cameraCenter.set(0, 0, 0);
+        v.cameraDist = cameraDist;
+        v.updateCamera();
+        canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+        canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 200, 100));
+        canvas.dispatchEvent(makePointerEvent('pointermove', 1, 120, 120));
+        canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 120));
+        canvas.dispatchEvent(makePointerEvent('pointerup', 1, 120, 120));
+        canvas.dispatchEvent(makePointerEvent('pointerup', 2, 220, 120));
+        return v.cameraCenter.length();
+      };
+
+      const nearPan = runPanAtDistance(5);
+      const farPan = runPanAtDistance(50);
+      expect(nearPan).toBeGreaterThan(0);
+      expect(farPan).toBeGreaterThan(nearPan * 5);
     } finally {
       if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
       else (window as any).PointerEvent = originalPointerEvent;
