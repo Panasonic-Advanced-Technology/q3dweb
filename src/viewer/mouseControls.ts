@@ -43,7 +43,7 @@ interface TouchGestureState {
 }
 
 const TOUCH_ROTATE_SPEED = 0.45 * Math.PI / 180;
-const TOUCH_PAN_SPEED = 1.8;
+const TOUCH_PAN_SPEED = 1;
 const TOUCH_PINCH_ZOOM_SPEED = 0.01;
 
 function isEditable(t: EventTarget | null): boolean {
@@ -54,8 +54,8 @@ function isEditable(t: EventTarget | null): boolean {
 }
 
 function getCameraK(ctx: InputContext): THREE.Matrix3 {
-    const w = ctx.container.clientWidth * ctx.rendererPixelRatio;
-    const h = ctx.container.clientHeight * ctx.rendererPixelRatio;
+    const w = ctx.container.clientWidth;
+    const h = ctx.container.clientHeight;
     const fovRad = ctx.camera.fov * Math.PI / 180;
     const f = (w / 2) / Math.tan(fovRad / 2);
     const K = new THREE.Matrix3();

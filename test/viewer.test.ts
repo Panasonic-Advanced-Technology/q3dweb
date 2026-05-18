@@ -1238,6 +1238,77 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     }
   });
 
+  it('one-finger touch pan matches mouse pan for the same screen delta', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+
+      const resetCamera = () => {
+        v.cameraCenter.set(0, 0, 0);
+        v.cameraDist = 40;
+        v.euler = [Math.PI / 3, 0, Math.PI / 4];
+        v.updateCamera();
+      };
+
+      resetCamera();
+      canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, button: 0 }));
+      canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 130, clientY: 125, button: 0 }));
+      canvas.dispatchEvent(new MouseEvent('mouseup'));
+      const mousePan = v.cameraCenter.clone();
+
+      resetCamera();
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 130, 125));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 130, 125));
+      const touchPan = v.cameraCenter.clone();
+
+      expect(touchPan.x).toBeCloseTo(mousePan.x, 6);
+      expect(touchPan.y).toBeCloseTo(mousePan.y, 6);
+      expect(touchPan.z).toBeCloseTo(mousePan.z, 6);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('one-finger touch pan uses CSS pixels on high DPI screens', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+
+      const runTouchPan = (rendererPixelRatio: number) => {
+        v.cameraCenter.set(0, 0, 0);
+        v.cameraDist = 40;
+        v.euler = [Math.PI / 3, 0, Math.PI / 4];
+        v.rendererPixelRatio = rendererPixelRatio;
+        v.updateCamera();
+        canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+        canvas.dispatchEvent(makePointerEvent('pointermove', 1, 130, 125));
+        canvas.dispatchEvent(makePointerEvent('pointerup', 1, 130, 125));
+        return v.cameraCenter.clone();
+      };
+
+      const normalDpiPan = runTouchPan(1);
+      const highDpiPan = runTouchPan(3);
+      expect(highDpiPan.x).toBeCloseTo(normalDpiPan.x, 6);
+      expect(highDpiPan.y).toBeCloseTo(normalDpiPan.y, 6);
+      expect(highDpiPan.z).toBeCloseTo(normalDpiPan.z, 6);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
   it('touch input does not drive measurement shortcuts', () => {
     const canvas = v.renderer.domElement;
     const addSpy = vi.spyOn(v, 'addMeasurementPoint');
