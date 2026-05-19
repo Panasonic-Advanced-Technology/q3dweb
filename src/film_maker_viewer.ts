@@ -85,9 +85,11 @@ export class FilmMakerViewer extends CloudViewer {
         this.refreshFilmMakerListUI();
         syncFilmMakerSpinboxes(this.filmMaker, this.filmMakerSpinLin, this.filmMakerSpinAng, this.filmMakerSpinStop);
         const itemSelect = this.settingsItemSelect?.closest('.q3d-material-select') as HTMLElement | null;
-        if (itemSelect?.parentElement === this.settingsPanel) {
-            itemSelect.style.marginTop = '2px';
-            this.settingsPanel.insertBefore(section, itemSelect);
+        const itemLabel = this.settingsPanel.querySelector('[data-role="settings-item-label"]') as HTMLElement | null;
+        const anchor = itemLabel ?? itemSelect;
+        if (anchor?.parentElement === this.settingsPanel) {
+            if (itemSelect) itemSelect.style.marginTop = '2px';
+            this.settingsPanel.insertBefore(section, anchor);
         } else {
             this.settingsPanel.insertBefore(section, this.settingsContent);
         }

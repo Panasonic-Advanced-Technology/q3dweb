@@ -202,6 +202,16 @@ describe('Viewer settings panel', () => {
     expect(button.querySelector('md-ripple')).toBeTruthy();
   });
 
+  it('shows the viewer setting label above the item selector', () => {
+    const label = v.settingsPanel!.querySelector('[data-role="settings-item-label"]') as HTMLElement;
+    const itemSelectWrapper = v.settingsItemSelect!.closest('.q3d-material-select') as HTMLElement;
+    expect(label.textContent).toBe('Viewer Setting:');
+    expect(label.classList.contains('q3d-setting-label')).toBe(true);
+    expect(Array.from(v.settingsPanel!.children).indexOf(label)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
+    );
+  });
+
   it('refreshSettingsItemList preserves preferred selection', () => {
     const obj = new THREE.Object3D();
     v.addItem('myitem', obj);
@@ -383,9 +393,13 @@ describe('Viewer Film Maker controls', () => {
     // Film maker UI is built during construction, always visible in panel
     expect(v.filmMakerTabActive).toBe(true);
     const fm = v.settingsPanel!.querySelector('[data-role="film-maker"]') as HTMLElement;
+    const itemLabel = v.settingsPanel!.querySelector('[data-role="settings-item-label"]') as HTMLElement;
     const itemSelectWrapper = v.settingsItemSelect!.closest('.q3d-material-select') as HTMLElement;
     expect(fm.textContent).toContain('Video File Name:');
     expect(Array.from(v.settingsPanel!.children).indexOf(fm)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemLabel),
+    );
+    expect(Array.from(v.settingsPanel!.children).indexOf(itemLabel)).toBeLessThan(
       Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
     );
 
@@ -575,9 +589,13 @@ describe('RealtimeViewer settings layout', () => {
 
   it('places realtime controls above the item selector with a clear boundary', () => {
     const realtime = v.settingsPanel!.querySelector('[data-role="realtime"]') as HTMLElement;
+    const itemLabel = v.settingsPanel!.querySelector('[data-role="settings-item-label"]') as HTMLElement;
     const itemSelectWrapper = v.settingsItemSelect!.closest('.q3d-material-select') as HTMLElement;
     expect(realtime.textContent).toContain('ROS Bridge URL');
     expect(Array.from(v.settingsPanel!.children).indexOf(realtime)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemLabel),
+    );
+    expect(Array.from(v.settingsPanel!.children).indexOf(itemLabel)).toBeLessThan(
       Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
     );
     expect(realtime.classList.contains('q3d-settings-section')).toBe(true);

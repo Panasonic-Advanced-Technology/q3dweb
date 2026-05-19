@@ -45,6 +45,7 @@ test.describe('smoke', () => {
     await page.goto('/');
     await expect(page.locator('text=Set background color:')).toBeVisible();
     await expect(page.locator('text=Show Center Point')).toBeVisible();
+    await expect(page.locator('[data-role="settings-item-label"]')).toHaveText('Viewer Setting:');
 
     // Default selection is "main win(Viewer)".
     const select = getSettingsItemSelect(page);

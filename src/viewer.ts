@@ -196,6 +196,9 @@ export class Viewer {
         panel.appendChild(title);
         this.settingsPanelTitle = titleText;
         this.settingsPanelToggleButton = toggleButton;
+        const itemLabel = makeLabel('Viewer Setting:');
+        itemLabel.setAttribute('data-role', 'settings-item-label');
+        panel.appendChild(itemLabel);
         const itemSelect = createMaterialMenuSelect(
             [{ label: 'Viewer', value: '__main_win__' }],
             '__main_win__',
