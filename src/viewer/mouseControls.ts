@@ -194,6 +194,14 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
 
     const remainingTouchGesture = (points: TouchPoint[]): void => {
         if (points.length === 0) resetTouchState();
+        else if (touchState.mode === 'multi' && points.length === 1) {
+            touchState.mode = 'none';
+            touchState.multiIntent = 'undecided';
+            touchState.lastPoint = null;
+            touchState.lastCenter = null;
+            touchState.lastDistance = 0;
+            touchState.lastAngle = 0;
+        }
         else startTouchGesture(points);
     };
 

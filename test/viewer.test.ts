@@ -1315,6 +1315,42 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     }
   });
 
+  it('two-finger pointer pinch keeps the rotation center fixed until all fingers are released', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      v.cameraCenter.set(4, 5, 6);
+      v.cameraDist = 40;
+      v.updateCamera();
+
+      const canvas = v.renderer.domElement;
+      const beforeCenter = v.cameraCenter.clone();
+      const beforeDist = v.cameraDist;
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 200, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 80, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 100));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 80, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 260, 160));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 260, 160));
+
+      expect(v.cameraDist).toBeLessThan(beforeDist);
+      expect(v.cameraCenter.distanceTo(beforeCenter)).toBeLessThan(1e-6);
+
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 130, 130));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 130, 130));
+      expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
   it('one-finger touch panning scales with distance from the rotation center', () => {
     const originalPointerEvent = (window as any).PointerEvent;
     try {

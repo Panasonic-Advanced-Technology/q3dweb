@@ -107,6 +107,19 @@ test.describe('mobile touch operation', () => {
 
       const twistYawDelta = viewer.euler[2] - beforeEuler[2];
 
+      const beforePinchCenter = viewer.cameraCenter.clone();
+      const beforePinchDistance = viewer.cameraDist;
+      dispatchPointer('pointerdown', 1, 100, 100, 1);
+      dispatchPointer('pointerdown', 2, 200, 100, 1);
+      dispatchPointer('pointermove', 1, 80, 100, 1);
+      dispatchPointer('pointermove', 2, 220, 100, 1);
+      dispatchPointer('pointerup', 1, 80, 100, 0);
+      dispatchPointer('pointermove', 2, 260, 160, 1);
+      dispatchPointer('pointerup', 2, 260, 160, 0);
+
+      const pinchCenterDelta = viewer.cameraCenter.distanceTo(beforePinchCenter);
+      const pinchDistanceDelta = Math.abs(viewer.cameraDist - beforePinchDistance);
+
       const beforeParallelEuler = [...viewer.euler];
       const beforeParallelDistance = viewer.cameraDist;
       const beforeParallelCenterDistance = viewer.camera.position.distanceTo(viewer.cameraCenter);
@@ -126,6 +139,8 @@ test.describe('mobile touch operation', () => {
         isTouchPrimaryDevice: viewer.isTouchPrimaryDevice,
         panDistance,
         twistYawDelta,
+        pinchCenterDelta,
+        pinchDistanceDelta,
         parallelPitchDelta,
         parallelYawDelta,
         parallelDistanceDelta,
@@ -138,6 +153,8 @@ test.describe('mobile touch operation', () => {
     expect(result.isTouchPrimaryDevice).toBe(true);
     expect(result.panDistance).toBeGreaterThan(0);
     expect(result.twistYawDelta).toBeGreaterThan(0.1);
+    expect(result.pinchDistanceDelta).toBeGreaterThan(0);
+    expect(result.pinchCenterDelta).toBeLessThan(0.01);
     expect(result.parallelPitchDelta).toBeGreaterThan(0.1);
     expect(result.parallelYawDelta).toBeLessThan(0.01);
     expect(result.parallelDistanceDelta).toBeLessThan(0.01);
