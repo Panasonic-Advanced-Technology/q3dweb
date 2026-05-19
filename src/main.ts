@@ -1,4 +1,5 @@
 import './style.css'
+import { installMaterialWebTheme } from './materialWeb';
 import { FilmMakerViewer } from './film_maker_viewer';
 import { RealtimeViewer } from './realtime_viewer';
 import { CloudViewer } from './cloud_viewer';
@@ -39,6 +40,8 @@ declare function acquireVsCodeApi(): any;
 
 // Initialize Viewer
 try {
+    installMaterialWebTheme();
+
     let vscode: any = null;
     try {
         vscode = acquireVsCodeApi();

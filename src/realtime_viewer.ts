@@ -55,7 +55,7 @@ export class RealtimeViewer extends Viewer {
     private installRealtimeSection(): void {
         if (!this.settingsPanel || !this.settingsContent) return;
         const section = document.createElement('div');
-        section.style.cssText = 'margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #888;box-shadow:0 1px 0 rgba(0,0,0,0.9);';
+        section.className = 'q3d-settings-section';
         section.setAttribute('data-role', 'realtime');
 
         section.appendChild(makeLabel('ROS Bridge URL'));
@@ -97,7 +97,7 @@ export class RealtimeViewer extends Viewer {
         });
         section.appendChild(connectBtn);
 
-        const itemSelect = this.settingsItemSelect;
+        const itemSelect = this.settingsItemSelect?.closest('.q3d-material-select') as HTMLElement | null;
         if (itemSelect?.parentElement === this.settingsPanel) {
             itemSelect.style.marginTop = '2px';
             this.settingsPanel.insertBefore(section, itemSelect);

@@ -6,20 +6,41 @@
 import * as THREE from 'three';
 import { NativeCloudItem } from '../items/NativeCloudItem';
 import type { ColorMode } from '../utils/realtimeTypes';
+import { createMaterialMenuSelect } from './materialSelect';
 
 // ========== Primitive UI builders ==========
+
+export function attachMaterialRipple(element: HTMLElement): void {
+    if (element.querySelector('md-ripple')) return;
+    const ripple = document.createElement('md-ripple');
+    ripple.setAttribute('aria-hidden', 'true');
+    element.prepend(ripple);
+}
+
+export function setMaterialButtonLabel(button: HTMLButtonElement, label: string): void {
+    let labelEl = button.querySelector('[data-role="material-button-label"]') as HTMLElement | null;
+    if (!labelEl) {
+        button.textContent = '';
+        attachMaterialRipple(button);
+        labelEl = document.createElement('span');
+        labelEl.setAttribute('data-role', 'material-button-label');
+        labelEl.className = 'q3d-material-button-label';
+        button.appendChild(labelEl);
+    }
+    labelEl.textContent = label;
+}
 
 export function makeLabel(text: string): HTMLElement {
     const lbl = document.createElement('div');
     lbl.textContent = text;
-    lbl.style.cssText = 'margin: 6px 0 2px 0; font-size: 11px; color: #ccc;';
+    lbl.className = 'q3d-setting-label md-typescale-label-medium';
     return lbl;
 }
 
 export function makeStaticValue(text: string): HTMLElement {
     const v = document.createElement('div');
     v.textContent = text;
-    v.style.cssText = 'width: 100%; box-sizing: border-box; background: #252525; color: #eee; border: 1px solid #444; padding: 3px 6px; border-radius: 3px; margin-bottom: 4px;';
+    v.className = 'q3d-setting-static md-typescale-body-medium';
     return v;
 }
 
@@ -27,7 +48,7 @@ export function makeTextInput(defaultVal: string, onChange: (val: string) => voi
     const input = document.createElement('input');
     input.type = 'text';
     input.value = defaultVal;
-    input.style.cssText = 'width: 100%; box-sizing: border-box; background: #333; color: #eee; border: 1px solid #666; padding: 3px 6px; border-radius: 3px; margin-bottom: 4px;';
+    input.className = 'q3d-setting-control md-typescale-body-medium';
     input.onchange = () => onChange(input.value);
     return input;
 }
@@ -36,18 +57,8 @@ export function makeSelectInput(
     options: Array<{ label: string; value: string }>,
     selectedValue: string,
     onChange: (value: string) => void,
-): HTMLSelectElement {
-    const select = document.createElement('select');
-    select.style.cssText = 'width: 100%; box-sizing: border-box; background: #333; color: #eee; border: 1px solid #666; padding: 3px 6px; border-radius: 3px; margin-bottom: 4px;';
-    for (const option of options) {
-        const el = document.createElement('option');
-        el.value = option.value;
-        el.textContent = option.label;
-        el.selected = option.value === selectedValue;
-        select.appendChild(el);
-    }
-    select.onchange = () => onChange(select.value);
-    return select;
+): HTMLElement {
+    return createMaterialMenuSelect(options, selectedValue, onChange).wrapper;
 }
 
 export function makeNumberInput(
@@ -58,7 +69,7 @@ export function makeNumberInput(
     input.type = 'number';
     input.value = value.toString();
     input.min = min.toString(); input.max = max.toString(); input.step = step.toString();
-    input.style.cssText = 'width: 100%; box-sizing: border-box; background: #333; color: #eee; border: 1px solid #666; padding: 3px 6px; border-radius: 3px; margin-bottom: 4px;';
+    input.className = 'q3d-setting-control md-typescale-body-medium';
     input.onchange = () => { const v = parseFloat(input.value); if (!isNaN(v)) onChange(v); };
     return input;
 }
@@ -68,7 +79,7 @@ export function makeRangeInput(
     onChange: (v: number) => void,
 ): HTMLElement {
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:4px;';
+    wrap.className = 'q3d-setting-range';
 
     const slider = document.createElement('input');
     slider.type = 'range';
@@ -76,11 +87,11 @@ export function makeRangeInput(
     slider.max = max.toString();
     slider.step = step.toString();
     slider.value = value.toString();
-    slider.style.cssText = 'flex:1;';
+    slider.className = 'q3d-setting-range-input';
 
     const precision = step >= 1 ? 0 : Math.max(1, Math.ceil(-Math.log10(step)));
     const valueText = document.createElement('span');
-    valueText.style.cssText = 'width:44px; text-align:right; color:#ccc; font-size:11px;';
+    valueText.className = 'q3d-setting-range-value md-typescale-label-medium';
 
     const publish = () => {
         const v = parseFloat(slider.value);
@@ -102,20 +113,20 @@ export function makeCheckbox(
     label: string, checked: boolean, onChange: (v: boolean) => void,
 ): HTMLElement {
     const row = document.createElement('div');
-    row.style.cssText = 'display: flex; align-items: center; margin: 6px 0;';
+    row.className = 'q3d-setting-checkbox md-typescale-body-medium';
     const cb = document.createElement('input');
     cb.type = 'checkbox'; cb.checked = checked;
     cb.onchange = () => onChange(cb.checked);
     const lbl = document.createElement('label');
-    lbl.textContent = label; lbl.style.marginLeft = '6px';
+    lbl.textContent = label;
     row.appendChild(cb); row.appendChild(lbl);
     return row;
 }
 
 export function makeButton(label: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement('button');
-    btn.textContent = label;
-    btn.style.cssText = 'width: 100%; box-sizing: border-box; background: #333; color: #eee; border: 1px solid #666; padding: 5px; border-radius: 3px; margin-bottom: 4px; cursor: pointer;';
+    btn.className = 'q3d-setting-button md-typescale-label-large';
+    setMaterialButtonLabel(btn, label);
     btn.addEventListener('click', onClick);
     return btn;
 }
@@ -316,7 +327,7 @@ export function buildFilmMakerSettings(
 
     container.appendChild(makeLabel('Key Frames (double-click to jump):'));
     const list = document.createElement('div');
-    list.style.cssText = 'max-height: 180px; overflow-y: auto; border: 1px solid #444; padding: 4px; border-radius: 3px; margin-bottom: 6px;';
+    list.className = 'q3d-keyframe-list';
     container.appendChild(list);
 
     container.appendChild(makeLabel('Linear Velocity (m/s):'));
@@ -345,8 +356,9 @@ export function refreshFilmMakerList(
     filmMaker.keyFrames.forEach((_kf: any, i: number) => {
         const row = document.createElement('div');
         row.textContent = `Frame ${i + 1}`;
+        row.className = 'q3d-keyframe-row md-typescale-body-medium';
         row.dataset.index = String(i);
-        row.style.cssText = `padding: 3px 6px; cursor: pointer; border-radius: 3px; margin-bottom: 2px; ${
+        row.style.cssText = `${
             i === sel ? 'background:#a33;color:#fff;' : 'background:#252525;color:#eee;'
         }`;
         row.addEventListener('click', () => onSelect(i));

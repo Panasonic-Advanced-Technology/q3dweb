@@ -3,6 +3,7 @@ import { FilmMaker, KeyFrame } from './viewer/filmMaker';
 import { recoverCenterEuler } from './utils/maths';
 import {
     buildFilmMakerSettings, refreshFilmMakerList, syncFilmMakerSpinboxes, FilmMakerUIRefs,
+    setMaterialButtonLabel,
 } from './viewer/settingsUI';
 import {
     FilmPlaybackContext,
@@ -53,7 +54,7 @@ export class FilmMakerViewer extends CloudViewer {
     private installFilmMakerSection(): void {
         if (!this.settingsPanel || !this.settingsContent) return;
         const section = document.createElement('div');
-        section.style.cssText = 'margin-bottom:10px;padding-bottom:10px;border-bottom:2px solid #888;box-shadow:0 1px 0 rgba(0,0,0,0.9);';
+        section.className = 'q3d-settings-section';
         section.setAttribute('data-role', 'film-maker');
         const refs: FilmMakerUIRefs = buildFilmMakerSettings(section, {
             filmMaker: this.filmMaker,
@@ -83,7 +84,7 @@ export class FilmMakerViewer extends CloudViewer {
         this.setFilmMakerPlayButtonState(this.isPlayingFilm);
         this.refreshFilmMakerListUI();
         syncFilmMakerSpinboxes(this.filmMaker, this.filmMakerSpinLin, this.filmMakerSpinAng, this.filmMakerSpinStop);
-        const itemSelect = this.settingsItemSelect;
+        const itemSelect = this.settingsItemSelect?.closest('.q3d-material-select') as HTMLElement | null;
         if (itemSelect?.parentElement === this.settingsPanel) {
             itemSelect.style.marginTop = '2px';
             this.settingsPanel.insertBefore(section, itemSelect);
@@ -147,7 +148,7 @@ export class FilmMakerViewer extends CloudViewer {
 
     setFilmMakerPlayButtonState(isPlaying: boolean): void {
         if (!this.filmMakerPlayBtn) return;
-        this.filmMakerPlayBtn.textContent = isPlaying ? 'Playing' : 'Play';
+        setMaterialButtonLabel(this.filmMakerPlayBtn, isPlaying ? 'Playing' : 'Play');
         this.filmMakerPlayBtn.style.backgroundColor = isPlaying ? '#a33' : '#333';
         this.filmMakerPlayBtn.style.color = isPlaying ? '#fff' : '#eee';
         this.filmMakerPlayBtn.style.borderColor = isPlaying ? '#d66' : '#666';

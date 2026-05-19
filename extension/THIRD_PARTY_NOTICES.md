@@ -4,6 +4,30 @@ q3dweb incorporates the following open-source software components.
 
 ## Runtime (bundled into `dist/`)
 
+### @material/web
+
+- License: **Apache License 2.0**
+- Source: https://github.com/material-components/material-web
+- Copyright: Copyright 2022-2026 Google LLC and contributors
+- License text: https://github.com/material-components/material-web/blob/main/LICENSE
+- Notes: q3dweb uses Material Web typography styles and the `md-ripple`
+  component for the settings UI. The Apache 2.0 license is reproduced at the
+  bottom of this file.
+
+### lit
+
+- License: BSD-3-Clause
+- Source: https://github.com/lit/lit
+- Copyright: Copyright (c) 2017 Google LLC
+- License text: https://github.com/lit/lit/blob/main/LICENSE
+
+### tslib
+
+- License: 0BSD
+- Source: https://github.com/Microsoft/tslib
+- Copyright: Copyright (c) Microsoft Corporation
+- License text: https://github.com/Microsoft/tslib/blob/main/LICENSE.txt
+
 ### three
 
 - License: MIT

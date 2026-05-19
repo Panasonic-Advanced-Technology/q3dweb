@@ -163,18 +163,19 @@ describe('Viewer settings panel', () => {
     v.toggleSettingsPanel();
     expect(v.settingsPanel?.style.display).toBe('block');
     expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('true');
-    expect(v.settingsPanel?.style.width).toBe('40px');
+    expect(v.settingsPanel?.style.width).toBe('36px');
     expect(v.settingsPanel?.style.padding).toBe('0px');
     expect(v.settingsPanel?.style.background).toBe('transparent');
     expect(v.settingsPanel?.style.border).toBe('0px');
-    expect(v.settingsItemSelect?.style.display).toBe('none');
+    const itemSelectWrapper = v.settingsItemSelect?.closest('.q3d-material-select') as HTMLElement;
+    expect(itemSelectWrapper.style.display).toBe('none');
     v.toggleSettingsPanel();
     expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
     expect(v.settingsPanel?.style.display).toBe('block');
-    expect(v.settingsPanel?.style.width).toBe('260px');
-    expect(v.settingsPanel?.style.background).toBe('rgba(20, 20, 20, 0.92)');
-    expect(v.settingsPanel?.style.border).toBe('1px solid rgb(85, 85, 85)');
-    expect(v.settingsItemSelect?.style.display).not.toBe('none');
+    expect(v.settingsPanel?.style.width).toBe('280px');
+    expect(v.settingsPanel?.style.background).toBe('rgba(18, 18, 18, 0.94)');
+    expect(v.settingsPanel?.style.border).toBe('1px solid rgb(63, 63, 63)');
+    expect(itemSelectWrapper.style.display).not.toBe('none');
   });
 
   it('settings minimize button toggles the panel', () => {
@@ -182,20 +183,23 @@ describe('Viewer settings panel', () => {
     expect(button).toBeDefined();
     button.click();
     expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('true');
-    expect(button.textContent).toBe('+');
-    expect(button.style.flex).toBe('0 0 30px');
-    expect(button.style.width).toBe('30px');
-    expect(button.style.height).toBe('30px');
-    expect(button.style.border).toBe('1px solid rgb(102, 102, 102)');
-    expect(button.style.borderRadius).toBe('4px');
+    expect(button.textContent).toBe('\u2699');
+    expect(button.style.flex).toBe('0 0 36px');
+    expect(button.style.width).toBe('36px');
+    expect(button.style.height).toBe('36px');
+    expect(button.style.border).toBe('1px solid rgb(95, 99, 104)');
+    expect(button.style.borderRadius).toBe('999px');
+    expect(button.classList.contains('md-typescale-label-large')).toBe(true);
+    expect(button.querySelector('md-ripple')).toBeTruthy();
     button.click();
     expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
     expect(button.textContent).toBe('-');
-    expect(button.style.flex).toBe('0 0 30px');
-    expect(button.style.width).toBe('30px');
-    expect(button.style.height).toBe('30px');
-    expect(button.style.border).toBe('1px solid rgb(102, 102, 102)');
-    expect(button.style.borderRadius).toBe('4px');
+    expect(button.style.flex).toBe('0 0 36px');
+    expect(button.style.width).toBe('36px');
+    expect(button.style.height).toBe('36px');
+    expect(button.style.border).toBe('1px solid rgb(95, 99, 104)');
+    expect(button.style.borderRadius).toBe('999px');
+    expect(button.querySelector('md-ripple')).toBeTruthy();
   });
 
   it('refreshSettingsItemList preserves preferred selection', () => {
@@ -312,9 +316,15 @@ describe('viewer mode selector', () => {
 
     expect(modeSelect).toBeTruthy();
     expect(itemSelect).toBe(v.settingsItemSelect);
-    expect(Array.from(v.settingsPanel!.children).indexOf(modeSelect)).toBeLessThan(
-      Array.from(v.settingsPanel!.children).indexOf(itemSelect),
+    const modeSelectWrapper = modeSelect.closest('.q3d-material-select') as HTMLElement;
+    const itemSelectWrapper = itemSelect.closest('.q3d-material-select') as HTMLElement;
+    expect(modeSelectWrapper).toBeTruthy();
+    expect(itemSelectWrapper).toBeTruthy();
+    expect(Array.from(v.settingsPanel!.children).indexOf(modeSelectWrapper)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
     );
+    expect(v.settingsPanel!.querySelector('[data-role="viewer-mode-select-menu"]')).toBeTruthy();
+    expect(v.settingsPanel!.querySelector('[data-role="viewer-mode-menu-button"]')).toBeTruthy();
     expect(Array.from(modeSelect.options).map((option) => option.textContent)).toEqual([
       'cloud_viewer',
       'film_maker',
@@ -373,9 +383,10 @@ describe('Viewer Film Maker controls', () => {
     // Film maker UI is built during construction, always visible in panel
     expect(v.filmMakerTabActive).toBe(true);
     const fm = v.settingsPanel!.querySelector('[data-role="film-maker"]') as HTMLElement;
+    const itemSelectWrapper = v.settingsItemSelect!.closest('.q3d-material-select') as HTMLElement;
     expect(fm.textContent).toContain('Video File Name:');
     expect(Array.from(v.settingsPanel!.children).indexOf(fm)).toBeLessThan(
-      Array.from(v.settingsPanel!.children).indexOf(v.settingsItemSelect!),
+      Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
     );
 
     const buttons = Array.from(fm.querySelectorAll('button'));
@@ -564,12 +575,13 @@ describe('RealtimeViewer settings layout', () => {
 
   it('places realtime controls above the item selector with a clear boundary', () => {
     const realtime = v.settingsPanel!.querySelector('[data-role="realtime"]') as HTMLElement;
+    const itemSelectWrapper = v.settingsItemSelect!.closest('.q3d-material-select') as HTMLElement;
     expect(realtime.textContent).toContain('ROS Bridge URL');
     expect(Array.from(v.settingsPanel!.children).indexOf(realtime)).toBeLessThan(
-      Array.from(v.settingsPanel!.children).indexOf(v.settingsItemSelect!),
+      Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
     );
-    expect(realtime.style.borderBottomWidth).toBe('2px');
-    expect(v.settingsItemSelect!.style.marginTop).toBe('2px');
+    expect(realtime.classList.contains('q3d-settings-section')).toBe(true);
+    expect(itemSelectWrapper.style.marginTop).toBe('2px');
   });
 
   it('applies realtime options to settings inputs', () => {

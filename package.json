@@ -1,7 +1,7 @@
 {
   "name": "q3dweb",
   "private": true,
-  "version": "1.0.33",
+  "version": "1.0.39",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -28,6 +28,7 @@
     "vitest": "^4.1.5"
   },
   "dependencies": {
+    "@material/web": "^2.4.1",
     "laz-perf": "^0.0.7",
     "proj4": "^2.20.8",
     "three": "^0.184.0"

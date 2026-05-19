@@ -6,7 +6,9 @@ import { Text3DItem } from './items/Text3DItem';
 import { eulerToMatrix4 } from './utils/maths';
 import {
     makeLabel, makeTextInput, makeCheckbox, buildCloudItemSettings,
+    setMaterialButtonLabel,
 } from './viewer/settingsUI';
+import { createMaterialMenuSelect } from './viewer/materialSelect';
 import {
     setupMouseControls as _setupMouse, setupKeyboardControls as _setupKeys, updateCameraMovement,
 } from './viewer/mouseControls';
@@ -50,6 +52,7 @@ export class Viewer {
     settingsPanelToggleButton: HTMLButtonElement | null = null;
     settingsContent: HTMLElement | null = null;
     settingsItemSelect: HTMLSelectElement | null = null;
+    settingsItemSelectSync: (() => void) | null = null;
     statusElement: HTMLElement | null = null;
     loadingOverlay: HTMLElement;
     selectedPoints: THREE.Vector3[] = [];
@@ -168,35 +171,48 @@ export class Viewer {
 
     createSettingsPanel() {
         const panel = document.createElement('div');
-        panel.style.cssText = 'position:absolute;top:10px;left:10px;background:rgba(20,20,20,0.92);color:#eee;padding:12px;border-radius:8px;font-family:monospace;font-size:12px;z-index:1100;width:260px;display:block;max-height:calc(100% - 20px);overflow-y:auto;border:1px solid #555;';
+        panel.className = 'q3d-settings-panel';
+        panel.style.cssText = 'position:absolute;top:10px;left:10px;background:rgba(18,18,18,0.94);color:#eee;padding:12px;border-radius:24px;font-size:12px;z-index:1100;width:280px;display:block;max-height:calc(100% - 20px);overflow-y:auto;border:1px solid #3f3f3f;';
         panel.setAttribute('data-minimized', 'false');
         const title = document.createElement('div');
-        title.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:14px;font-weight:bold;margin-bottom:8px;border-bottom:1px solid #555;padding-bottom:4px;';
+        title.className = 'q3d-settings-header';
+        title.style.cssText = 'display:flex;align-items:center;gap:10px;font-size:14px;font-weight:bold;margin-bottom:10px;border-bottom:1px solid #3f3f3f;padding-bottom:8px;';
         title.setAttribute('data-role', 'settings-panel-header');
         const toggleButton = document.createElement('button');
         toggleButton.type = 'button';
-        toggleButton.textContent = '-';
         toggleButton.title = 'Minimize menu';
         toggleButton.setAttribute('aria-label', 'Minimize menu');
         toggleButton.setAttribute('data-role', 'settings-minimize-button');
-        toggleButton.style.cssText = 'flex:0 0 30px;width:30px;height:30px;line-height:26px;box-sizing:border-box;background:#333;color:#eee;border:1px solid #666;border-radius:4px;cursor:pointer;font-size:18px;font-family:monospace;padding:0;touch-action:manipulation;';
+        toggleButton.className = 'q3d-settings-icon-button md-typescale-label-large';
+        toggleButton.style.cssText = 'flex:0 0 36px;width:36px;height:36px;line-height:32px;box-sizing:border-box;background:#303134;color:#eee;border:1px solid #5f6368;border-radius:999px;cursor:pointer;font-size:18px;font-family:var(--q3d-font-plain);padding:0;touch-action:manipulation;';
+        setMaterialButtonLabel(toggleButton, '-');
         toggleButton.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSettingsPanel(); });
         const titleText = document.createElement('span');
         titleText.textContent = 'Settings';
+        titleText.className = 'q3d-settings-title md-typescale-title-medium';
         titleText.setAttribute('data-role', 'settings-panel-title');
         title.appendChild(toggleButton);
         title.appendChild(titleText);
         panel.appendChild(title);
         this.settingsPanelTitle = titleText;
         this.settingsPanelToggleButton = toggleButton;
-        const select = document.createElement('select');
-        select.style.cssText = 'width:100%;margin-bottom:8px;background:#333;color:#eee;border:1px solid #666;padding:4px;border-radius:3px;';
-        select.setAttribute('data-role', 'settings-item-select');
-        select.onchange = () => this.onSettingsItemSelected(select.value);
-        panel.appendChild(select);
-        this.settingsItemSelect = select;
+        const itemSelect = createMaterialMenuSelect(
+            [{ label: 'Viewer', value: '__main_win__' }],
+            '__main_win__',
+            (value) => this.onSettingsItemSelected(value),
+            {
+                dataRole: 'settings-item-select',
+                menuDataRole: 'settings-item-select-menu',
+                buttonDataRole: 'settings-item-menu-button',
+                ariaLabel: 'Settings target',
+                className: 'q3d-settings-target-select',
+            },
+        );
+        panel.appendChild(itemSelect.wrapper);
+        this.settingsItemSelect = itemSelect.select;
+        this.settingsItemSelectSync = itemSelect.syncFromSelect;
         const content = document.createElement('div');
-        content.style.cssText = 'border:1px solid #444;border-radius:4px;padding:8px;';
+        content.className = 'q3d-settings-content';
         panel.appendChild(content);
         this.settingsContent = content;
         this.container.appendChild(panel);
@@ -216,28 +232,31 @@ export class Viewer {
         for (let i = 1; i < this.settingsPanel.children.length; i++) {
             (this.settingsPanel.children[i] as HTMLElement).style.display = minimized ? 'none' : '';
         }
-        this.settingsPanel.style.width = minimized ? '40px' : '260px';
-        this.settingsPanel.style.height = minimized ? '40px' : '';
+        this.settingsPanel.style.width = minimized ? '36px' : '280px';
+        this.settingsPanel.style.height = minimized ? '36px' : '';
         this.settingsPanel.style.padding = minimized ? '0' : '12px';
-        this.settingsPanel.style.maxHeight = minimized ? '40px' : 'calc(100% - 20px)';
+        this.settingsPanel.style.maxHeight = minimized ? '36px' : 'calc(100% - 20px)';
         this.settingsPanel.style.overflow = minimized ? 'hidden' : 'auto';
-        this.settingsPanel.style.background = minimized ? 'transparent' : 'rgba(20,20,20,0.92)';
-        this.settingsPanel.style.border = minimized ? '0' : '1px solid #555';
+        this.settingsPanel.style.background = minimized ? 'transparent' : 'rgba(18,18,18,0.94)';
+        this.settingsPanel.style.border = minimized ? '0' : '1px solid #3f3f3f';
+        this.settingsPanel.style.borderRadius = minimized ? '999px' : '24px';
+        this.settingsPanel.style.boxShadow = minimized ? 'none' : '';
         const header = this.settingsPanel.children[0] as HTMLElement;
         header.style.justifyContent = minimized ? 'center' : '';
-        header.style.marginBottom = minimized ? '0' : '8px';
-        header.style.borderBottom = minimized ? '0' : '1px solid #555';
-        header.style.paddingBottom = minimized ? '0' : '4px';
+        header.style.height = minimized ? '36px' : '';
+        header.style.marginBottom = minimized ? '0' : '10px';
+        header.style.borderBottom = minimized ? '0' : '1px solid #3f3f3f';
+        header.style.paddingBottom = minimized ? '0' : '8px';
         if (this.settingsPanelTitle) this.settingsPanelTitle.style.display = minimized ? 'none' : '';
-        this.settingsPanelToggleButton.textContent = minimized ? '+' : '-';
-        this.settingsPanelToggleButton.title = minimized ? 'Expand menu' : 'Minimize menu';
+        setMaterialButtonLabel(this.settingsPanelToggleButton, minimized ? '\u2699' : '-');
+        this.settingsPanelToggleButton.title = minimized ? 'Open settings' : 'Minimize menu';
         this.settingsPanelToggleButton.setAttribute('aria-label', this.settingsPanelToggleButton.title);
-        this.settingsPanelToggleButton.style.flex = '0 0 30px';
-        this.settingsPanelToggleButton.style.width = '30px';
-        this.settingsPanelToggleButton.style.height = '30px';
-        this.settingsPanelToggleButton.style.lineHeight = '26px';
-        this.settingsPanelToggleButton.style.border = '1px solid #666';
-        this.settingsPanelToggleButton.style.borderRadius = '4px';
+        this.settingsPanelToggleButton.style.flex = '0 0 36px';
+        this.settingsPanelToggleButton.style.width = '36px';
+        this.settingsPanelToggleButton.style.height = '36px';
+        this.settingsPanelToggleButton.style.lineHeight = '32px';
+        this.settingsPanelToggleButton.style.border = '1px solid #5f6368';
+        this.settingsPanelToggleButton.style.borderRadius = '999px';
     }
 
     refreshSettingsItemList(preferredSelection?: string) {
@@ -255,6 +274,7 @@ export class Viewer {
         const desired = preferredSelection ?? prev;
         const exists = desired && Array.from(this.settingsItemSelect.options).some(o => o.value === desired);
         this.settingsItemSelect.value = exists ? desired! : '__main_win__';
+        this.settingsItemSelectSync?.();
         if (!this.settingsPanelMinimized)
             this.onSettingsItemSelected(this.settingsItemSelect.value);
     }
