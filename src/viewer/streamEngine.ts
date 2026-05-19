@@ -152,7 +152,8 @@ export function processChunk(v: any, chunkData: Uint8Array, _offset: number): vo
     try {
         if (v.streamAborted) return;
         v.streamLoadedSize += chunkData.byteLength;
-        const progress = v.streamTotalSize > 0 ? (v.streamLoadedSize / v.streamTotalSize) * 100 : 0;
+        if (v.streamTotalSize > 0 && v.streamLoadedSize > v.streamTotalSize) v.streamTotalSize = v.streamLoadedSize;
+        const progress = v.streamTotalSize > 0 ? Math.min(100, (v.streamLoadedSize / v.streamTotalSize) * 100) : 0;
         const pHtml = (pct: number) => `<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Loading: ${pct.toFixed(1)}%</div>`;
         if (v.currentFormat === 'las') {
             processLASChunkInternal(v, chunkData);

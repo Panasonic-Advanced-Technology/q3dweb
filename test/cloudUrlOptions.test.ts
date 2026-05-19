@@ -17,6 +17,44 @@ describe('cloudUrlOptions', () => {
     expect(options).toEqual({
       pointCloudUrl: 'https://example.com/a.pcd',
       filename: 'alias.pcd',
+      maxPoints: undefined,
+      pointSize: undefined,
+      pointType: undefined,
+      alpha: undefined,
+      colorMode: undefined,
+      vmin: undefined,
+      vmax: undefined,
+      backgroundColor: undefined,
+      showCenter: undefined,
+    });
+  });
+
+  it('parses cloud viewer and cloud item setting options', () => {
+    const options = parseCloudUrlOptions(new URLSearchParams({
+      cloudUrl: 'https://example.com/a.pcd',
+      maxPoints: '12345',
+      pointSize: '7.5',
+      pointType: 'spheres',
+      alpha: '0.35',
+      colorMode: 'flat',
+      vmin: '-5',
+      vmax: '250',
+      bgColor: '#112233',
+      showCenter: 'false',
+    }));
+
+    expect(options).toEqual({
+      pointCloudUrl: 'https://example.com/a.pcd',
+      filename: undefined,
+      maxPoints: 12345,
+      pointSize: 7.5,
+      pointType: 'SPHERE',
+      alpha: 0.35,
+      colorMode: 'FLAT',
+      vmin: -5,
+      vmax: 250,
+      backgroundColor: '#112233',
+      showCenter: false,
     });
   });
 
@@ -27,10 +65,28 @@ describe('cloudUrlOptions', () => {
     expect(parseCloudUrlOptions(new URLSearchParams({ file: 'e.laz', name: 'e.laz' }))).toEqual({
       pointCloudUrl: 'e.laz',
       filename: 'e.laz',
+      maxPoints: undefined,
+      pointSize: undefined,
+      pointType: undefined,
+      alpha: undefined,
+      colorMode: undefined,
+      vmin: undefined,
+      vmax: undefined,
+      backgroundColor: undefined,
+      showCenter: undefined,
     });
     expect(parseCloudUrlOptions(new URLSearchParams())).toEqual({
       pointCloudUrl: undefined,
       filename: undefined,
+      maxPoints: undefined,
+      pointSize: undefined,
+      pointType: undefined,
+      alpha: undefined,
+      colorMode: undefined,
+      vmin: undefined,
+      vmax: undefined,
+      backgroundColor: undefined,
+      showCenter: undefined,
     });
   });
 

@@ -55,6 +55,35 @@ describe('cloudRenderer', () => {
     expect((viewer.items.cloud as CloudItem).getPointCount()).toBe(0);
   });
 
+  it('applies cloud URL render options to loaded clouds', () => {
+    const viewer = makeViewer() as ReturnType<typeof makeViewer> & { cloudRenderOptions: unknown };
+    viewer.cloudRenderOptions = {
+      pointSize: 7,
+      pointType: 'SPHERE',
+      alpha: 0.35,
+      colorMode: 'FLAT',
+      vmin: -10,
+      vmax: 42,
+    };
+
+    renderPoints(
+      viewer,
+      new Float32Array([0, 0, 0, 1, 1, 1]),
+      new Float32Array([0, 100]),
+      new Uint8Array([255, 0, 0, 0, 255, 0]),
+    );
+
+    const material = (viewer.items.cloud as CloudItem).material as any;
+    expect(material.uniforms.pointSize.value).toBe(7);
+    expect(material.uniforms.pointType.value).toBe(2);
+    expect(material.uniforms.alpha.value).toBe(0.35);
+    expect(material.uniforms.colorMode.value).toBe(2);
+    expect(material.uniforms.vmin.value).toBe(-10);
+    expect(material.uniforms.vmax.value).toBe(42);
+    expect(material.transparent).toBe(true);
+    expect(material.depthWrite).toBe(false);
+  });
+
   it('resets realtime cloud state', () => {
     const viewer = makeViewer();
     viewer.items.cloud = new CloudItem(new Float32Array(3), new Float32Array(1));

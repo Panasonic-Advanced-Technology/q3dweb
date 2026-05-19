@@ -134,6 +134,12 @@ export function buildCloudItemSettings(
     const pointCount = geometry?.getAttribute('position')?.count;
     const pointTypeUniform = mat.uniforms.pointType;
     const pointSizeUniform = mat.uniforms.pointSize;
+    const syncPointTransparency = () => {
+        const alpha = mat.uniforms.alpha?.value ?? 1;
+        const pointType = pointTypeUniform?.value ?? 0;
+        mat.transparent = alpha < 0.99 || pointType > 1.5;
+        mat.depthWrite = alpha >= 0.99 && pointType <= 1.5;
+    };
 
     const isPixelPointType   = (value: number) => value < 0.5;
     const getSizeLabelText   = () => !pointTypeUniform ? 'Size:' :
@@ -171,6 +177,7 @@ export function buildCloudItemSettings(
                     else if (!wasPixel && willPixel) pointSizeUniform.value *= pixelRatio;
                 }
                 pointTypeUniform.value = next;
+                syncPointTransparency();
                 if (sizeLabel) sizeLabel.textContent = getSizeLabelText();
                 if (sizeInput) sizeInput.value = getPointSizeInput().toString();
                 mat.needsUpdate = true; onRender();
@@ -191,7 +198,7 @@ export function buildCloudItemSettings(
         container.appendChild(makeLabel('Alpha:'));
         container.appendChild(makeRangeInput(mat.uniforms.alpha.value, 0, 1, 0.01, (v) => {
             mat.uniforms.alpha.value = v;
-            mat.transparent = v < 0.99; mat.depthWrite = v >= 0.99;
+            syncPointTransparency();
             mat.needsUpdate = true; onRender();
         }));
     }

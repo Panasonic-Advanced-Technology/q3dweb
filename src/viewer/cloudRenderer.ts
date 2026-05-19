@@ -1,13 +1,45 @@
 import * as THREE from 'three';
 import { CloudItem, CloudShaderMaterial } from '../items/CloudItem';
 
+type CloudRenderOptions = {
+    pointSize?: number;
+    pointType?: 'PIXEL' | 'SQUARE' | 'SPHERE';
+    alpha?: number;
+    colorMode?: 'I' | 'RGB' | 'FLAT';
+    vmin?: number;
+    vmax?: number;
+};
+
+function colorModeToUniformValue(colorMode: 'I' | 'RGB' | 'FLAT'): number {
+    if (colorMode === 'RGB') return 1;
+    if (colorMode === 'FLAT') return 2;
+    return 0;
+}
+
+function pointTypeToUniformValue(pointType: 'PIXEL' | 'SQUARE' | 'SPHERE'): number {
+    if (pointType === 'SQUARE') return 1;
+    if (pointType === 'SPHERE') return 2;
+    return 0;
+}
+
+function resolvePointSize(v: any, options: CloudRenderOptions, pointType: 'PIXEL' | 'SQUARE' | 'SPHERE'): number {
+    const pixelRatio = typeof v.getBaseRendererPixelRatio === 'function'
+        ? v.getBaseRendererPixelRatio()
+        : Math.max(window.devicePixelRatio || 1, 1);
+    if (options.pointSize === undefined) return 1.0 * pixelRatio;
+    return pointType === 'PIXEL' ? options.pointSize * pixelRatio : options.pointSize;
+}
+
 export function renderPoints(v: any, positions: Float32Array, values: Float32Array, rgbColors?: Uint8Array): void {
     const count = values.length;
     let minVal = Infinity, maxVal = -Infinity;
     for (let i = 0; i < count; i += 1000) { const val = values[i]; if (val < minVal) minVal = val; if (val > maxVal) maxVal = val; }
     if (minVal === Infinity) { minVal = 0; maxVal = 255; }
     if (minVal === maxVal) { minVal -= 1; maxVal += 1; }
-    v.dataMin = minVal; v.dataMax = maxVal;
+    const renderOptions = (v.cloudRenderOptions ?? {}) as CloudRenderOptions;
+    const effectiveMin = renderOptions.vmin ?? minVal;
+    const effectiveMax = renderOptions.vmax ?? maxVal;
+    v.dataMin = effectiveMin; v.dataMax = effectiveMax;
 
     let colorMode: 'I' | 'RGB' | 'FLAT' = 'I';
     if (rgbColors) {
@@ -15,9 +47,19 @@ export function renderPoints(v: any, positions: Float32Array, values: Float32Arr
             if (rgbColors[i] > 0 || rgbColors[i + 1] > 0 || rgbColors[i + 2] > 0) { colorMode = 'RGB'; break; }
         }
     }
-    const cloud = new CloudItem(positions, values, { size: 1.0 * window.devicePixelRatio, alpha: 0.1, colorMode }, colorMode === 'RGB' ? rgbColors : undefined);
+    colorMode = renderOptions.colorMode ?? colorMode;
+    const pointType = renderOptions.pointType ?? 'PIXEL';
+    const pointSize = resolvePointSize(v, renderOptions, pointType);
+    const alpha = renderOptions.alpha ?? 0.1;
+    const cloud = new CloudItem(positions, values, { size: pointSize, alpha, colorMode, pointType }, colorMode === 'RGB' ? rgbColors : undefined);
     const material = cloud.material as CloudShaderMaterial;
-    material.uniforms.vmin.value = minVal; material.uniforms.vmax.value = maxVal;
+    material.uniforms.pointSize.value = pointSize;
+    material.uniforms.pointType.value = pointTypeToUniformValue(pointType);
+    material.uniforms.alpha.value = alpha;
+    material.uniforms.colorMode.value = colorModeToUniformValue(colorMode);
+    material.uniforms.vmin.value = effectiveMin; material.uniforms.vmax.value = effectiveMax;
+    material.transparent = alpha < 0.99 || pointType === 'SPHERE';
+    material.depthWrite = alpha >= 0.99 && pointType !== 'SPHERE';
     cloud.name = 'cloud'; cloud.frustumCulled = false;
     cloud.geometry.computeBoundingBox();
     if (cloud.geometry.boundingBox) {

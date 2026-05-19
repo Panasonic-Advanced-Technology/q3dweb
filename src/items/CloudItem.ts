@@ -382,6 +382,7 @@ export class CloudItem extends THREE.Points {
 export class CloudShaderMaterial extends THREE.ShaderMaterial {
     constructor(options: CloudItemOptions) {
         const alpha = options.alpha !== undefined ? options.alpha : 1.0;
+        const pointType = pointTypeToUniformValue(options.pointType);
         const uniforms = {
             pointSize: { value: options.size || 1.0 },
             alpha: { value: alpha },
@@ -389,7 +390,7 @@ export class CloudShaderMaterial extends THREE.ShaderMaterial {
             vmax: { value: 255.0 },
             colorMode: { value: colorModeToUniformValue(options.colorMode) },
             flatColor: { value: new THREE.Color(options.color || 'white') },
-            pointType: { value: pointTypeToUniformValue(options.pointType) },
+            pointType: { value: pointType },
             viewportHeight: { value: 1.0 },
         };
 
@@ -442,11 +443,10 @@ export class CloudShaderMaterial extends THREE.ShaderMaterial {
             uniform float pointType;
 
             void main() {
-                if (pointType > 1.5) {
-                    vec2 coord = gl_PointCoord * 2.0 - 1.0;
-                    if (dot(coord, coord) > 1.0) discard;
-                }
-                gl_FragColor = vec4(vColor, alpha);
+                vec2 coord = gl_PointCoord * 2.0 - 1.0;
+                float sphereMask = 1.0 - step(1.0, dot(coord, coord));
+                float sphereMode = step(1.5, pointType);
+                gl_FragColor = vec4(vColor, alpha * mix(1.0, sphereMask, sphereMode));
             }
         `;
 
@@ -454,9 +454,9 @@ export class CloudShaderMaterial extends THREE.ShaderMaterial {
             uniforms: uniforms,
             vertexShader: vertexShader,
             fragmentShader: fragmentShader,
-            transparent: alpha < 0.99,
+            transparent: alpha < 0.99 || pointType > 1.5,
             depthTest: true,
-            depthWrite: alpha >= 0.99,
+            depthWrite: alpha >= 0.99 && pointType <= 1.5,
         });
     }
 }

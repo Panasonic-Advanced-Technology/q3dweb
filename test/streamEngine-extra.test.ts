@@ -89,6 +89,17 @@ describe('streamEngine extra paths', () => {
     expect(viewer.loadingOverlay.innerHTML).toContain('50.0%');
   });
 
+  it('keeps loading progress at or below 100% when streamed bytes exceed content length', () => {
+    const viewer = makeViewer();
+    streamEngine.startStream(viewer, 1, 'sample.e57');
+
+    streamEngine.processChunk(viewer, new Uint8Array([1, 2, 3]), 0);
+
+    expect(viewer.streamTotalSize).toBe(3);
+    expect(viewer.loadingOverlay.innerHTML).toContain('100.0%');
+    expect(viewer.loadingOverlay.innerHTML).not.toContain('300.0%');
+  });
+
   it('finalizes chunked E57 streams asynchronously', async () => {
     const viewer = makeViewer();
     streamEngine.startStream(viewer, 2, 'sample.e57');

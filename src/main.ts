@@ -46,7 +46,7 @@ try {
     const viewer: CloudViewer | RealtimeViewer =
         mode === 'realtime'   ? new RealtimeViewer('app', realtimeOptions) :
         mode === 'film_maker' ? new FilmMakerViewer('app') :
-                                new CloudViewer('app');  // default: no param or ?mode=cloud
+                                new CloudViewer('app', cloudOptions);  // default: no param or ?mode=cloud
     installViewerModeSelector(viewer, mode);
 
     if (mode === 'realtime' && viewer instanceof RealtimeViewer) {

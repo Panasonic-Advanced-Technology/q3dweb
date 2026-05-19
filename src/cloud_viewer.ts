@@ -1,4 +1,6 @@
+import * as THREE from 'three';
 import { Viewer } from './viewer';
+import type { CloudUrlOptions } from './cloudUrlOptions';
 import {
     PCDHeader, getFieldSpec, readPackedRGB as _readPackedRGB,
     parseAsciiPackedRGB as _parseAsciiPackedRGB, readNumericValue as _readNumericValue,
@@ -50,10 +52,32 @@ export class CloudViewer extends Viewer {
     posIndex: number = 0;
     dataMin: number = 0;
     dataMax: number = 255;
+    cloudRenderOptions: Pick<CloudUrlOptions, 'pointSize' | 'pointType' | 'alpha' | 'colorMode' | 'vmin' | 'vmax'> = {};
 
-    constructor(containerId: string) {
+    constructor(containerId: string, options: CloudUrlOptions = {}) {
         super(containerId);
+        this.applyUrlOptions(options);
         this.setupDragDrop();
+    }
+
+    applyUrlOptions(options: CloudUrlOptions): void {
+        if (options.maxPoints !== undefined) this.MAX_POINTS_VISUAL = Math.floor(options.maxPoints);
+        if (options.backgroundColor) {
+            try {
+                this.scene.background = new THREE.Color(options.backgroundColor);
+                this.colorStr = options.backgroundColor;
+            } catch { /* ignore invalid colors */ }
+        }
+        if (options.showCenter !== undefined) this.enableShowCenter = options.showCenter;
+        this.cloudRenderOptions = {
+            pointSize: options.pointSize,
+            pointType: options.pointType,
+            alpha: options.alpha,
+            colorMode: options.colorMode,
+            vmin: options.vmin,
+            vmax: options.vmax,
+        };
+        if (this.settingsItemSelect?.value === '__main_win__') this.onSettingsItemSelected('__main_win__');
     }
 
     setupDragDrop() {
