@@ -442,11 +442,11 @@ export class CloudShaderMaterial extends THREE.ShaderMaterial {
             uniform float pointType;
 
             void main() {
-                vec2 coord = gl_PointCoord * 2.0 - 1.0;
-                float sphereEnabled = step(1.5, pointType);
-                float insideSphere = 1.0 - step(1.0, dot(coord, coord));
-                float pointAlpha = alpha * mix(1.0, insideSphere, sphereEnabled);
-                gl_FragColor = vec4(vColor, pointAlpha);
+                if (pointType > 1.5) {
+                    vec2 coord = gl_PointCoord * 2.0 - 1.0;
+                    if (dot(coord, coord) > 1.0) discard;
+                }
+                gl_FragColor = vec4(vColor, alpha);
             }
         `;
 
