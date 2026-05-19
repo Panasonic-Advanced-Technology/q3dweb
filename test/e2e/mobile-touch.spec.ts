@@ -4,6 +4,33 @@ import { attachErrorSinks } from './helpers';
 test.describe('mobile touch operation', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
+  test('disables browser page zoom on mobile viewports', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => (window as any).__viewer);
+
+    const state = await page.evaluate(() => {
+      const viewport = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
+      const htmlStyle = getComputedStyle(document.documentElement);
+      const bodyStyle = getComputedStyle(document.body);
+      const appStyle = getComputedStyle(document.getElementById('app') as HTMLElement);
+      return {
+        viewport: viewport?.content ?? '',
+        htmlTouchAction: htmlStyle.touchAction,
+        bodyTouchAction: bodyStyle.touchAction,
+        appTouchAction: appStyle.touchAction,
+        bodyOverscroll: bodyStyle.overscrollBehavior,
+      };
+    });
+
+    expect(state.viewport).toContain('maximum-scale=1.0');
+    expect(state.viewport).toContain('user-scalable=no');
+    expect(state.viewport).toContain('viewport-fit=cover');
+    expect(state.htmlTouchAction).toBe('none');
+    expect(state.bodyTouchAction).toBe('none');
+    expect(state.appTouchAction).toBe('none');
+    expect(state.bodyOverscroll).toBe('none');
+  });
+
   test('minimizes the settings menu with a tap and keeps the compact button as a round M3 icon button', async ({ page }) => {
     const { pageErrors } = attachErrorSinks(page);
     await page.goto('/');

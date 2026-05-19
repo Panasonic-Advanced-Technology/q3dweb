@@ -1,9 +1,16 @@
+html,
 body {
   margin: 0;
   overflow: hidden;
   background-color: #000;
   color: white;
   font-family: var(--q3d-font-plain);
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+#app {
+  touch-action: none;
 }
 
 :root {

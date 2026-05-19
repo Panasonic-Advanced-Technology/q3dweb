@@ -170,12 +170,12 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
             <head>
                 <meta charset="UTF-8">
                 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; connect-src 'self' data: blob: ${webview.cspSource} https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://cyberjapandata.gsi.go.jp ws: wss:; img-src ${webview.cspSource} 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://cyberjapandata.gsi.go.jp; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource} 'unsafe-eval' 'wasm-unsafe-eval';">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
                 <link rel="stylesheet" type="text/css" href="${styleUri}" />
                 <title>q3dviewer</title>
                 <style>
-                    body { margin: 0; overflow: hidden; width: 100vw; height: 100vh; }
-                    #app { width: 100%; height: 100%; }
+                    html, body { margin: 0; overflow: hidden; width: 100%; height: 100%; overscroll-behavior: none; touch-action: none; }
+                    #app { width: 100%; height: 100%; touch-action: none; }
                 </style>
             </head>
             <body>
