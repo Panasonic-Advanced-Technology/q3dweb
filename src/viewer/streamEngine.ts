@@ -259,7 +259,7 @@ export function addLASOverlay(v: any, originLatLon: [number, number], bounds: LA
     v.requestRender();
 }
 
-export function finalizeStream(v: any): void {
+export async function finalizeStream(v: any): Promise<void> {
     console.log('Stream finished.');
     const onErr = (e: any) => {
         console.error('Finalize Error', e);
@@ -286,10 +286,11 @@ export function finalizeStream(v: any): void {
             if (chunks.length === 0) throw new Error('Empty E57 stream');
             console.log(`E57 chunked bytes: ${v.streamTotalSize || v.fullBufferWriteOffset}`);
             v.chunkList = []; v.fullBuffer = null;
-            void parseE57(chunks, v.MAX_POINTS_VISUAL, v.streamTotalSize || v.fullBufferWriteOffset).then((r) => {
+            try {
+                const r = await parseE57(chunks, v.MAX_POINTS_VISUAL, v.streamTotalSize || v.fullBufferWriteOffset);
                 v.pointsLoaded = r.values.length;
                 v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
-            }).catch(onErr);
+            } catch (e) { onErr(e); }
         } else if (v.currentFormat === 'laz' || v.currentFormat === 'ply') {
             if (v.currentFormat === 'laz' && !ensureSingleBufferInputBudget(v, v.streamTotalSize || v.fullBufferWriteOffset, 'laz', v.streamFilename)) return;
             const assembled = assembleChunkList(v);
@@ -301,16 +302,18 @@ export function finalizeStream(v: any): void {
                 if (result.values.length > 0) normalizeIntensity(result.values as Float32Array);
                 v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
             } else if (v.currentFormat === 'laz') {
-                void parseLAZ(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength).then((r) => {
+                try {
+                    const r = await parseLAZ(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength);
                     v.pointsLoaded = r.values.length;
                     v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
                     if (r.originLatLon && r.bounds) addLASOverlay(v, r.originLatLon, r.bounds);
-                }).catch(onErr);
+                } catch (e) { onErr(e); }
             } else {
-                void parseE57(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength).then((r) => {
+                try {
+                    const r = await parseE57(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength);
                     v.pointsLoaded = r.values.length;
                     v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
-                }).catch(onErr);
+                } catch (e) { onErr(e); }
             }
             v.chunkList = []; v.fullBuffer = null;
         } else if (v.isBinary && v.posBuffer) {
@@ -339,14 +342,14 @@ export function finalizeStream(v: any): void {
     } catch (e: any) { onErr(e); }
 }
 
-export function loadData(v: any, content: Uint8Array, filename?: string): void {
+export async function loadData(v: any, content: Uint8Array, filename?: string): Promise<void> {
     try {
         const fmt = detectFormat(filename);
         if (!shouldDeferInitialMemoryCheck(fmt) && !checkMemoryBudget(v, content.byteLength, fmt, filename)) return;
         v.removeItem('cloud');
         startStream(v, content.byteLength, filename);
         processChunk(v, content, 0);
-        if (!v.streamAborted) finalizeStream(v);
+        if (!v.streamAborted) await finalizeStream(v);
     } catch (err) { console.error('Error loading data:', err); }
 }
 
@@ -390,7 +393,7 @@ export async function loadFile(v: any, file: File, append: boolean = false): Pro
                 await new Promise(r => setTimeout(r, 0));
             }
         }
-        if (!v.streamAborted) finalizeStream(v);
+        if (!v.streamAborted) await finalizeStream(v);
     } catch (err) { console.error(`Error loading ${file.name}:`, err); }
 }
 

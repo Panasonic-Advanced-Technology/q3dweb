@@ -63,7 +63,7 @@ export async function loadUrl(v: any, sourceUrl: string, filename?: string): Pro
 
         if (!response.body) {
             const content = new Uint8Array(await response.arrayBuffer());
-            loadData(v, content, effectiveFilename);
+            await loadData(v, content, effectiveFilename);
             return;
         }
 
@@ -87,7 +87,7 @@ export async function loadUrl(v: any, sourceUrl: string, filename?: string): Pro
                 await new Promise(r => setTimeout(r, 0));
             }
         }
-        if (!v.streamAborted) finalizeStream(v);
+        if (!v.streamAborted) await finalizeStream(v);
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         showRemoteLoadError(v, `Failed to load ${sourceUrl}: ${message}`);

@@ -86,7 +86,7 @@ try {
                 case 'loadData':
                 case 'loadPCD':
                     applyHostHeapBudget(message);
-                    cv?.loadData(message.value, message.filename);
+                    void cv?.loadData(message.value, message.filename);
                     break;
                 case 'startStream':
                     applyHostHeapBudget(message);
@@ -96,7 +96,7 @@ try {
                     cv?.processChunk(message.data, message.offset);
                     break;
                 case 'endStream':
-                    cv?.finalizeStream();
+                    void cv?.finalizeStream();
                     break;
                 case 'realtimePoints': {
                     const positions = toFloat32Array(message.positions);

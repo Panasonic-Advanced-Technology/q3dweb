@@ -99,20 +99,19 @@ describe('streamEngine extra paths', () => {
       rgb: new Uint8Array([1, 2, 3]),
     });
 
-    streamEngine.finalizeStream(viewer);
-    await Promise.resolve();
+    await streamEngine.finalizeStream(viewer);
 
     expect(parserMocks.parseE57).toHaveBeenCalledWith(expect.any(Array), 100, 2);
     expect(viewer.renderPoints).toHaveBeenCalledWith(expect.any(Float32Array), expect.any(Float32Array), expect.any(Uint8Array));
     expect(viewer.pointsLoaded).toBe(1);
   });
 
-  it('reports finalize errors for empty E57 streams', () => {
+  it('reports finalize errors for empty E57 streams', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const viewer = makeViewer();
     streamEngine.startStream(viewer, 0, 'empty.e57');
 
-    streamEngine.finalizeStream(viewer);
+    await streamEngine.finalizeStream(viewer);
 
     expect(viewer.loadingOverlay.innerHTML).toContain('Empty E57 stream');
     error.mockRestore();

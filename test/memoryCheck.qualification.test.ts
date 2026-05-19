@@ -106,7 +106,7 @@ describe('memoryCheck qualification (real samples)', () => {
 
       const buf = fs.readFileSync(fp);
       const u8 = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
-      v.loadData(u8, sample.name);
+      await v.loadData(u8, sample.name);
 
       const peakAfter = readRss();
       const delta = Math.max(peakAfter - before, 0);

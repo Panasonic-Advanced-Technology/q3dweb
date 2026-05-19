@@ -65,8 +65,8 @@ export class CloudViewer extends Viewer {
     startStream(totalSize: number, filename?: string): void { _startStream(this, totalSize, filename); }
     processChunk(chunkData: Uint8Array, offset: number): void { _processChunk(this, chunkData, offset); }
     parseHeader(headerStr: string): void { _parseHeader(this, headerStr); }
-    finalizeStream(): void { _finalizeStream(this); }
-    loadData(content: Uint8Array, filename?: string): void { _loadData(this, content, filename); }
+    async finalizeStream(): Promise<void> { await _finalizeStream(this); }
+    async loadData(content: Uint8Array, filename?: string): Promise<void> { await _loadData(this, content, filename); }
     async loadFile(file: File, append: boolean = false): Promise<void> { return _loadFile(this, file, append); }
     async loadUrl(sourceUrl: string, filename?: string): Promise<void> { return _loadUrl(this, sourceUrl, filename); }
     async handleDrop(e: DragEvent): Promise<void> { await _handleDrop(this, e); }

@@ -35,7 +35,7 @@ test.describe('mobile touch operation', () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test('one-finger pan and two-finger rotate/pinch update the camera without measurement mode', async ({ page }) => {
+  test('one-finger pan and two-finger twist rotate/pinch update the camera without measurement mode', async ({ page }) => {
     const { pageErrors } = attachErrorSinks(page);
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__viewer);
@@ -67,10 +67,10 @@ test.describe('mobile touch operation', () => {
       const beforeDistance = viewer.cameraDist;
       dispatchPointer('pointerdown', 1, 100, 100, 1);
       dispatchPointer('pointerdown', 2, 200, 100, 1);
-      dispatchPointer('pointermove', 1, 120, 120, 1);
-      dispatchPointer('pointermove', 2, 245, 120, 1);
-      dispatchPointer('pointerup', 1, 120, 120, 0);
-      dispatchPointer('pointerup', 2, 245, 120, 0);
+      dispatchPointer('pointermove', 1, 120, 80, 1);
+      dispatchPointer('pointermove', 2, 245, 145, 1);
+      dispatchPointer('pointerup', 1, 120, 80, 0);
+      dispatchPointer('pointerup', 2, 245, 145, 0);
 
       const eulerDelta = Math.max(
         Math.abs(viewer.euler[0] - beforeEuler[0]),
