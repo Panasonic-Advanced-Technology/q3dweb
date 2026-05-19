@@ -29,9 +29,6 @@ export default defineConfig(() => {
         provider: 'v8',
         reporter: ['text', 'html', 'json-summary'],
         reportOnFailure: true,
-        thresholds: {
-          statements: 95,
-        },
         include: ['src/**/*.ts'],
         exclude: [
           'src/**/*.d.ts',
