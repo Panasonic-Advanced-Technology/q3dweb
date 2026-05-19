@@ -101,6 +101,17 @@ You can then record and download the playback as a video file. The default setti
 
 ![firm_l.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/3953399/15a0b61b-453d-4579-ba71-665d21289389.gif)
 
+### 7. Distance Measuring
+
+You can measure distance by holding Control and left-clicking.
+
+If you click multiple times, you can also measure the total length.
+
+Press Control and right-click to undo.
+
+<img width="486" height="324" alt="measure" src="https://github.com/user-attachments/assets/135907d5-5765-45f3-a294-22c64dbcce73" />
+
+
 ## Supported Formats
 
 - **PCD** (`.pcd`): binary and ASCII
