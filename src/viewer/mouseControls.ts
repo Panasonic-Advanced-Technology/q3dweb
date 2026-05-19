@@ -38,12 +38,14 @@ interface TouchPoint { x: number; y: number; }
 interface TouchGestureState {
     mode: 'none' | 'single' | 'multi';
     lastPoint: TouchPoint | null;
+    lastCenter: TouchPoint | null;
     lastDistance: number;
     lastAngle: number;
 }
 
 const TOUCH_PAN_SPEED = 1;
 const TOUCH_PINCH_ZOOM_SPEED = 0.01;
+const TOUCH_TWO_FINGER_PITCH_SPEED = 0.2 * Math.PI / 180;
 
 function isEditable(t: EventTarget | null): boolean {
     if (!t) return false;
@@ -79,6 +81,10 @@ function distanceBetweenPoints(points: TouchPoint[]): number {
     return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
 }
 
+function centerBetweenPoints(points: TouchPoint[]): TouchPoint {
+    return { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 };
+}
+
 function angleBetweenPoints(points: TouchPoint[]): number {
     return Math.atan2(points[1].y - points[0].y, points[1].x - points[0].x);
 }
@@ -95,6 +101,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
     const touchState: TouchGestureState = {
         mode: 'none',
         lastPoint: null,
+        lastCenter: null,
         lastDistance: 0,
         lastAngle: 0,
     };
@@ -103,6 +110,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
     const resetTouchState = (): void => {
         touchState.mode = 'none';
         touchState.lastPoint = null;
+        touchState.lastCenter = null;
         touchState.lastDistance = 0;
         touchState.lastAngle = 0;
     };
@@ -111,6 +119,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
         if (points.length === 1) {
             touchState.mode = 'single';
             touchState.lastPoint = points[0];
+            touchState.lastCenter = null;
             touchState.lastDistance = 0;
             touchState.lastAngle = 0;
             return;
@@ -118,6 +127,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
         if (points.length >= 2) {
             touchState.mode = 'multi';
             touchState.lastPoint = null;
+            touchState.lastCenter = centerBetweenPoints(points);
             touchState.lastDistance = distanceBetweenPoints(points);
             touchState.lastAngle = angleBetweenPoints(points);
         }
@@ -136,17 +146,20 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
         }
 
         if (points.length >= 2) {
+            const center = centerBetweenPoints(points);
             const pinchDistance = distanceBetweenPoints(points);
             const angle = angleBetweenPoints(points);
-            if (touchState.mode !== 'multi') {
+            if (touchState.mode !== 'multi' || !touchState.lastCenter) {
                 startTouchGesture(points);
                 return;
             }
 
             const angleDelta = normalizeAngleDelta(angle - touchState.lastAngle);
             const pinchDelta = pinchDistance - touchState.lastDistance;
-            if (angleDelta !== 0) ctx.rotateCam(0, 0, -angleDelta);
+            const pitchDelta = -(center.y - touchState.lastCenter.y) * TOUCH_TWO_FINGER_PITCH_SPEED;
+            if (pitchDelta !== 0 || angleDelta !== 0) ctx.rotateCam(pitchDelta, 0, angleDelta);
             if (pinchDelta !== 0) ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
+            touchState.lastCenter = center;
             touchState.lastDistance = pinchDistance;
             touchState.lastAngle = angle;
             ctx.showCenter = true;
