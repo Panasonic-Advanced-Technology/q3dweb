@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { dropFile, makeAsciiPLY, waitForPointCount } from './helpers';
+import { dropFile, getSettingsItemSelect, makeAsciiPLY, waitForPointCount } from './helpers';
 
 /**
  * M キーで設定パネルを閉じて再度開いたとき、閉じる前と同じタブ・内容が
@@ -13,10 +13,10 @@ import { dropFile, makeAsciiPLY, waitForPointCount } from './helpers';
  *  3. <select> のタイプアヘッドで 'm' が "main win(Viewer)" を選択する (0.0.20/21)
  */
 
-async function panelVisible(page: Page): Promise<boolean> {
+async function panelMinimized(page: Page): Promise<boolean> {
     return await page.evaluate(() => {
         const v = (window as any).__viewer;
-        return v?.settingsPanel?.style.display !== 'none';
+        return v?.settingsPanel?.getAttribute('data-minimized') === 'true';
     });
 }
 
@@ -26,21 +26,19 @@ async function currentTab(page: Page): Promise<string> {
 
 test.describe('M toggle preserves settings panel state', () => {
     test('reopening with M keeps the Film Maker tab active', async ({ page }) => {
-        await page.goto('/');
+        await page.goto('/?mode=film_maker');
         await page.waitForFunction(() => (window as any).__viewer);
 
-        const select = page.locator('select').first();
-        await select.selectOption('__film_maker__');
-        expect(await currentTab(page)).toBe('__film_maker__');
+        await expect(page.locator('[data-role="film-maker"]')).toBeVisible();
 
         // フォーカスを body に移す
         await page.locator('body').click({ position: { x: 1, y: 1 } });
         await page.keyboard.press('m');
-        expect(await panelVisible(page)).toBe(false);
+        expect(await panelMinimized(page)).toBe(true);
 
         await page.keyboard.press('m');
-        expect(await panelVisible(page)).toBe(true);
-        expect(await currentTab(page)).toBe('__film_maker__');
+        expect(await panelMinimized(page)).toBe(false);
+        await expect(page.locator('[data-role="film-maker"]')).toBeVisible();
     });
 
     test('reopening with M keeps the per-item cloud tab active', async ({ page }) => {
@@ -54,10 +52,10 @@ test.describe('M toggle preserves settings panel state', () => {
 
         await page.locator('body').click({ position: { x: 1, y: 1 } });
         await page.keyboard.press('m');
-        expect(await panelVisible(page)).toBe(false);
+        expect(await panelMinimized(page)).toBe(true);
 
         await page.keyboard.press('m');
-        expect(await panelVisible(page)).toBe(true);
+        expect(await panelMinimized(page)).toBe(false);
         expect(await currentTab(page)).toBe('cloud');
         await expect(page.locator('text=Points:')).toBeVisible();
     });
@@ -66,17 +64,20 @@ test.describe('M toggle preserves settings panel state', () => {
         await page.goto('/');
         await page.waitForFunction(() => (window as any).__viewer);
 
-        const select = page.locator('select').first();
-        await select.selectOption('__film_maker__');
+        await dropFile(page, 'synth.ply', makeAsciiPLY(500));
+        await waitForPointCount(page);
+
+        const select = getSettingsItemSelect(page);
+        await select.selectOption('cloud');
         await select.focus();
         await expect(select).toBeFocused();
 
         await page.keyboard.press('m');
-        expect(await panelVisible(page)).toBe(false);
+        expect(await panelMinimized(page)).toBe(true);
 
         await page.keyboard.press('m');
-        expect(await panelVisible(page)).toBe(true);
-        expect(await currentTab(page)).toBe('__film_maker__');
+        expect(await panelMinimized(page)).toBe(false);
+        expect(await currentTab(page)).toBe('cloud');
     });
 
     test('M is ignored while typing in a text input', async ({ page }) => {
@@ -93,7 +94,7 @@ test.describe('M toggle preserves settings panel state', () => {
 
         await page.keyboard.press('m');
         // パネルは開いたまま (ショートカット無効)
-        expect(await panelVisible(page)).toBe(true);
+        expect(await panelMinimized(page)).toBe(false);
         // 入力には 'm' が追記されている
         expect(await colorInput.inputValue()).toBe('#abcdefm');
     });

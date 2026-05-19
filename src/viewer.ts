@@ -20,6 +20,10 @@ const wrapAngle = (a: number): number =>
     ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
 
 interface SettingBuilder { addSetting(container: HTMLElement): void; }
+
+let globalErrorViewer: Viewer | null = null;
+let globalErrorHandlersInstalled = false;
+
 export class Viewer {
     container: HTMLElement;
     scene: THREE.Scene;
@@ -301,13 +305,20 @@ export class Viewer {
     }
 
     installGlobalErrorHandler() {
+        globalErrorViewer = this;
+        if (globalErrorHandlersInstalled) return;
+        globalErrorHandlersInstalled = true;
         window.addEventListener('error', (ev) => {
             console.error('Global error:', ev.error);
-            if (this.statusElement) { this.statusElement.textContent = `Global Error: ${ev.message}`; this.statusElement.style.backgroundColor = 'rgba(255,0,0,0.8)'; }
+            ev.preventDefault();
+            const viewer = globalErrorViewer;
+            if (viewer?.statusElement) { viewer.statusElement.textContent = `Global Error: ${ev.message}`; viewer.statusElement.style.backgroundColor = 'rgba(255,0,0,0.8)'; }
         });
         window.addEventListener('unhandledrejection', (ev) => {
             console.error('Unhandled rejection:', ev.reason);
-            if (this.statusElement) { this.statusElement.textContent = `Async Error: ${ev.reason}`; this.statusElement.style.backgroundColor = 'rgba(255,0,0,0.8)'; }
+            ev.preventDefault();
+            const viewer = globalErrorViewer;
+            if (viewer?.statusElement) { viewer.statusElement.textContent = `Async Error: ${ev.reason}`; viewer.statusElement.style.backgroundColor = 'rgba(255,0,0,0.8)'; }
         });
     }
 

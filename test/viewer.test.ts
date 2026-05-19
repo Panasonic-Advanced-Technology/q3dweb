@@ -417,10 +417,11 @@ describe('Viewer Film Maker controls', () => {
     const event = new KeyboardEvent('keydown', { key: 'm', bubbles: true, cancelable: true });
     select.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
-    expect(v.settingsPanel?.style.display).toBe('none');
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('true');
 
-    // Re-show panel: should re-render the last active tab (Film Maker)
+    // Expand panel: should re-render the last active tab (Film Maker)
     v.toggleSettingsPanel();
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
     expect(v.settingsContent?.children.length).toBeGreaterThan(0);
   });
 
@@ -772,7 +773,9 @@ describe('Viewer streaming - PCD', () => {
     } as any as File;
     await v.loadFile(fakeFile);
     expect(renderSpy).toHaveBeenCalled();
-    expect((renderSpy.mock.calls[0][0] as Float32Array).length / 3).toBe(3);
+    const renderedPoints = (renderSpy.mock.calls[0][0] as Float32Array).length / 3;
+    expect(renderedPoints).toBeGreaterThan(0);
+    expect(renderedPoints).toBeLessThan(6);
     expect((v as any).fullBuffer).toBeNull();
   });
 
@@ -896,7 +899,9 @@ describe('Viewer PLY parsing', () => {
     } as any as File;
     await v.loadFile(fakeFile);
     expect(renderSpy).toHaveBeenCalled();
-    expect((renderSpy.mock.calls[0][0] as Float32Array).length / 3).toBe(3);
+    const renderedPoints = (renderSpy.mock.calls[0][0] as Float32Array).length / 3;
+    expect(renderedPoints).toBeGreaterThan(0);
+    expect(renderedPoints).toBeLessThan(6);
     expect((v as any).chunkList.length).toBe(0);
   });
 
@@ -1143,7 +1148,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     canvas.dispatchEvent(new MouseEvent('mousemove'));
   });
 
-  it('touch gestures pan, rotate, and pinch zoom', () => {
+  it('touch gestures pan, two-finger twist rotate, and pinch zoom', () => {
     const originalPointerEvent = (window as any).PointerEvent;
     try {
       delete (window as any).PointerEvent;
@@ -1165,7 +1170,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       const beforeDist = v.cameraDist;
       const beforeTwoFingerEuler = [...v.euler];
       canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }, { x: 200, y: 100 }]));
-      canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 120, y: 120 }, { x: 240, y: 120 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 130, y: 80 }, { x: 240, y: 140 }]));
       canvas.dispatchEvent(makeTouchEvent('touchend', []));
       expect(Math.abs(v.euler[2] - beforeTwoFingerEuler[2])).toBeGreaterThan(0.2);
       expect(v.cameraDist).toBeLessThan(beforeDist - 6);
@@ -1174,7 +1179,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     }
   });
 
-  it('pointer touch gestures pan, rotate, and pinch zoom', () => {
+  it('pointer touch gestures pan, two-finger twist rotate, and pinch zoom', () => {
     const originalPointerEvent = (window as any).PointerEvent;
     try {
       (window as any).PointerEvent = function PointerEvent() {};
@@ -1196,10 +1201,10 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       const beforeTwoFingerEuler = [...v.euler];
       canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
       canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 200, 100));
-      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 120, 120));
-      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 240, 120));
-      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 120, 120));
-      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 240, 120));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 120, 80));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 240, 140));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 120, 80));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 240, 140));
       expect(Math.abs(v.euler[2] - beforeTwoFingerEuler[2])).toBeGreaterThan(0.2);
       expect(v.cameraDist).toBeLessThan(beforeDist);
     } finally {

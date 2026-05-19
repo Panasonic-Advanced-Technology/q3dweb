@@ -1,7 +1,7 @@
 {
   "name": "q3dweb",
   "private": true,
-  "version": "1.0.21",
+  "version": "1.0.27",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -10,13 +10,16 @@
     "build:pages": "tsc && vite build --mode github-pages",
     "preview": "vite preview",
     "test": "vitest",
+    "test:unit:ci": "vitest run --coverage --silent",
     "test:e2e": "playwright test",
+    "test:e2e:ci": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "build:extension": "npm run build && node -e \"require('fs').rmSync('extension/webview-dist',{recursive:true,force:true})\" && cp -r dist extension/webview-dist && cp NOTICE THIRD_PARTY_NOTICES.md extension/ && cd extension && npm run compile",
     "package:extension": "npm run build:extension && cd extension && npx @vscode/vsce package --allow-missing-repository"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
+    "@types/node": "^22.19.19",
     "@types/three": "^0.184.1",
     "@vitest/coverage-v8": "^4.1.5",
     "jsdom": "^29.1.1",

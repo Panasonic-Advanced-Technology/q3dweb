@@ -11,6 +11,7 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "types": ["node"],
     "noEmit": true,
 
     /* Linting */

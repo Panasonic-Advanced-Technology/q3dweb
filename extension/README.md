@@ -3,16 +3,6 @@
 q3dviewer is a VS Code extension for viewing point cloud files (`.pcd`, `.ply`, `.las`, `.laz`, `.e57`) in 3D.
 It embeds a q3dweb-based WebView so you can inspect point clouds directly inside the editor by rotating, panning, and zooming.
 
-## Features
-
-- Open `.pcd`, `.ply`, `.las`, `.laz`, `.e57` files in a VS Code custom editor
-- Rotate, pan, and zoom with the mouse; fly through with the keyboard
-- Adjust point size, alpha, color mode, and display range from the settings menu
-- Check the loaded point count on the cloud tab
-- Measure distance between two points
-- Film Maker tab: add / preview camera key frames and record a fly-through
-- Settings panel remembers the active tab when toggled with `M`
-
 ## Usage
 
 1. Install this extension in VS Code.
@@ -21,7 +11,11 @@ It embeds a q3dweb-based WebView so you can inspect point clouds directly inside
    **Point Cloud Viewer**.
 4. Press `M` to show / hide the settings panel.
 
-## Controls
+### 1. Basic Controls
+
+After you load a point cloud by drag and drop, you can inspect it with the mouse and keyboard.
+
+![drag_pcd.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/3953399/555fee3d-8ec3-4fee-80f6-767844c003da.gif)
 
 | Input | Action |
 | --- | --- |
@@ -35,6 +29,28 @@ It embeds a q3dweb-based WebView so you can inspect point clouds directly inside
 | `M` | Toggle settings menu (preserves the active tab) |
 | `Space` (Film Maker tab) | Add key frame from current camera |
 | `Delete` (Film Maker tab) | Remove current key frame |
+
+### 2. LAS / LAZ Map Overlay
+
+If a LAS or LAZ file includes coordinate reference system information, q3dweb can read it and overlay the point cloud on map tiles.
+
+The following map sources are available by default.
+
+- OpenStreetMap
+- GSI Standard Map
+- GSI Pale Map
+- GSI Seamless Aerial Photo
+- GSI Blank Map
+
+<img width="528" height="327" alt="map" src="https://github.com/user-attachments/assets/1dcf11f2-7fa0-466c-95f1-dee6a25ff064" />
+
+### 3. Creating Demo Videos
+
+q3dweb also includes a Film Maker workflow for creating camera fly-throughs. Open the Film Maker tab in the settings panel, save camera positions as key frames, and preview the interpolated camera motion.
+
+You can then record and download the playback as a video file. The default setting targets MP4/H.264 when the browser supports it and otherwise falls back to another MediaRecorder-compatible format.
+
+![firm_l.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/3953399/15a0b61b-453d-4579-ba71-665d21289389.gif)
 
 ## Supported Formats
 

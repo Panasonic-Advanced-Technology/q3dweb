@@ -1,0 +1,1244 @@
+[33mBoth esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored.[39m The following esbuild options were set: `{ keepNames: true }`
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90m/home/hara/web_q3d/q3dweb[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m test/FrameItem.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m test/Text2DItem.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m test/CloudItem.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m test/LineItem.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstderr[2m | test/GNSSMapItem.test.ts[2m > [22m[2mGNSSMapItem[2m > [22m[2msetZoom changes/clamps
+[22m[39m[GNSSMapItem] tile load failed https://tile.openstreetmap.org/1/0/0.png ErrorEvent { isTrusted: [36m[Getter][39m }
+[GNSSMapItem] tile load failed https://tile.openstreetmap.org/1/1/0.png ErrorEvent { isTrusted: [36m[Getter][39m }
+[GNSSMapItem] tile load failed https://tile.openstreetmap.org/1/0/0.png ErrorEvent { isTrusted: [36m[Getter][39m }
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ [32m✓[39m test/measurement-extra.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m test/WebGLCloudBackend.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m test/loadBudget.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m test/ImageItem.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m test/filmMaker.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m test/filmPlayback-extra.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m test/cloudRenderer.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m test/remoteCloudLoader.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+[90mstdout[2m | test/lasParser.test.ts[2m > [22m[2mlasParser[2m > [22m[2mparses LAS metadata for point formats and LAS 1.4 counts
+[22m[39mLAS 1.2, Format 2, 3 points, Record Length 26
+LAS 1.2, Format 3, 3 points, Record Length 34
+LAS 1.2, Format 5, 3 points, Record Length 63
+LAS 1.4, Format 7, 3 points, Record Length 36
+LAS 1.4, Format 8, 3 points, Record Length 38
+LAS 1.4, Format 10, 3 points, Record Length 67
+
+ [32m✓[39m test/pcdParser.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+[90mstdout[2m | test/lasParser.test.ts[2m > [22m[2mlasParser[2m > [22m[2mprocesses streaming LAS records with sampling, RGB scaling, and leftovers
+[22m[39mLAS 1.2, Format 2, 3 points, Record Length 26
+
+ [32m✓[39m test/GridItem.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+ [32m✓[39m test/lasParser.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m test/e57Parser.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32m✓[39m test/GNSSMapItem-presets.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 197[2mms[22m[39m
+ [32m✓[39m test/GNSSMapItem.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 221[2mms[22m[39m
+[90mstdout[2m | test/streamEngine-extra.test.ts[2m > [22m[2mstreamEngine extra paths[2m > [22m[2mfinalizes chunked E57 streams asynchronously
+[22m[39mStream finished.
+E57 chunked bytes: 2
+
+[90mstdout[2m | test/streamEngine-extra.test.ts[2m > [22m[2mstreamEngine extra paths[2m > [22m[2mreports finalize errors for empty E57 streams
+[22m[39mStream finished.
+
+ [32m✓[39m test/streamEngine-extra.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 434[2mms[22m[39m
+     [33m[2m✓[22m[39m detects stream formats and single-buffer/deferred policies [33m 361[2mms[22m[39m
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for warehouse_ascii.pcd
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m132[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mparseHeader for binary with rgba field and counts/sizes
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, rgba: [33m12[39m },
+  width: [33m2[39m,
+  height: [33m1[39m,
+  points: [33m2[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m108[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'rgba'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'U'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+
+[90mstderr[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mloadData catches errors when content forces throw via tampered state
+[22m[39mError loading data: Error: boom
+    at CloudViewer.v.removeItem [90m(/home/hara/web_q3d/q3dweb/[39mtest/viewer-edge.test.ts:62:43[90m)[39m
+    at loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:346:11[90m)[39m
+    at CloudViewer.loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:69:62[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer-edge.test.ts:63:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mreadNumericValue covers all type/size combinations
+[22m[39mParsed Header: {
+  offset: {
+    f4: [33m0[39m,
+    f8: [33m4[39m,
+    u1: [33m12[39m,
+    u2: [33m13[39m,
+    u4: [33m15[39m,
+    i1: [33m19[39m,
+    i2: [33m20[39m,
+    i4: [33m22[39m,
+    ux: [33m26[39m,
+    uxx: [33m34[39m,
+    uxxx: [33m50[39m
+  },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m177[39m,
+  rowSize: [33m82[39m,
+  fields: [
+    [32m'f4'[39m,  [32m'f8'[39m,   [32m'u1'[39m,
+    [32m'u2'[39m,  [32m'u4'[39m,   [32m'i1'[39m,
+    [32m'i2'[39m,  [32m'i4'[39m,   [32m'ux'[39m,
+    [32m'uxx'[39m, [32m'uxxx'[39m
+  ],
+  counts: [
+    [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m,
+    [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m,
+    [33m1[39m
+  ],
+  types: [
+    [32m'F'[39m, [32m'F'[39m, [32m'U'[39m, [32m'U'[39m,
+    [32m'U'[39m, [32m'I'[39m, [32m'I'[39m, [32m'I'[39m,
+    [32m'X'[39m, [32m'X'[39m, [32m'X'[39m
+  ],
+  sizes: [
+     [33m4[39m, [33m8[39m, [33m1[39m, [33m2[39m,  [33m4[39m,
+     [33m1[39m, [33m2[39m, [33m4[39m, [33m8[39m, [33m16[39m,
+    [33m32[39m
+  ]
+}
+
+[90mstderr[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mhandleDrop with files invokes loadFile per file
+[22m[39mError loading a.pcd: TypeError: file.stream is not a function
+    at loadFile [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:383:29[90m)[39m
+    at handleDrop [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:400:50[90m)[39m
+    at CloudViewer.handleDrop [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:72:59[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer-edge.test.ts:71:13
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+
+[90mstdout[2m | test/viewer-finish.test.ts[2m > [22m[2mViewer last-mile coverage[2m > [22m[2mprocessChunk: PCD header arrives without DATA marker (leftover path)
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m97[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-georef.test.ts[2m > [22m[2mViewer parseLAS georef branches[2m > [22m[2mfalls back to WKT VLR when EPSG is absent
+[22m[39mLAS 1.2, Format 0, 1 points, Record Length 20
+LAS georef: EPSG=wkt, centre=(35.005000, 139.005000)
+Stream finished.
+GNSS overlay: zoom=19, tileRadius=2
+
+[90mstdout[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mloadFile drives stream via file.stream()
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m96[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+
+[90mstdout[2m | test/integration-samples.test.ts[2m > [22m[2mIntegration: load real sample files[2m > [22m[2mloads warehouse_ascii.pcd
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m, time: [33m16[39m, ring: [33m20[39m },
+  width: [33m52411[39m,
+  height: [33m1[39m,
+  points: [33m52411[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m209[39m,
+  rowSize: [33m22[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m, [32m'time'[39m, [32m'ring'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'U'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m, [33m2[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-georef.test.ts[2m > [22m[2mViewer parseLAS georef branches[2m > [22m[2mlogs warning when EPSG is unknown (no overlay added)
+[22m[39mLAS 1.2, Format 0, 1 points, Record Length 20
+Stream finished.
+
+[90mstdout[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mloadFile drives stream via file.stream()
+[22m[39mStream finished.
+
+ [32m✓[39m test/integration-samples.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 257[2mms[22m[39m
+ [32m✓[39m test/viewer-georef.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 241[2mms[22m[39m
+[90mstderr[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mloadFile catches inner error
+[22m[39mError loading c.pcd: Error: stream-fail
+    at File.stream [90m(/home/hara/web_q3d/q3dweb/[39mtest/viewer-edge.test.ts:101:58[90m)[39m
+    at loadFile [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:383:29[90m)[39m
+    at CloudViewer.loadFile [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:70:81[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer-edge.test.ts:102:13
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+
+[90mstderr[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mprocessChunk catches inner error via tampered loadingOverlay (forces inner throw)
+[22m[39mChunk processing failed Error: boom
+    at CloudViewer.get [as loadingOverlay] [90m(/home/hara/web_q3d/q3dweb/[39mtest/viewer-edge.test.ts:110:21[90m)[39m
+    at processChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:232:35[90m)[39m
+    at CloudViewer.processChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:66:65[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer-edge.test.ts:113:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for warehouse_ascii.pcd
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m, time: [33m16[39m, ring: [33m20[39m },
+  width: [33m52411[39m,
+  height: [33m1[39m,
+  points: [33m52411[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m209[39m,
+  rowSize: [33m22[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m, [32m'time'[39m, [32m'ring'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'U'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m, [33m2[39m ]
+}
+Stream finished.
+[qual] warehouse_ascii.pcd (pcd) size=1.4 MiB estimate=2.9 MiB rss_delta=1.8 MiB ratio_est/delta=1.60
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mPLY ascii with line lacking sufficient tokens is skipped
+[22m[39mStream finished.
+
+[90mstderr[2m | test/viewer-finish.test.ts[2m > [22m[2mViewer last-mile coverage[2m > [22m[2mprocessChunk: error inside try is caught
+[22m[39mChunk processing failed Error: boom
+    at Uint8Array.get [90m(/home/hara/web_q3d/q3dweb/[39mtest/viewer-finish.test.ts:80:60[90m)[39m
+    at processChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:154:41[90m)[39m
+    at CloudViewer.processChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:66:65[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer-finish.test.ts:81:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+
+[90mstderr[2m | test/realtimeViewer.test.ts[2m > [22m[2mRealtimeViewer streaming workflow[2m > [22m[2mconnects, subscribes, handles publish messages, and disconnects cleanly
+[22m[39mrosbridge websocket error: Event { isTrusted: [36m[Getter][39m }
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mPLY ascii without trailing newline still parses last line
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mprocessChunk: ascii data full-buffer accumulation
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m96[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_binary.pcd
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m132[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mPLY ascii with float intensity (0..1) gets rescaled
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mprocessChunk: binary with leftover from previous chunk
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m2[39m,
+  height: [33m1[39m,
+  points: [33m2[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m97[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-finish.test.ts[2m > [22m[2mViewer last-mile coverage[2m > [22m[2mprocessAsciiData: lines.length fallback when totalPoints undefined + sample-ratio branch
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  data: [32m'ascii'[39m,
+  headerLen: [33m70[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mLAS legacy count when 64-bit value is zero
+[22m[39mLAS 1.4, Format 0, 1 points, Record Length 20
+Stream finished.
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mPLY binary intensity + packed RGB
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mprocessAsciiData: header without POINTS uses lines.length
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m87[39m,
+  points: [33m1[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mPLY binary with element list properties (skipped)
+[22m[39mStream finished.
+
+ [32m✓[39m test/realtimeViewer.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 479[2mms[22m[39m
+[90mstdout[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mprocessAsciiData without intensity uses z as value
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m96[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-finish.test.ts[2m > [22m[2mViewer last-mile coverage[2m > [22m[2mdecodePLYPackedRGB: integer (non-float) type path
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mPLY without xyz throws (caught by loadData)
+[22m[39mStream finished.
+
+[90mstderr[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mPLY without xyz throws (caught by loadData)
+[22m[39mChunk processing failed Error: PLY missing x/y/z properties
+    at deriveFields [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/plyStreamParser.ts:55:15[90m)[39m
+    at createPLYStreamState [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/plyStreamParser.ts:87:20[90m)[39m
+    at processPLYChunkInternal [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:144:19[90m)[39m
+    at processChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:163:13[90m)[39m
+    at loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:348:9[90m)[39m
+    at CloudViewer.loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:69:62[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer-extra.test.ts:183:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+Finalize Error Error: Empty PLY stream
+    at finalizeStream [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:296:51[90m)[39m
+    at loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:349:31[90m)[39m
+    at CloudViewer.loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:69:62[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer-extra.test.ts:183:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+
+[90mstdout[2m | test/plyParser.test.ts[2m > [22m[2mparsePLY[2m > [22m[2mrejects PLY files without x/y/z vertex properties
+[22m[39mPLY: format=ascii, vertices=1, props=x,y
+
+ [32m✓[39m test/plyParser.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+[90mstdout[2m | test/viewer-edge.test.ts[2m > [22m[2mViewer remaining branch coverage[2m > [22m[2mprocessBinaryData fallback path without intensity
+[22m[39mParsed Header: {
+  offset: { pad: [33m0[39m, x: [33m4[39m, y: [33m8[39m, z: [33m12[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m107[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'pad'[39m, [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-finish.test.ts[2m > [22m[2mViewer last-mile coverage[2m > [22m[2mprocessBinaryData: fast path with rgb at non-float-aligned offset
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, _: [33m17[39m, rgb: [33m13[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m123[39m,
+  rowSize: [33m20[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'_'[39m, [32m'rgb'[39m, [32m'_'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'U'[39m, [32m'U'[39m, [32m'U'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m1[39m, [33m4[39m, [33m3[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mLAS 1.4 with 64-bit point count
+[22m[39mLAS 1.4, Format 3, 2 points, Record Length 34
+Stream finished.
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mprocessAsciiData with rgba and intensity
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m, rgba: [33m16[39m },
+  width: [33m2[39m,
+  height: [33m1[39m,
+  points: [33m2[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m123[39m,
+  rowSize: [33m20[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m, [32m'rgba'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'U'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+ [32m✓[39m test/viewer-finish.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 472[2mms[22m[39m
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mprocessAsciiData throws when missing xyz
+[22m[39mParsed Header: {
+  offset: { a: [33m0[39m, b: [33m4[39m, c: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m96[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'a'[39m, [32m'b'[39m, [32m'c'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstderr[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mprocessAsciiData throws when missing xyz
+[22m[39mChunk processing failed Error: ASCII PCD is missing x/y/z fields.
+    at createPCDAsciiStreamState [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/pcdAsciiStream.ts:43:15[90m)[39m
+    at processChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:204:44[90m)[39m
+    at loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:348:9[90m)[39m
+    at CloudViewer.loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:69:62[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer-extra.test.ts:227:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mprocessBinaryData with non-standard offsets goes through fallback path
+[22m[39mParsed Header: {
+  offset: { pad: [33m0[39m, x: [33m4[39m, y: [33m8[39m, z: [33m12[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m107[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'pad'[39m, [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer settings panel[2m > [22m[2monSettingsItemSelected main_win builds main settings
+[22m[39mTHREE.Color: Unknown color this-is-not-a-color
+
+ [32m✓[39m test/lasGeo.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m test/maths.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mprocessBinaryData with intensity & rgb in fallback path
+[22m[39mParsed Header: {
+  offset: { pad: [33m0[39m, x: [33m4[39m, y: [33m8[39m, z: [33m12[39m, intensity: [33m16[39m, rgb: [33m20[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m133[39m,
+  rowSize: [33m24[39m,
+  fields: [ [32m'pad'[39m, [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m, [32m'rgb'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'U'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+ [32m✓[39m test/memoryCheck.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mfinalize empty PLY stream throws (caught)
+[22m[39mStream finished.
+
+[90mstderr[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mfinalize empty PLY stream throws (caught)
+[22m[39mFinalize Error Error: Empty PLY stream
+    at finalizeStream [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:296:51[90m)[39m
+    at CloudViewer.finalizeStream [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:68:30[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer-extra.test.ts:265:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mbinary_compressed PCD path shows error
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'binary_compressed'[39m,
+  headerLen: [33m108[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstderr[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mbinary_compressed PCD path shows error
+[22m[39mbinary_compressed PCD not supported in streaming mode.
+
+ [32m✓[39m test/pointCloud2Decode.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+[90mstdout[2m | test/viewer-extra.test.ts[2m > [22m[2mViewer additional branch coverage[2m > [22m[2mprocessChunk catches inner error
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m97[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+
+ [32m✓[39m test/AxisItem.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m test/cloudUrlOptions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m test/Text3DItem.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m test/projConvert.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m test/viewer-extra.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 624[2mms[22m[39m
+ [32m✓[39m test/GaussianItem.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m test/MeshItem.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m test/parserSampling.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_binary.pcd
+[22m[39mParsed Header: {
+  offset: { intensity: [33m0[39m, _: [33m28[39m, x: [33m16[39m, y: [33m20[39m, z: [33m24[39m },
+  width: [33m17982071[39m,
+  height: [33m1[39m,
+  points: [33m17982071[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m226[39m,
+  rowSize: [33m32[39m,
+  fields: [ [32m'intensity'[39m, [32m'_'[39m, [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'_'[39m ],
+  counts: [ [33m1[39m, [33m12[39m, [33m1[39m, [33m1[39m, [33m1[39m, [33m4[39m ],
+  types: [ [32m'F'[39m, [32m'U'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'U'[39m ],
+  sizes: [ [33m4[39m, [33m1[39m, [33m4[39m, [33m4[39m, [33m4[39m, [33m1[39m ]
+}
+Stream finished.
+[qual] mihara_binary.pcd (pcd) size=548.8 MiB estimate=1097.5 MiB rss_delta=547.9 MiB ratio_est/delta=2.00
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_ascii.ply
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m132[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer Film Maker controls[2m > [22m[2mcovers playback guard paths and captureStream fallback
+[22m[39mcaptureStream not supported
+Recording stop failed: Error: stop failed
+    at Object.<anonymous> [90m(/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:490:49[90m)[39m
+    at Object.Mock [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/spy[24m/dist/index.js:332:34[90m)[39m
+    at stopRecording [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/filmPlayback.ts:143:30[90m)[39m
+    at FilmMakerViewer.stopRecording [90m(/home/hara/web_q3d/q3dweb/[39msrc/film_maker_viewer.ts:161:29[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:492:16
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer Film Maker controls[2m > [22m[2mcovers playback guard paths and captureStream fallback
+[22m[39mRecording stop failed: Error: stop failed
+    at Object.<anonymous> [90m(/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:490:49[90m)[39m
+    at Object.Mock [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/spy[24m/dist/index.js:332:34[90m)[39m
+    at stopRecording [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/filmPlayback.ts:143:30[90m)[39m
+    at stopPlayback [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/filmPlayback.ts:87:9[90m)[39m
+    at FilmMakerViewer.stopPlayback [90m(/home/hara/web_q3d/q3dweb/[39msrc/film_maker_viewer.ts:158:28[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:335:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at wrapper [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:750:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer Film Maker controls[2m > [22m[2mconfirms warning-level memory budget checks
+[22m[39m[memoryCheck] large file warning: Opening "large.pcd" may exhaust browser memory.
+
+Estimated memory to load this PCD file: 1.37 GiB (raw 700.0 MiB x 2). Available JS heap: 2.00 GiB (limit 2.00 GiB).
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mCloudViewer URL loading[2m > [22m[2mloads a remote point cloud through fetch streaming
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m },
+  width: [33m2[39m,
+  height: [33m1[39m,
+  points: [33m2[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m136[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mCloudViewer URL loading[2m > [22m[2mloads a remote point cloud through fetch streaming
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mloads binary PCD (small)
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m },
+  width: [33m3[39m,
+  height: [33m1[39m,
+  points: [33m3[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m180[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mloadFile with binary .pcd defers the initial memory budget check
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m },
+  width: [33m2[39m,
+  height: [33m1[39m,
+  points: [33m2[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m180[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mloadFile with binary .pcd defers the initial memory budget check
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mloads ascii PCD
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m },
+  width: [33m3[39m,
+  height: [33m1[39m,
+  points: [33m3[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m136[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mstreams fake 2GiB+ ASCII PCD without allocating the full file
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m },
+  width: [33m6[39m,
+  height: [33m1[39m,
+  points: [33m6[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m136[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mstreams fake 2GiB+ ASCII PCD without allocating the full file
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mloads binary PCD with RGB
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, rgb: [33m12[39m },
+  width: [33m2[39m,
+  height: [33m1[39m,
+  points: [33m2[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m131[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'rgb'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstderr[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_ascii.ply
+[22m[39mChunk processing failed TypeError: The encoded data was not valid for encoding utf-8
+[90m    at TextDecoder.decode (node:internal/encoding:462:14)[39m
+    at processAsciiChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/plyStreamParser.ts:164:53[90m)[39m
+    at processPLYStreamChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/plyStreamParser.ts:224:42[90m)[39m
+    at processPLYChunkInternal [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:147:5[90m)[39m
+    at processChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:163:13[90m)[39m
+    at loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:348:9[90m)[39m
+    at CloudViewer.loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:69:62[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/memoryCheck.qualification.test.ts:109:9
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26 {
+  code: [32m'ERR_ENCODING_INVALID_ENCODED_DATA'[39m
+}
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_ascii.ply
+[22m[39mStream finished.
+[qual] mihara_ascii.ply (ply) size=512.3 MiB estimate=1280.7 MiB rss_delta=0.0 MiB ratio_est/delta=1342912990.00
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mhandles intermediate header chunk (header arrives split)
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'binary'[39m,
+  headerLen: [33m180[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_binary.ply
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m132[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mhandles ascii data via streaming
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m, intensity: [33m12[39m },
+  width: [33m2[39m,
+  height: [33m1[39m,
+  points: [33m2[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m136[39m,
+  rowSize: [33m16[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m, [32m'intensity'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mparseHeader handles missing POINTS by computing from W*H
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m5[39m,
+  height: [33m2[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m75[39m,
+  points: [33m10[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer streaming - PCD[2m > [22m[2mparseHeader without COUNT still works
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m3[39m,
+  height: [33m1[39m,
+  points: [33m3[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m84[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mparses ASCII PLY with intensity + colors
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mstreams fake 2GiB+ ASCII PLY with source-size thinning
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mparses ASCII PLY with intensity only (no colors)
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mparses ASCII PLY with no intensity
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mparses binary little endian PLY
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mparses ASCII PLY with packed RGB float
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mthrows on PLY without end_header
+[22m[39mStream finished.
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mthrows on PLY without end_header
+[22m[39mFinalize Error Error: Empty PLY stream
+    at finalizeStream [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:296:51[90m)[39m
+    at loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:349:31[90m)[39m
+    at CloudViewer.loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:69:62[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:929:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mrejects file that is not PLY
+[22m[39mStream finished.
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer PLY parsing[2m > [22m[2mrejects file that is not PLY
+[22m[39mChunk processing failed Error: Not a PLY file
+    at parsePLYHeader [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/plyParser.ts:67:35[90m)[39m
+    at parsePLYStreamHeader [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/plyStreamParser.ts:246:12[90m)[39m
+    at processPLYChunkInternal [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:138:20[90m)[39m
+    at processChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:163:13[90m)[39m
+    at loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:348:9[90m)[39m
+    at CloudViewer.loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:69:62[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:935:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+Finalize Error Error: Empty PLY stream
+    at finalizeStream [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:296:51[90m)[39m
+    at loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:349:31[90m)[39m
+    at CloudViewer.loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:69:62[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:935:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mparses LAS 1.2 format 0
+[22m[39mLAS 1.2, Format 0, 2 points, Record Length 20
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mparses LAS 1.2 format 2 with RGB
+[22m[39mLAS 1.2, Format 2, 2 points, Record Length 26
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mparses LAS 1.2 format 3 with RGB
+[22m[39mLAS 1.2, Format 3, 2 points, Record Length 34
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mparses LAS 1.4 format 7 with RGB
+[22m[39mLAS 1.4, Format 7, 2 points, Record Length 36
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mparses LAS 1.4 format 8 with RGB
+[22m[39mLAS 1.4, Format 8, 2 points, Record Length 38
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mparses LAS through streaming chunks without assembling the whole file
+[22m[39mLAS 1.2, Format 0, 3 points, Record Length 20
+Stream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mloadFile with .las defers the initial memory budget check
+[22m[39mLAS 1.2, Format 0, 2 points, Record Length 20
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mloadFile with .las defers the initial memory budget check
+[22m[39mStream finished.
+
+[90mstdout[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mrejects file without LASF magic
+[22m[39mStream finished.
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer LAS parsing[2m > [22m[2mrejects file without LASF magic
+[22m[39mChunk processing failed Error: Not a valid LAS file
+    at processLASChunkInternal [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:96:123[90m)[39m
+    at processChunk [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:158:13[90m)[39m
+    at loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:348:9[90m)[39m
+    at CloudViewer.loadData [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:69:62[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:1058:7
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+
+ [32m✓[39m test/viewer-edge.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 1170[2mms[22m[39m
+     [33m[2m✓[22m[39m animation showCenter sets timeout that hides marker [33m 709[2mms[22m[39m
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_binary.ply
+[22m[39mStream finished.
+[qual] mihara_binary.ply (ply) size=274.4 MiB estimate=686.0 MiB rss_delta=0.0 MiB ratio_est/delta=719283515.00
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_binary.las
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m132[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer drag and drop & loadFile[2m > [22m[2mloadFile with unsupported ext warns
+[22m[39mUnsupported file type: foo.txt
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer drag and drop & loadFile[2m > [22m[2mloadFile with .pcd reads stream
+[22m[39mError loading foo.pcd: TypeError: file.stream is not a function
+    at loadFile [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:383:29[90m)[39m
+    at CloudViewer.loadFile [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:70:81[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:1393:13
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer drag and drop & loadFile[2m > [22m[2mloadFile append=true does not remove cloud
+[22m[39mError loading foo.pcd: TypeError: file.stream is not a function
+    at loadFile [90m(/home/hara/web_q3d/q3dweb/[39msrc/viewer/streamEngine.ts:383:29[90m)[39m
+    at CloudViewer.loadFile [90m(/home/hara/web_q3d/q3dweb/[39msrc/cloud_viewer.ts:70:81[90m)[39m
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:1399:13
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer global error handlers + window resize + animation[2m > [22m[2mglobal error event sets statusElement
+[22m[39mGlobal error: Error: boom
+    at [90m/home/hara/web_q3d/q3dweb/[39mtest/viewer.test.ts:1414:59
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2955:64
+
+[90mstderr[2m | test/viewer.test.ts[2m > [22m[2mViewer global error handlers + window resize + animation[2m > [22m[2munhandled rejection sets statusElement
+[22m[39mUnhandled rejection: [90mundefined[39m
+Unhandled rejection: failure
+
+ [32m✓[39m test/viewer.test.ts [2m([22m[2m88 tests[22m[2m)[22m[33m 1419[2mms[22m[39m
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_binary.las
+[22m[39mLAS 1.2, Format 0, 17982071 points, Record Length 20
+Stream finished.
+[qual] mihara_binary.las (las) size=343.0 MiB estimate=857.5 MiB rss_delta=71.7 MiB ratio_est/delta=11.95
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_gnss.las
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m132[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara_gnss.las
+[22m[39mLAS 1.4, Format 1, 17982071 points, Record Length 28
+LAS georef: EPSG=6672, centre=(34.474702, 132.990224)
+Stream finished.
+GNSS overlay: zoom=19, tileRadius=5
+[qual] mihara_gnss.las (las) size=480.2 MiB estimate=1200.4 MiB rss_delta=140.7 MiB ratio_est/delta=8.53
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara.laz
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m132[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara.laz
+[22m[39mStream finished.
+LAZ assembled bytes: 183019068
+LAZ: decompressing via laz-perf (format 0)...
+[qual] mihara.laz (laz) size=174.5 MiB estimate=1396.3 MiB rss_delta=0.0 MiB ratio_est/delta=1464152544.00
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara.e57
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m132[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (real samples)[2m > [22m[2mestimate is an upper bound for mihara.e57
+[22m[39mStream finished.
+E57 chunked bytes: 288937984
+E57: parsing 288937984 bytes via vendor/e57-wasm...
+[qual] mihara.e57 (e57) size=275.6 MiB estimate=826.7 MiB rss_delta=184.8 MiB ratio_est/delta=4.47
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (gate behaviour)[2m > [22m[2mblocks a load that exceeds the heap budget
+[22m[39mStream finished.
+
+[90mstderr[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (gate behaviour)[2m > [22m[2mblocks a load that exceeds the heap budget
+[22m[39m[memoryCheck] blocked: Estimated contiguous input memory for LAZ of "synthetic.laz": 52.0 MiB. Available: 1.00 MiB. Sampling threshold: 128.0 MiB.
+
+[90mstdout[2m | test/memoryCheck.qualification.test.ts[2m > [22m[2mmemoryCheck qualification (gate behaviour)[2m > [22m[2mpasses a small load when the heap budget is generous
+[22m[39mParsed Header: {
+  offset: { x: [33m0[39m, y: [33m4[39m, z: [33m8[39m },
+  width: [33m1[39m,
+  height: [33m1[39m,
+  points: [33m1[39m,
+  data: [32m'ascii'[39m,
+  headerLen: [33m163[39m,
+  rowSize: [33m12[39m,
+  fields: [ [32m'x'[39m, [32m'y'[39m, [32m'z'[39m ],
+  counts: [ [33m1[39m, [33m1[39m, [33m1[39m ],
+  types: [ [32m'F'[39m, [32m'F'[39m, [32m'F'[39m ],
+  sizes: [ [33m4[39m, [33m4[39m, [33m4[39m ]
+}
+Stream finished.
+
+ [32m✓[39m test/memoryCheck.qualification.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 2425[2mms[22m[39m
+     [33m[2m✓[22m[39m estimate is an upper bound for warehouse_ascii.pcd [33m 306[2mms[22m[39m
+     [33m[2m✓[22m[39m estimate is an upper bound for mihara_binary.pcd [33m 428[2mms[22m[39m
+     [33m[2m✓[22m[39m estimate is an upper bound for mihara_binary.ply [33m 409[2mms[22m[39m
+     [33m[2m✓[22m[39m estimate is an upper bound for mihara_binary.las [33m 358[2mms[22m[39m
+     [33m[2m✓[22m[39m estimate is an upper bound for mihara_gnss.las [33m 409[2mms[22m[39m
+[90mstderr[2m | onErr (/home/hara/web_q3d/q3dweb/src/viewer/streamEngine.ts:265:17)
+[22m[39mFinalize Error TypeError: Failed to parse URL from /vendor/e57-wasm/pkg/e57_wasm_bg.wasm
+[90m    at node:internal/deps/undici/undici:13510:13[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at Module.__wbg_init [90m(/home/hara/web_q3d/q3dweb/[39mvendor/e57-wasm/pkg/e57_wasm.js:316:51[90m)[39m
+    at parseE57 [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/e57Parser.ts:39:5[90m)[39m {
+  [cause]: TypeError: Invalid URL
+  [90m    at new URL (node:internal/url:825:25)[39m
+      at new URL [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4mvitest[24m/dist/chunks/index.DC7d2Pf8.js:557:2[90m)[39m
+  [90m    at new Request (node:internal/deps/undici/undici:9586:25)[39m
+  [90m    at fetch (node:internal/deps/undici/undici:10315:25)[39m
+  [90m    at fetch (node:internal/deps/undici/undici:13508:10)[39m
+  [90m    at fetch (node:internal/bootstrap/web/exposed-window-or-worker:75:12)[39m
+      at Module.__wbg_init [90m(/home/hara/web_q3d/q3dweb/[39mvendor/e57-wasm/pkg/e57_wasm.js:313:26[90m)[39m
+      at parseE57 [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/e57Parser.ts:39:15[90m)[39m
+  [90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m {
+    code: [32m'ERR_INVALID_URL'[39m,
+    input: [32m'/vendor/e57-wasm/pkg/e57_wasm_bg.wasm'[39m
+  }
+}
+
+[90mstderr[2m | onErr (/home/hara/web_q3d/q3dweb/src/viewer/streamEngine.ts:265:17)
+[22m[39mFinalize Error TypeError: Failed to parse URL from /node_modules/laz-perf/lib/web/laz-perf.wasm
+[90m    at node:internal/deps/undici/undici:13510:13[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m {
+  [cause]: TypeError: Invalid URL
+  [90m    at new URL (node:internal/url:825:25)[39m
+      at new URL [90m(file:///home/hara/web_q3d/q3dweb/[39mnode_modules/[4mvitest[24m/dist/chunks/index.DC7d2Pf8.js:557:2[90m)[39m
+  [90m    at new Request (node:internal/deps/undici/undici:9586:25)[39m
+  [90m    at fetch (node:internal/deps/undici/undici:10315:25)[39m
+  [90m    at fetch (node:internal/deps/undici/undici:13508:10)[39m
+  [90m    at fetch (node:internal/bootstrap/web/exposed-window-or-worker:75:12)[39m
+      at instantiateAsync [90m(/home/hara/web_q3d/q3dweb/[39mnode_modules/[4mlaz-perf[24m/lib/web/laz-perf.js:9:19456[90m)[39m
+      at createWasm [90m(/home/hara/web_q3d/q3dweb/[39mnode_modules/[4mlaz-perf[24m/lib/web/laz-perf.js:9:20066[90m)[39m
+      at [90m/home/hara/web_q3d/q3dweb/[39mnode_modules/[4mlaz-perf[24m/lib/web/laz-perf.js:9:74006
+      at parseLAZ [90m(/home/hara/web_q3d/q3dweb/[39msrc/parsers/lasParser.ts:212:33[90m)[39m {
+    code: [32m'ERR_INVALID_URL'[39m,
+    input: [32m'/node_modules/laz-perf/lib/web/laz-perf.wasm'[39m
+  }
+}
+
+
+[2m Test Files [22m [1m[32m39 passed[39m[22m[90m (39)[39m
+[2m      Tests [22m [1m[32m408 passed[39m[22m[90m (408)[39m
+[2m   Start at [22m 12:34:38
+[2m   Duration [22m 4.12s[2m (transform 5.31s, setup 1.34s, import 7.93s, tests 8.44s, environment 29.33s)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |    95.1 |    85.78 |    94.1 |   97.54 |                   
+ src               |   93.89 |    83.75 |   86.42 |   97.27 |                   
+  ...UrlOptions.ts |     100 |       90 |     100 |     100 | 31                
+  cloud_viewer.ts  |      90 |       50 |    82.6 |   95.74 | 82-84             
+  ...ker_viewer.ts |   87.25 |    71.42 |   78.78 |   91.66 | 65-70,91,156      
+  ...UrlOptions.ts |   84.61 |     87.5 |     100 |      90 | 12                
+  ...ime_viewer.ts |   91.51 |    81.34 |      76 |   96.51 | 92-96,105,254     
+  viewer.ts        |   98.73 |    91.05 |   95.83 |     100 | ...15-321,340,372 
+  viewerMode.ts    |   90.32 |    69.23 |     100 |     100 | 30-55             
+ src/items         |   98.21 |    90.98 |     100 |   98.88 |                   
+  AxisItem.ts      |     100 |      100 |     100 |     100 |                   
+  CloudItem.ts     |   93.68 |    88.23 |     100 |   94.92 | 165-173,269       
+  FrameItem.ts     |     100 |      100 |     100 |     100 |                   
+  GNSSMapItem.ts   |   98.99 |       92 |     100 |     100 | ...67,364,407,452 
+  GaussianItem.ts  |     100 |    92.59 |     100 |     100 | 224               
+  GridItem.ts      |     100 |      100 |     100 |     100 |                   
+  ImageItem.ts     |     100 |      100 |     100 |     100 |                   
+  LineItem.ts      |     100 |       72 |     100 |     100 | 53-105,111        
+  MeshItem.ts      |     100 |      100 |     100 |     100 |                   
+  ...eCloudItem.ts |   96.15 |    80.95 |     100 |     100 | 23-25,64          
+  Text2DItem.ts    |     100 |       96 |     100 |     100 | 35                
+  Text3DItem.ts    |     100 |    94.11 |     100 |     100 | 109-110           
+  index.ts         |       0 |        0 |       0 |       0 |                   
+ src/parsers       |   94.89 |    87.73 |   98.11 |    97.7 |                   
+  e57Parser.ts     |     100 |    84.61 |     100 |     100 | 45-48             
+  lasParser.ts     |   95.95 |       80 |   85.71 |   98.21 | 213,243-244       
+  ...sciiStream.ts |   90.74 |    81.96 |     100 |     100 | ...-75,84,105-115 
+  pcdParser.ts     |   98.18 |    94.44 |     100 |   99.43 | 281               
+  plyParser.ts     |   92.65 |    88.12 |     100 |   95.45 | 194,231-236       
+  ...reamParser.ts |   90.55 |    83.63 |     100 |   95.41 | 174-178           
+  sampling.ts      |     100 |      100 |     100 |     100 |                   
+ src/utils         |   95.92 |    88.48 |     100 |   97.41 |                   
+  ...oudBackend.ts |   90.86 |    80.28 |     100 |   93.33 | ...06,251,258,267 
+  heapBudget.ts    |   97.77 |    84.61 |     100 |     100 | 30,41,60,70-73    
+  lasGeo.ts        |   97.87 |    94.44 |     100 |     100 | 41,56             
+  maths.ts         |   99.31 |    85.18 |     100 |   99.23 | 35                
+  memoryCheck.ts   |     100 |       85 |     100 |     100 | 82-85,95          
+  ...oud2Decode.ts |   98.13 |    95.74 |     100 |   98.94 | 119               
+  projConvert.ts   |   95.65 |    88.23 |     100 |     100 | 78,101            
+  realtimeTypes.ts |       0 |        0 |       0 |       0 |                   
+ src/viewer        |   93.22 |    81.15 |   92.36 |   96.41 |                   
+  cloudRenderer.ts |   99.08 |    86.36 |     100 |     100 | ...39,50,62,68-76 
+  filmMaker.ts     |     100 |     87.5 |     100 |     100 | 90-100            
+  filmPlayback.ts  |   96.39 |    85.18 |   85.71 |   98.85 | 153               
+  loadBudget.ts    |   97.46 |    82.14 |     100 |     100 | ...45-46,48-52,63 
+  measurement.ts   |     100 |       90 |     100 |     100 | 37-38,83          
+  mouseControls.ts |   95.51 |    89.78 |   96.66 |   98.88 | 142-143           
+  ...loudLoader.ts |   94.91 |    81.57 |    87.5 |   98.03 | 30                
+  settingsUI.ts    |   95.14 |    69.64 |   88.88 |    98.7 | 217,222           
+  streamEngine.ts  |   85.18 |     74.8 |    90.9 |   90.07 | ...23-327,375-377 
+-------------------|---------|----------|---------|---------|-------------------

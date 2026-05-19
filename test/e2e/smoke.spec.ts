@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { attachErrorSinks } from './helpers';
+import { attachErrorSinks, getSettingsItemSelect } from './helpers';
 
 test.describe('smoke', () => {
   test('app boots and exposes a WebGL canvas with no JS errors', async ({ page }) => {
@@ -27,16 +27,18 @@ test.describe('smoke', () => {
 
   test('settings panel is present on boot and can be toggled with M', async ({ page }) => {
     await page.goto('/');
-    const title = page.locator('text=Settings (M to toggle)');
+    const title = page.locator('[data-role="settings-panel-title"]');
     await expect(title).toBeVisible();
-    const panel = title.locator('..');
+    const panel = page.locator('[data-minimized]').first();
 
     await page.locator('#app').click({ position: { x: 500, y: 500 } });
     await page.keyboard.press('m');
-    await expect(panel).toBeHidden();
+    await expect(panel).toHaveAttribute('data-minimized', 'true');
+    await expect(page.locator('[data-role="settings-minimize-button"]')).toHaveText('+');
 
     await page.keyboard.press('m');
-    await expect(panel).toBeVisible();
+    await expect(panel).toHaveAttribute('data-minimized', 'false');
+    await expect(title).toBeVisible();
   });
 
   test('main win settings are shown initially (bg color + center toggle)', async ({ page }) => {
@@ -45,7 +47,7 @@ test.describe('smoke', () => {
     await expect(page.locator('text=Show Center Point')).toBeVisible();
 
     // Default selection is "main win(Viewer)".
-    const select = page.locator('select').first();
+    const select = getSettingsItemSelect(page);
     await expect(select).toHaveValue('__main_win__');
   });
 });

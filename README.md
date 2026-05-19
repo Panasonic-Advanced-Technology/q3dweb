@@ -1,7 +1,7 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/test.yml/badge.svg)](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/test.yml)
 [![Deploy Cloud Viewer to GitHub Pages](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/deploy-pages.yml)
 [![Build VS Code Extension](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/build-extension.yml/badge.svg)](https://github.com/Panasonic-Advanced-Technology/q3dweb/actions/workflows/build-extension.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 # q3dweb
 q3dweb is a lightweight 3D point cloud viewer for the browser and VS Code. It is designed to make point cloud data easy to view, share, and inspect without a heavy desktop setup.
 

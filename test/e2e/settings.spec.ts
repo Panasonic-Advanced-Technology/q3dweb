@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { dropFile, getCloudSizeInput, getCloudSizeLabel, makeAsciiPLY, waitForPointCount } from './helpers';
+import { dropFile, getCloudSizeInput, getCloudSizeLabel, getSettingsItemSelect, makeAsciiPLY, waitForPointCount } from './helpers';
 
 test.describe('settings panel', () => {
   test('background color input updates scene.background', async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe('settings panel', () => {
     await dropFile(page, 'synth.ply', makeAsciiPLY(1234));
     await waitForPointCount(page);
 
-    const select = page.locator('select').first();
+    const select = getSettingsItemSelect(page);
     await expect(select).toHaveValue('cloud');
     const optionValues = await select.locator('option').evaluateAll((nodes) =>
       nodes.map((n) => (n as HTMLOptionElement).value),

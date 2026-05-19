@@ -38,11 +38,10 @@ interface TouchPoint { x: number; y: number; }
 interface TouchGestureState {
     mode: 'none' | 'single' | 'multi';
     lastPoint: TouchPoint | null;
-    lastCenter: TouchPoint | null;
     lastDistance: number;
+    lastAngle: number;
 }
 
-const TOUCH_ROTATE_SPEED = 0.45 * Math.PI / 180;
 const TOUCH_PAN_SPEED = 1;
 const TOUCH_PINCH_ZOOM_SPEED = 0.01;
 
@@ -76,12 +75,16 @@ function translateFromScreenDelta(ctx: InputContext, dx: number, dy: number, dis
     ctx.translateCam(sv);
 }
 
-function centerOfPoints(points: TouchPoint[]): TouchPoint {
-    return { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 };
-}
-
 function distanceBetweenPoints(points: TouchPoint[]): number {
     return Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+}
+
+function angleBetweenPoints(points: TouchPoint[]): number {
+    return Math.atan2(points[1].y - points[0].y, points[1].x - points[0].x);
+}
+
+function normalizeAngleDelta(delta: number): number {
+    return Math.atan2(Math.sin(delta), Math.cos(delta));
 }
 
 function isTouchLikePointer(e: PointerEvent): boolean {
@@ -92,31 +95,31 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
     const touchState: TouchGestureState = {
         mode: 'none',
         lastPoint: null,
-        lastCenter: null,
         lastDistance: 0,
+        lastAngle: 0,
     };
     const activeTouchPointers = new Map<number, TouchPoint>();
 
     const resetTouchState = (): void => {
         touchState.mode = 'none';
         touchState.lastPoint = null;
-        touchState.lastCenter = null;
         touchState.lastDistance = 0;
+        touchState.lastAngle = 0;
     };
 
     const startTouchGesture = (points: TouchPoint[]): void => {
         if (points.length === 1) {
             touchState.mode = 'single';
             touchState.lastPoint = points[0];
-            touchState.lastCenter = null;
             touchState.lastDistance = 0;
+            touchState.lastAngle = 0;
             return;
         }
         if (points.length >= 2) {
             touchState.mode = 'multi';
             touchState.lastPoint = null;
-            touchState.lastCenter = centerOfPoints(points);
             touchState.lastDistance = distanceBetweenPoints(points);
+            touchState.lastAngle = angleBetweenPoints(points);
         }
     };
 
@@ -133,20 +136,19 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
         }
 
         if (points.length >= 2) {
-            const center = centerOfPoints(points);
             const pinchDistance = distanceBetweenPoints(points);
-            if (touchState.mode !== 'multi' || !touchState.lastCenter) {
+            const angle = angleBetweenPoints(points);
+            if (touchState.mode !== 'multi') {
                 startTouchGesture(points);
                 return;
             }
 
-            const dx = center.x - touchState.lastCenter.x;
-            const dy = center.y - touchState.lastCenter.y;
+            const angleDelta = normalizeAngleDelta(angle - touchState.lastAngle);
             const pinchDelta = pinchDistance - touchState.lastDistance;
-            if (dx !== 0 || dy !== 0) ctx.rotateCam(-dy * TOUCH_ROTATE_SPEED, 0, -dx * TOUCH_ROTATE_SPEED);
+            if (angleDelta !== 0) ctx.rotateCam(0, 0, -angleDelta);
             if (pinchDelta !== 0) ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
-            touchState.lastCenter = center;
             touchState.lastDistance = pinchDistance;
+            touchState.lastAngle = angle;
             ctx.showCenter = true;
             ctx.requestRender();
         }
