@@ -94,6 +94,9 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
                     webviewReady = true;
                     tryUpdateWebview();
                     return;
+                case 'modeChanged':
+                    currentMode = normalizeViewerMode(e.mode ?? currentMode);
+                    return;
                 case 'changeMode': {
                     const nextMode = normalizeViewerMode(e.mode);
                     if (nextMode !== currentMode) reloadWebview(nextMode);

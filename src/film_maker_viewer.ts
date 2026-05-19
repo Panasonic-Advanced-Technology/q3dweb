@@ -1,4 +1,5 @@
 import { CloudViewer } from './cloud_viewer';
+import type { CloudUrlOptions } from './cloudUrlOptions';
 import { FilmMaker, KeyFrame } from './viewer/filmMaker';
 import { recoverCenterEuler } from './utils/maths';
 import {
@@ -18,9 +19,11 @@ import {
  * add/delete/play/record controls) above the inherited item dropdown.
  */
 export class FilmMakerViewer extends CloudViewer {
+    private viewerMode: 'cloud' | 'film_maker' = 'film_maker';
     filmMaker: FilmMaker = new FilmMaker();
-    /** Always true — enables Space/Delete keyboard shortcuts for keyframe editing. */
-    get filmMakerTabActive(): boolean { return true; }
+    /** Enabled only while the film_maker mode is active. */
+    get filmMakerTabActive(): boolean { return this.viewerMode === 'film_maker'; }
+    get currentViewerMode(): 'cloud' | 'film_maker' { return this.viewerMode; }
     filmPlaybackIndex: number = 0;
     filmPlaybackRequestId: number | null = null;
     filmPlaybackLastTimestamp: number | null = null;
@@ -39,11 +42,14 @@ export class FilmMakerViewer extends CloudViewer {
     private filmMakerSpinLin: HTMLInputElement | null = null;
     private filmMakerSpinAng: HTMLInputElement | null = null;
     private filmMakerSpinStop: HTMLInputElement | null = null;
+    private filmMakerSection: HTMLElement | null = null;
 
-    constructor(containerId: string) {
-        super(containerId);
+    constructor(containerId: string, options: CloudUrlOptions = {}, initialMode: 'cloud' | 'film_maker' = 'film_maker') {
+        super(containerId, options);
+        this.viewerMode = initialMode;
         // Fields are now initialized — install the film maker section in the panel.
         this.installFilmMakerSection();
+        this.setViewerMode(initialMode);
     }
 
     /**
@@ -56,6 +62,7 @@ export class FilmMakerViewer extends CloudViewer {
         const section = document.createElement('div');
         section.className = 'q3d-settings-section';
         section.setAttribute('data-role', 'film-maker');
+        this.filmMakerSection = section;
         const refs: FilmMakerUIRefs = buildFilmMakerSettings(section, {
             filmMaker: this.filmMaker,
             isPlayingFilm: this.isPlayingFilm,
@@ -92,6 +99,13 @@ export class FilmMakerViewer extends CloudViewer {
             this.settingsPanel.insertBefore(section, anchor);
         } else {
             this.settingsPanel.insertBefore(section, this.settingsContent);
+        }
+    }
+
+    setViewerMode(mode: 'cloud' | 'film_maker'): void {
+        this.viewerMode = mode;
+        if (this.filmMakerSection) {
+            this.filmMakerSection.hidden = mode !== 'film_maker';
         }
     }
 

@@ -345,6 +345,10 @@ describe('viewer mode selector', () => {
     modeSelect.value = 'film_maker';
     modeSelect.onchange?.(new Event('change'));
     expect(navigate).toHaveBeenCalledWith('film_maker');
+
+    modeSelect.value = 'cloud';
+    modeSelect.onchange?.(new Event('change'));
+    expect(navigate).toHaveBeenNthCalledWith(2, 'cloud');
   });
 
   it('normalizes unknown modes to cloud', () => {
@@ -390,7 +394,7 @@ describe('Viewer Film Maker controls', () => {
   }
 
   it('builds the Film Maker UI and wires list, buttons, inputs, and shortcuts', () => {
-    // Film maker UI is built during construction, always visible in panel
+    // Film maker UI is built during construction and visible in film_maker mode
     expect(v.filmMakerTabActive).toBe(true);
     const fm = v.settingsPanel!.querySelector('[data-role="film-maker"]') as HTMLElement;
     const itemLabel = v.settingsPanel!.querySelector('[data-role="settings-item-label"]') as HTMLElement;
@@ -455,6 +459,29 @@ describe('Viewer Film Maker controls', () => {
     const ignoredSpace = new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true });
     input.dispatchEvent(ignoredSpace);
     expect(ignoredSpace.defaultPrevented).toBe(false);
+  });
+
+  it('toggles the Film Maker section and shortcuts without rebuilding the viewer', () => {
+    const fm = v.settingsPanel!.querySelector('[data-role="film-maker"]') as HTMLElement;
+
+    v.setViewerMode('cloud');
+    expect(v.currentViewerMode).toBe('cloud');
+    expect(v.filmMakerTabActive).toBe(false);
+    expect(fm.hidden).toBe(true);
+
+    const ignoredSpace = new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true });
+    window.dispatchEvent(ignoredSpace);
+    expect(v.filmMaker.keyFrames.length).toBe(0);
+
+    v.setViewerMode('film_maker');
+    expect(v.currentViewerMode).toBe('film_maker');
+    expect(v.filmMakerTabActive).toBe(true);
+    expect(fm.hidden).toBe(false);
+
+    const activeSpace = new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true });
+    window.dispatchEvent(activeSpace);
+    expect(activeSpace.defaultPrevented).toBe(true);
+    expect(v.filmMaker.keyFrames.length).toBe(1);
   });
 
   it('handles select-target M shortcut and panel re-show', () => {

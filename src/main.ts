@@ -3,7 +3,7 @@ import { installMaterialWebTheme } from './materialWeb';
 import { FilmMakerViewer } from './film_maker_viewer';
 import { RealtimeViewer } from './realtime_viewer';
 import { CloudViewer } from './cloud_viewer';
-import { getHostViewerMode, installViewerModeSelector, navigateToViewerMode, normalizeViewerMode } from './viewerMode';
+import { getHostViewerMode, installViewerModeSelector, navigateToViewerMode, normalizeViewerMode, type ViewerMode } from './viewerMode';
 import { configureSamplingHeapBudget } from './parsers/sampling';
 import { parseRealtimeUrlOptions } from './realtimeUrlOptions';
 import { parseCloudUrlOptions } from './cloudUrlOptions';
@@ -35,6 +35,12 @@ function applyHostHeapBudget(message: any): void {
     configureSamplingHeapBudget(message.hostHeapLimitBytes, message.hostHeapUsedBytes);
 }
 
+function replaceStandaloneViewerMode(mode: Extract<ViewerMode, 'cloud' | 'film_maker'>): void {
+    const url = new URL(window.location.href);
+    url.searchParams.set('mode', mode);
+    window.history.replaceState(window.history.state, '', url.toString());
+}
+
 // Declare VS Code API
 declare function acquireVsCodeApi(): any;
 
@@ -53,12 +59,23 @@ try {
     const params = new URLSearchParams(window.location.search);
     const mode = getHostViewerMode() ?? normalizeViewerMode(params.get('mode'));
     const realtimeOptions = mode === 'realtime' ? parseRealtimeUrlOptions(params) : undefined;
-    const cloudOptions = mode === 'cloud' ? parseCloudUrlOptions(params) : undefined;
+    const cloudOptions = mode === 'realtime' ? undefined : parseCloudUrlOptions(params);
+    const initialCloudMode: Extract<ViewerMode, 'cloud' | 'film_maker'> = mode === 'film_maker' ? 'film_maker' : 'cloud';
     const viewer: CloudViewer | RealtimeViewer =
-        mode === 'realtime'   ? new RealtimeViewer('app', realtimeOptions) :
-        mode === 'film_maker' ? new FilmMakerViewer('app') :
-                                new CloudViewer('app', cloudOptions);  // default: no param or ?mode=cloud
-    installViewerModeSelector(viewer, mode, nextMode => navigateToViewerMode(nextMode, vscode));
+        mode === 'realtime' ? new RealtimeViewer('app', realtimeOptions) :
+                              new FilmMakerViewer('app', cloudOptions, initialCloudMode);
+    installViewerModeSelector(viewer, mode, nextMode => {
+        if (viewer instanceof FilmMakerViewer && nextMode !== 'realtime') {
+            viewer.setViewerMode(nextMode);
+            if (vscode) {
+                vscode.postMessage({ type: 'modeChanged', mode: nextMode });
+            } else {
+                replaceStandaloneViewerMode(nextMode);
+            }
+            return;
+        }
+        navigateToViewerMode(nextMode, vscode);
+    });
 
     if (mode === 'realtime' && viewer instanceof RealtimeViewer) {
         if (realtimeOptions?.rosbridgeUrl) {
@@ -67,9 +84,9 @@ try {
         } else {
             console.log('Realtime mode enabled. Configure settings in the panel, or provide ?ros=ws://host:9090&cloudTopic=/points&odomTopic=/odom to auto-connect.');
         }
-    } else if (mode === 'cloud' && viewer instanceof CloudViewer && cloudOptions?.pointCloudUrl) {
+    } else if (viewer instanceof CloudViewer && cloudOptions?.pointCloudUrl) {
         void viewer.loadUrl(cloudOptions.pointCloudUrl, cloudOptions.filename);
-        console.log(`Cloud mode enabled, loading point cloud URL: ${cloudOptions.pointCloudUrl}`);
+        console.log(`${mode} mode enabled, loading point cloud URL: ${cloudOptions.pointCloudUrl}`);
     }
 
     // Expose viewer on window for E2E tests and debugging.
@@ -116,7 +133,7 @@ try {
         });
 
         // Signal readiness
-        vscode.postMessage({ type: 'ready', mode });
+        vscode.postMessage({ type: 'ready', mode: viewer instanceof FilmMakerViewer ? viewer.currentViewerMode : mode });
     } else {
         // Standalone Mode
         console.log("Drag and drop a point cloud file (.pcd, .ply, .las, .laz, .e57) to view it.");

@@ -55,9 +55,41 @@ test.describe('film maker mode', () => {
     await page.waitForFunction(() => (window as any).__viewer);
     await page.locator('#app canvas').click({ position: { x: 400, y: 300 } });
     await page.keyboard.press('Space');
-    await expect(page.locator('[data-role="film-maker"]')).toHaveCount(0);
-    const hasFilmMaker = await page.evaluate(() => 'filmMaker' in (window as any).__viewer);
-    expect(hasFilmMaker).toBe(false);
+    await expect(page.locator('[data-role="film-maker"]')).toBeHidden();
+    const count = await page.evaluate(() => (window as any).__viewer.filmMaker.keyFrames.length);
+    expect(count).toBe(0);
+  });
+
+  test('switching between cloud and film maker keeps the loaded point cloud', async ({ page }) => {
+    await page.goto('/?mode=cloud');
+    await page.waitForFunction(() => (window as any).__viewer);
+
+    await dropFile(page, 'small_ascii.ply', makeAsciiPLY(64));
+    const beforeLabel = await waitForPointCount(page);
+    expect(beforeLabel).toContain('64 pts');
+
+    await page.evaluate(() => {
+      (window as any).__viewerBeforeModeSwitch = (window as any).__viewer;
+      const select = document.querySelector('[data-role="viewer-mode-select"]') as HTMLSelectElement;
+      select.value = 'film_maker';
+      select.onchange?.(new Event('change'));
+    });
+
+    await expect(page.locator('[data-role="film-maker"]')).toBeVisible();
+    await expect.poll(async () => await page.evaluate(() => (window as any).__viewerBeforeModeSwitch === (window as any).__viewer)).toBe(true);
+    const filmMakerLabel = await waitForPointCount(page);
+    expect(filmMakerLabel).toContain('64 pts');
+
+    await page.evaluate(() => {
+      const select = document.querySelector('[data-role="viewer-mode-select"]') as HTMLSelectElement;
+      select.value = 'cloud';
+      select.onchange?.(new Event('change'));
+    });
+
+    await expect(page.locator('[data-role="film-maker"]')).toBeHidden();
+    await expect.poll(async () => await page.evaluate(() => (window as any).__viewerBeforeModeSwitch === (window as any).__viewer)).toBe(true);
+    const cloudLabel = await waitForPointCount(page);
+    expect(cloudLabel).toContain('64 pts');
   });
 
   test('spinboxes update the selected keyframe velocities', async ({ page }) => {

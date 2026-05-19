@@ -50,10 +50,13 @@ export function installViewerModeSelector(
     const label = makeLabel('Viewer Mode:');
     label.setAttribute('data-role', 'viewer-mode-label');
 
+    let activeMode = currentMode;
+
     const modeSelect = createMaterialMenuSelect(VIEWER_MODE_OPTIONS, currentMode, (value) => {
         const selectedMode = normalizeViewerMode(value);
-        if (selectedMode === currentMode) return;
+        if (selectedMode === activeMode) return;
         navigate(selectedMode);
+        activeMode = selectedMode;
     }, {
         dataRole: 'viewer-mode-select',
         menuDataRole: 'viewer-mode-select-menu',
