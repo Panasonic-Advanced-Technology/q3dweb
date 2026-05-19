@@ -63,6 +63,41 @@ export function makeNumberInput(
     return input;
 }
 
+export function makeRangeInput(
+    value: number, min: number, max: number, step: number,
+    onChange: (v: number) => void,
+): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex; align-items:center; gap:8px; margin-bottom:4px;';
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = min.toString();
+    slider.max = max.toString();
+    slider.step = step.toString();
+    slider.value = value.toString();
+    slider.style.cssText = 'flex:1;';
+
+    const precision = step >= 1 ? 0 : Math.max(1, Math.ceil(-Math.log10(step)));
+    const valueText = document.createElement('span');
+    valueText.style.cssText = 'width:44px; text-align:right; color:#ccc; font-size:11px;';
+
+    const publish = () => {
+        const v = parseFloat(slider.value);
+        if (Number.isNaN(v)) return;
+        valueText.textContent = v.toFixed(precision);
+        onChange(v);
+    };
+
+    publish();
+    slider.oninput = publish;
+    slider.onchange = publish;
+
+    wrap.appendChild(slider);
+    wrap.appendChild(valueText);
+    return wrap;
+}
+
 export function makeCheckbox(
     label: string, checked: boolean, onChange: (v: boolean) => void,
 ): HTMLElement {
@@ -154,7 +189,7 @@ export function buildCloudItemSettings(
 
     if (mat.uniforms.alpha) {
         container.appendChild(makeLabel('Alpha:'));
-        container.appendChild(makeNumberInput(mat.uniforms.alpha.value, 0, 1, 0.01, (v) => {
+        container.appendChild(makeRangeInput(mat.uniforms.alpha.value, 0, 1, 0.01, (v) => {
             mat.uniforms.alpha.value = v;
             mat.transparent = v < 0.99; mat.depthWrite = v >= 0.99;
             mat.needsUpdate = true; onRender();
@@ -197,7 +232,7 @@ export function buildNativeCloudItemSettings(
     }));
 
     container.appendChild(makeLabel('Alpha:'));
-    container.appendChild(makeNumberInput(1, 0, 1, 0.01, v => {
+    container.appendChild(makeRangeInput(1, 0, 1, 0.01, v => {
         item.setAlpha(v); onRender();
     }));
 
