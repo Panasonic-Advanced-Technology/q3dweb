@@ -47,7 +47,6 @@ interface TouchGestureState {
 const TOUCH_PAN_SPEED = 1;
 const TOUCH_PINCH_ZOOM_SPEED = 0.01;
 const TOUCH_TWO_FINGER_PITCH_SPEED = 0.2 * Math.PI / 180;
-const TOUCH_TWO_FINGER_PITCH_REFERENCE_DISTANCE = 40;
 const TOUCH_PITCH_PINCH_SUPPRESSION_RATIO = 1;
 const TOUCH_MULTI_INTENT_THRESHOLD_PX = 2;
 
@@ -108,9 +107,8 @@ function detectMultiTouchIntent(pinchDelta: number, centerDeltaY: number): Touch
     return shouldApplyPinchZoom(pinchDelta, centerDeltaY) ? 'pinch' : 'pitch';
 }
 
-function getTouchPitchDelta(ctx: InputContext, centerDeltaY: number): number {
-    const distanceScale = Math.max(ctx.cameraDist, 0.5) / TOUCH_TWO_FINGER_PITCH_REFERENCE_DISTANCE;
-    return -centerDeltaY * TOUCH_TWO_FINGER_PITCH_SPEED * distanceScale;
+function getTouchPitchDelta(centerDeltaY: number): number {
+    return -centerDeltaY * TOUCH_TWO_FINGER_PITCH_SPEED;
 }
 
 function isTouchLikePointer(e: PointerEvent): boolean {
@@ -181,7 +179,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
             const angleDelta = normalizeAngleDelta(angle - touchState.lastAngle);
             const pinchDelta = pinchDistance - touchState.lastDistance;
             const centerDeltaY = center.y - touchState.lastCenter.y;
-            const pitchDelta = getTouchPitchDelta(ctx, centerDeltaY);
+            const pitchDelta = getTouchPitchDelta(centerDeltaY);
             const pinchZoomFrame = shouldApplyPinchZoom(pinchDelta, centerDeltaY);
             if (touchState.multiIntent === 'undecided') {
                 touchState.multiIntent = detectMultiTouchIntent(pinchDelta, centerDeltaY);

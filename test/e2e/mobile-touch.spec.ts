@@ -164,7 +164,7 @@ test.describe('mobile touch operation', () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test('two-finger pitch sensitivity stays visually consistent across zoom levels', async ({ page }) => {
+  test('two-finger pitch amount stays constant across zoom levels', async ({ page }) => {
     const { pageErrors } = attachErrorSinks(page);
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__viewer);
@@ -209,7 +209,7 @@ test.describe('mobile touch operation', () => {
     });
 
     expect(result.nearPitchDelta).toBeGreaterThan(0);
-    expect(result.farPitchDelta).toBeGreaterThan(result.nearPitchDelta * 6);
+    expect(result.farPitchDelta).toBeCloseTo(result.nearPitchDelta, 6);
     expect(pageErrors).toEqual([]);
   });
 });

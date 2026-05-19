@@ -1351,7 +1351,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     }
   });
 
-  it('two-finger pointer pitch sensitivity stays visually consistent across zoom levels', () => {
+  it('two-finger pointer pitch amount stays constant across zoom levels', () => {
     const originalPointerEvent = (window as any).PointerEvent;
     try {
       (window as any).PointerEvent = function PointerEvent() {};
@@ -1381,7 +1381,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       const farPitchDelta = runPitchAtDistance(80);
 
       expect(nearPitchDelta).toBeGreaterThan(0);
-      expect(farPitchDelta).toBeGreaterThan(nearPitchDelta * 6);
+      expect(farPitchDelta).toBeCloseTo(nearPitchDelta, 6);
     } finally {
       if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
       else (window as any).PointerEvent = originalPointerEvent;
