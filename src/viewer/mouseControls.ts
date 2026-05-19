@@ -46,6 +46,7 @@ interface TouchGestureState {
 const TOUCH_PAN_SPEED = 1;
 const TOUCH_PINCH_ZOOM_SPEED = 0.01;
 const TOUCH_TWO_FINGER_PITCH_SPEED = 0.2 * Math.PI / 180;
+const TOUCH_PITCH_PINCH_SUPPRESSION_RATIO = 0.75;
 
 function isEditable(t: EventTarget | null): boolean {
     if (!t) return false;
@@ -91,6 +92,10 @@ function angleBetweenPoints(points: TouchPoint[]): number {
 
 function normalizeAngleDelta(delta: number): number {
     return Math.atan2(Math.sin(delta), Math.cos(delta));
+}
+
+function shouldApplyPinchZoom(pinchDelta: number, centerDeltaY: number): boolean {
+    return Math.abs(pinchDelta) > Math.abs(centerDeltaY) * TOUCH_PITCH_PINCH_SUPPRESSION_RATIO;
 }
 
 function isTouchLikePointer(e: PointerEvent): boolean {
@@ -156,9 +161,12 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
 
             const angleDelta = normalizeAngleDelta(angle - touchState.lastAngle);
             const pinchDelta = pinchDistance - touchState.lastDistance;
-            const pitchDelta = -(center.y - touchState.lastCenter.y) * TOUCH_TWO_FINGER_PITCH_SPEED;
+            const centerDeltaY = center.y - touchState.lastCenter.y;
+            const pitchDelta = -centerDeltaY * TOUCH_TWO_FINGER_PITCH_SPEED;
             if (pitchDelta !== 0 || angleDelta !== 0) ctx.rotateCam(pitchDelta, 0, angleDelta);
-            if (pinchDelta !== 0) ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
+            if (shouldApplyPinchZoom(pinchDelta, centerDeltaY)) {
+                ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
+            }
             touchState.lastCenter = center;
             touchState.lastDistance = pinchDistance;
             touchState.lastAngle = angle;
