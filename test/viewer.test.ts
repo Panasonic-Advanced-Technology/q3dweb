@@ -1230,7 +1230,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 180 }, { x: 220, y: 180 }]));
       canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 100, y: 120 }, { x: 220, y: 120 }]));
       canvas.dispatchEvent(makeTouchEvent('touchend', []));
-      expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.15);
+      expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.08);
       expect(Math.abs(v.euler[2] - beforeParallelEuler[2])).toBeLessThan(0.001);
       expect(Math.abs(v.cameraDist - beforeParallelDist)).toBeLessThan(0.001);
     } finally {
@@ -1275,7 +1275,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 120));
       canvas.dispatchEvent(makePointerEvent('pointerup', 1, 100, 120));
       canvas.dispatchEvent(makePointerEvent('pointerup', 2, 220, 120));
-      expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.15);
+      expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.08);
       expect(Math.abs(v.euler[2] - beforeParallelEuler[2])).toBeLessThan(0.001);
       expect(Math.abs(v.cameraDist - beforeParallelDist)).toBeLessThan(0.001);
     } finally {
@@ -1345,6 +1345,43 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       canvas.dispatchEvent(makePointerEvent('pointermove', 1, 130, 130));
       canvas.dispatchEvent(makePointerEvent('pointerup', 1, 130, 130));
       expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('two-finger pointer pitch sensitivity stays visually consistent across zoom levels', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+
+      const runPitchAtDistance = (cameraDist: number): number => {
+        v.cameraCenter.set(0, 0, 0);
+        v.cameraDist = cameraDist;
+        v.euler = [Math.PI / 3, 0, 0];
+        v.updateCamera();
+
+        const beforePitch = v.euler[0];
+        canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 180));
+        canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 220, 180));
+        canvas.dispatchEvent(makePointerEvent('pointermove', 1, 100, 140));
+        canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 140));
+        canvas.dispatchEvent(makePointerEvent('pointerup', 1, 100, 140));
+        canvas.dispatchEvent(makePointerEvent('pointerup', 2, 220, 140));
+        return v.euler[0] - beforePitch;
+      };
+
+      const nearPitchDelta = runPitchAtDistance(10);
+      const farPitchDelta = runPitchAtDistance(80);
+
+      expect(nearPitchDelta).toBeGreaterThan(0);
+      expect(farPitchDelta).toBeGreaterThan(nearPitchDelta * 6);
     } finally {
       if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
       else (window as any).PointerEvent = originalPointerEvent;

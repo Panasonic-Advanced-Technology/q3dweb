@@ -155,12 +155,61 @@ test.describe('mobile touch operation', () => {
     expect(result.twistYawDelta).toBeGreaterThan(0.1);
     expect(result.pinchDistanceDelta).toBeGreaterThan(0);
     expect(result.pinchCenterDelta).toBeLessThan(0.01);
-    expect(result.parallelPitchDelta).toBeGreaterThan(0.1);
+    expect(result.parallelPitchDelta).toBeGreaterThan(0.08);
     expect(result.parallelYawDelta).toBeLessThan(0.01);
     expect(result.parallelDistanceDelta).toBeLessThan(0.01);
     expect(result.parallelCenterDistanceDelta).toBeLessThan(0.01);
     expect(result.distanceDelta).toBeGreaterThan(0);
     expect(result.selectedPointCount).toBe(0);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('two-finger pitch sensitivity stays visually consistent across zoom levels', async ({ page }) => {
+    const { pageErrors } = attachErrorSinks(page);
+    await page.goto('/');
+    await page.waitForFunction(() => (window as any).__viewer);
+
+    const result = await page.evaluate(() => {
+      const viewer = (window as any).__viewer;
+      const canvas = viewer.renderer.domElement as HTMLCanvasElement;
+      (canvas as any).setPointerCapture = () => undefined;
+      const dispatchPointer = (type: string, pointerId: number, x: number, y: number, buttons: number) => {
+        canvas.dispatchEvent(new PointerEvent(type, {
+          pointerId,
+          pointerType: 'touch',
+          isPrimary: pointerId === 1,
+          clientX: x,
+          clientY: y,
+          buttons,
+          bubbles: true,
+          cancelable: true,
+        }));
+      };
+
+      const runPitchAtDistance = (cameraDist: number) => {
+        viewer.cameraCenter.set(0, 0, 0);
+        viewer.cameraDist = cameraDist;
+        viewer.euler = [Math.PI / 3, 0, 0];
+        viewer.updateCamera();
+
+        const beforePitch = viewer.euler[0];
+        dispatchPointer('pointerdown', 1, 100, 180, 1);
+        dispatchPointer('pointerdown', 2, 220, 180, 1);
+        dispatchPointer('pointermove', 1, 100, 140, 1);
+        dispatchPointer('pointermove', 2, 220, 140, 1);
+        dispatchPointer('pointerup', 1, 100, 140, 0);
+        dispatchPointer('pointerup', 2, 220, 140, 0);
+        return viewer.euler[0] - beforePitch;
+      };
+
+      return {
+        nearPitchDelta: runPitchAtDistance(10),
+        farPitchDelta: runPitchAtDistance(80),
+      };
+    });
+
+    expect(result.nearPitchDelta).toBeGreaterThan(0);
+    expect(result.farPitchDelta).toBeGreaterThan(result.nearPitchDelta * 6);
     expect(pageErrors).toEqual([]);
   });
 });
