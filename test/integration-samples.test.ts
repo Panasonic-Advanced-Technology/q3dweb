@@ -17,12 +17,16 @@ vi.mock('three', async () => {
   return { ...actual, WebGLRenderer: FakeWebGLRenderer };
 });
 
-import { Viewer } from '../src/viewer';
+import { CloudViewer } from '../src/cloud_viewer';
+import { CloudItem } from '../src/items/CloudItem';
 
 const SAMPLE_DIR = '/home/hara/web_q3d/test_sample';
 
-const SAMPLES = [
+const LIGHT_SAMPLES = [
   'warehouse_ascii.pcd',
+];
+
+const HEAVY_SAMPLES = [
   'umeda_7F_color_opt.pcd',
   'mihara_binary.pcd',
   'mihara_ascii.ply',
@@ -30,6 +34,10 @@ const SAMPLES = [
   'mihara_binary.las',
   'mihara_gnss.las',
 ];
+
+const SAMPLES = process.env.Q3DWEB_HEAVY_SAMPLES === '1'
+  ? [...LIGHT_SAMPLES, ...HEAVY_SAMPLES]
+  : LIGHT_SAMPLES;
 
 function makeContainer(): HTMLElement {
   const c = document.createElement('div');
@@ -39,11 +47,11 @@ function makeContainer(): HTMLElement {
 }
 
 describe('Integration: load real sample files', () => {
-  let v: Viewer;
+  let v: CloudViewer;
 
   beforeEach(() => {
     makeContainer();
-    v = new Viewer('app');
+    v = new CloudViewer('app');
     // Smaller cap so very large files don't allocate too much memory in CI
     v.MAX_POINTS_VISUAL = 200_000;
     // Bypass the heap-size guard: the jsdom environment does not expose
@@ -66,7 +74,7 @@ describe('Integration: load real sample files', () => {
       const u8 = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
       v.loadData(u8, name);
       expect(v.items.cloud).toBeDefined();
-      expect(v.pointsLoaded).toBeGreaterThan(0);
+      expect((v.items.cloud as CloudItem).getPointCount()).toBeGreaterThan(0);
     }, 300_000);
   }
 });

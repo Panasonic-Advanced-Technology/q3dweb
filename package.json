@@ -1,7 +1,7 @@
 {
   "name": "q3dweb",
   "private": true,
-  "version": "1.0.21",
+  "version": "1.0.22",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
+    "@types/node": "^22.19.19",
     "@types/three": "^0.184.1",
     "@vitest/coverage-v8": "^4.1.5",
     "jsdom": "^29.1.1",
