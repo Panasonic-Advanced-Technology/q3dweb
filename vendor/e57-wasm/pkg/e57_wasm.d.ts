@@ -5,7 +5,7 @@ export class Points {
     private constructor();
     free(): void;
     [Symbol.dispose](): void;
-    readonly colors: Float32Array;
+    readonly colors: Uint8Array;
     readonly hasColor: boolean;
     readonly hasIntensity: boolean;
     readonly intensities: Float32Array;
@@ -14,18 +14,30 @@ export class Points {
 }
 
 /**
+ * Parse chunked E57 input without assembling one large JavaScript ArrayBuffer.
+ */
+export function parsePointChunksSampled(chunks: Array<any>, max_points: number, source_bytes: number, sampling_threshold_bytes: number): Points;
+
+/**
  * Parse the first point cloud of an E57 file.
- * Returns positions (xyz interleaved), colors (rgb 0..1 interleaved) and
- * intensities (0..1 normalized by the library based on the intensity limits).
+ * Returns recentered positions (xyz interleaved), colors (rgb 0..255 interleaved) and
+ * intensities (0..255 normalized by the library based on the intensity limits).
  */
 export function parsePoints(data: Uint8Array): Points;
+
+/**
+ * Parse the first point cloud of an E57 file with source-size aware sampling.
+ */
+export function parsePointsSampled(data: Uint8Array, max_points: number, source_bytes: number, sampling_threshold_bytes: number): Points;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_points_free: (a: number, b: number) => void;
-    readonly parsePoints: (a: number, b: number) => [number, number, number];
+    readonly parsePointChunksSampled: (a: any, b: number, c: number, d: number) => [number, number, number];
+    readonly parsePoints: (a: any) => [number, number, number];
+    readonly parsePointsSampled: (a: any, b: number, c: number, d: number) => [number, number, number];
     readonly points_colors: (a: number) => any;
     readonly points_hasColor: (a: number) => number;
     readonly points_hasIntensity: (a: number) => number;
@@ -33,7 +45,6 @@ export interface InitOutput {
     readonly points_pointCount: (a: number) => number;
     readonly points_positions: (a: number) => any;
     readonly __wbindgen_externrefs: WebAssembly.Table;
-    readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }

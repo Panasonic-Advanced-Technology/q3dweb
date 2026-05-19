@@ -4,6 +4,7 @@ import {
   dropFile,
   getCloudSizeInput,
   getCloudSizeLabel,
+  getSettingsItemSelect,
   readTestData,
   waitForPointCount,
   parsePointCount,
@@ -29,7 +30,7 @@ test.describe('acceptance', () => {
     expect(n).toBe(TESTDATA_POINT_COUNT);
 
     // 2. Cloud item is auto-selected in the settings combo.
-    const select = page.locator('select').first();
+    const select = getSettingsItemSelect(page);
     await expect(select).toHaveValue('cloud');
     await expect(getCloudSizeLabel(page)).toBeVisible();
 
@@ -46,9 +47,9 @@ test.describe('acceptance', () => {
     // 5. Toggle settings panel with M and back.
     await page.locator('#app').click({ position: { x: box.width - 20, y: box.height - 20 } });
     await page.keyboard.press('m');
-    await expect(page.locator('text=Settings (M to toggle)')).toBeHidden();
+    await expect(page.locator('[data-minimized]').first()).toHaveAttribute('data-minimized', 'true');
     await page.keyboard.press('m');
-    await expect(page.locator('text=Settings (M to toggle)')).toBeVisible();
+    await expect(page.locator('[data-minimized]').first()).toHaveAttribute('data-minimized', 'false');
 
     // 6. Ctrl+click measurement. We do not assert overlay presence (depends on ray hit),
     //    only that the app is still healthy.

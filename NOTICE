@@ -27,6 +27,20 @@ Runtime npm dependencies
   Licensed under the Apache License, Version 2.0:
   http://www.apache.org/licenses/LICENSE-2.0
 
+- @material/web (Apache License 2.0)
+  https://github.com/material-components/material-web
+  Copyright (c) Google LLC and contributors.
+  Licensed under the Apache License, Version 2.0:
+  http://www.apache.org/licenses/LICENSE-2.0
+
+- lit (BSD-3-Clause)
+  https://github.com/lit/lit
+  Copyright (c) 2017 Google LLC. All rights reserved.
+
+- tslib (0BSD)
+  https://github.com/Microsoft/tslib
+  Copyright (c) Microsoft Corporation.
+
 ================================================================================
 Bundled WebAssembly module: vendor/e57-wasm
 ================================================================================

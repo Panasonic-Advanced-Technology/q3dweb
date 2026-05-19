@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { Locator, Page, expect } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -100,4 +102,9 @@ export function getCloudSizeLabel(page: Page): Locator {
 /** Locate the CloudItem size input associated with the size label. */
 export function getCloudSizeInput(page: Page): Locator {
   return getCloudSizeLabel(page).locator('xpath=following-sibling::input[1]');
+}
+
+/** Locate the item/settings select, excluding the viewer-mode selector above it. */
+export function getSettingsItemSelect(page: Page): Locator {
+  return page.locator('[data-role="settings-item-select"]');
 }

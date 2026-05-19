@@ -37,7 +37,7 @@ vi.mock('three', async () => {
   return { ...actual, WebGLRenderer: FakeWebGLRenderer };
 });
 
-import { Viewer } from '../src/viewer';
+import { CloudViewer } from '../src/cloud_viewer';
 import { estimateMemoryRequirement } from '../src/utils/memoryCheck';
 
 const SAMPLE_DIR = '/home/hara/web_q3d/test_sample';
@@ -67,11 +67,11 @@ function readRss(): number {
 }
 
 describe('memoryCheck qualification (real samples)', () => {
-  let v: Viewer;
+  let v: CloudViewer;
 
   beforeEach(() => {
     makeContainer();
-    v = new Viewer('app');
+    v = new CloudViewer('app');
     v.MAX_POINTS_VISUAL = 200_000;
     v.skipMemoryCheck = true;
     // Warm-up: load a tiny PCD so that jsdom/three baseline allocations
@@ -106,7 +106,7 @@ describe('memoryCheck qualification (real samples)', () => {
 
       const buf = fs.readFileSync(fp);
       const u8 = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
-      v.loadData(u8, sample.name);
+      await v.loadData(u8, sample.name);
 
       const peakAfter = readRss();
       const delta = Math.max(peakAfter - before, 0);
@@ -138,7 +138,7 @@ describe('memoryCheck qualification (gate behaviour)', () => {
   afterEach(() => { document.body.innerHTML = ''; });
 
   it('blocks a load that exceeds the heap budget', () => {
-    const v = new Viewer('app');
+    const v = new CloudViewer('app');
     // 10 MiB synthetic payload with a .laz extension -> 8x factor = 80 MiB
     // estimate, against a mocked 1 MiB heap -> ratio >> 0.9 -> block.
     const data = new Uint8Array(10 * 1024 * 1024);
@@ -173,7 +173,7 @@ describe('memoryCheck qualification (gate behaviour)', () => {
   });
 
   it('passes a small load when the heap budget is generous', () => {
-    const v = new Viewer('app');
+    const v = new CloudViewer('app');
     v.MAX_POINTS_VISUAL = 10_000;
     const header =
       '# .PCD v0.7 - Point Cloud Data file format\n' +

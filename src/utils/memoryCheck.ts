@@ -1,13 +1,12 @@
 /**
  * Memory budget estimation for point cloud loading.
  *
- * Large PCD/PLY/LAS/LAZ/E57 files are accumulated into a single contiguous
- * Uint8Array before parsing, and the parsed output (Float32 positions,
- * Uint8 colors, Float32 intensities) also lives in memory at the same time.
- * Loading a file that is too large for the current JS heap causes the tab
- * to OOM and die silently. This module estimates the peak memory requirement
- * and decides whether to proceed / warn / refuse.
+ * Point cloud loading keeps parsed output buffers in memory, and a few formats
+ * also need full compressed input. Loading beyond the current heap budget can
+ * OOM the webview, so this module estimates memory risk before allocation.
  */
+
+import { detectHeapLimitBytes, detectHeapUsedBytes } from './heapBudget';
 
 export type MemoryCheckResult = {
     /** Whether the caller should proceed with loading. */
@@ -39,33 +38,18 @@ const FORMAT_EXPANSION_FACTOR: Record<string, number> = {
 };
 
 /**
- * Return `performance.memory.jsHeapSizeLimit` when available (Chromium),
- * otherwise fall back to a heuristic based on `navigator.deviceMemory`,
- * otherwise assume a conservative 2 GiB.
+ * Return the host Node heap limit when VS Code provides it, then browser heap
+ * information, then a conservative fallback.
  */
 export function detectHeapLimit(): number {
-    const perf = (globalThis as any).performance;
-    if (perf && perf.memory && typeof perf.memory.jsHeapSizeLimit === 'number' && perf.memory.jsHeapSizeLimit > 0) {
-        return perf.memory.jsHeapSizeLimit as number;
-    }
-    const nav = (globalThis as any).navigator;
-    if (nav && typeof nav.deviceMemory === 'number' && nav.deviceMemory > 0) {
-        // deviceMemory is in GiB; assume ~50% is usable by a single tab.
-        return Math.floor(nav.deviceMemory * 1024 * 1024 * 1024 * 0.5);
-    }
-    // Conservative fallback: 2 GiB.
-    return 2 * 1024 * 1024 * 1024;
+    return detectHeapLimitBytes();
 }
 
 /**
  * Currently used JS heap, when available. Returns 0 when unknown.
  */
 export function detectHeapUsed(): number {
-    const perf = (globalThis as any).performance;
-    if (perf && perf.memory && typeof perf.memory.usedJSHeapSize === 'number') {
-        return perf.memory.usedJSHeapSize as number;
-    }
-    return 0;
+    return detectHeapUsedBytes();
 }
 
 export function formatBytes(bytes: number): string {

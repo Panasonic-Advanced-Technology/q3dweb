@@ -1,18 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { dropFile, makeAsciiPLY, waitForPointCount, attachErrorSinks } from './helpers';
 
-test.describe('film maker tab', () => {
-  test('is selectable in the settings combo', async ({ page }) => {
-    await page.goto('/');
+test.describe('film maker mode', () => {
+  test('renders Film Maker controls in the viewer mode', async ({ page }) => {
+    await page.goto('/?mode=film_maker');
     await page.waitForFunction(() => (window as any).__viewer);
 
-    const select = page.locator('select').first();
-    const values = await select.locator('option').evaluateAll((nodes) =>
-      nodes.map((n) => (n as HTMLOptionElement).value),
-    );
-    expect(values).toContain('__film_maker__');
-
-    await select.selectOption('__film_maker__');
+    await expect(page.locator('[data-role="viewer-mode-select"]')).toHaveValue('film_maker');
+    await expect(page.locator('[data-role="film-maker"]')).toBeVisible();
     await expect(page.locator('text=Add Key Frame (Space)')).toBeVisible();
     await expect(page.locator('text=Delete Key Frame (Delete)')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
@@ -21,9 +16,8 @@ test.describe('film maker tab', () => {
   });
 
   test('Space adds a key frame when the tab is active; button also adds', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?mode=film_maker');
     await page.waitForFunction(() => (window as any).__viewer);
-    await page.locator('select').first().selectOption('__film_maker__');
 
     // Focus the canvas so window key handler fires (not any input).
     await page.locator('#app canvas').click({ position: { x: 600, y: 300 } });
@@ -41,9 +35,8 @@ test.describe('film maker tab', () => {
   });
 
   test('Delete removes the selected key frame', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?mode=film_maker');
     await page.waitForFunction(() => (window as any).__viewer);
-    await page.locator('select').first().selectOption('__film_maker__');
     await page.locator('#app canvas').click({ position: { x: 400, y: 300 } });
 
     await page.keyboard.press('Space');
@@ -57,20 +50,51 @@ test.describe('film maker tab', () => {
     expect(count).toBe(2);
   });
 
-  test('keyboard shortcut is inactive when Film Maker tab is not active', async ({ page }) => {
-    await page.goto('/');
+  test('cloud mode does not expose Film Maker shortcuts or state', async ({ page }) => {
+    await page.goto('/?mode=cloud');
     await page.waitForFunction(() => (window as any).__viewer);
-    // stay on default main_win
     await page.locator('#app canvas').click({ position: { x: 400, y: 300 } });
     await page.keyboard.press('Space');
+    await expect(page.locator('[data-role="film-maker"]')).toBeHidden();
     const count = await page.evaluate(() => (window as any).__viewer.filmMaker.keyFrames.length);
     expect(count).toBe(0);
   });
 
-  test('spinboxes update the selected keyframe velocities', async ({ page }) => {
-    await page.goto('/');
+  test('switching between cloud and film maker keeps the loaded point cloud', async ({ page }) => {
+    await page.goto('/?mode=cloud');
     await page.waitForFunction(() => (window as any).__viewer);
-    await page.locator('select').first().selectOption('__film_maker__');
+
+    await dropFile(page, 'small_ascii.ply', makeAsciiPLY(64));
+    const beforeLabel = await waitForPointCount(page);
+    expect(beforeLabel).toContain('64 pts');
+
+    await page.evaluate(() => {
+      (window as any).__viewerBeforeModeSwitch = (window as any).__viewer;
+      const select = document.querySelector('[data-role="viewer-mode-select"]') as HTMLSelectElement;
+      select.value = 'film_maker';
+      select.onchange?.(new Event('change'));
+    });
+
+    await expect(page.locator('[data-role="film-maker"]')).toBeVisible();
+    await expect.poll(async () => await page.evaluate(() => (window as any).__viewerBeforeModeSwitch === (window as any).__viewer)).toBe(true);
+    const filmMakerLabel = await waitForPointCount(page);
+    expect(filmMakerLabel).toContain('64 pts');
+
+    await page.evaluate(() => {
+      const select = document.querySelector('[data-role="viewer-mode-select"]') as HTMLSelectElement;
+      select.value = 'cloud';
+      select.onchange?.(new Event('change'));
+    });
+
+    await expect(page.locator('[data-role="film-maker"]')).toBeHidden();
+    await expect.poll(async () => await page.evaluate(() => (window as any).__viewerBeforeModeSwitch === (window as any).__viewer)).toBe(true);
+    const cloudLabel = await waitForPointCount(page);
+    expect(cloudLabel).toContain('64 pts');
+  });
+
+  test('spinboxes update the selected keyframe velocities', async ({ page }) => {
+    await page.goto('/?mode=film_maker');
+    await page.waitForFunction(() => (window as any).__viewer);
     await page.locator('#app canvas').click({ position: { x: 400, y: 300 } });
     await page.keyboard.press('Space');
 
@@ -101,14 +125,12 @@ test.describe('film maker tab', () => {
 
   test('play with 2 key frames advances playback index and ends cleanly', async ({ page }) => {
     const { pageErrors } = attachErrorSinks(page);
-    await page.goto('/');
+    await page.goto('/?mode=film_maker');
     await page.waitForFunction(() => (window as any).__viewer);
-    await page.locator('select').first().selectOption('__film_maker__');
 
     // Add 2 key frames with different poses by nudging the camera in between.
     await page.evaluate(() => {
       const v = (window as any).__viewer;
-      v.filmMakerTabActive = true;
       v.addKeyFrameFromCamera();
       // Move camera center to create a distinct second pose.
       v.cameraCenter.set(5, 3, 2);
@@ -132,9 +154,8 @@ test.describe('film maker tab', () => {
   });
 
   test('record toggle produces a recorded blob after playback', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?mode=film_maker');
     await page.waitForFunction(() => (window as any).__viewer);
-    await page.locator('select').first().selectOption('__film_maker__');
 
     const recorderOK = await page.evaluate(() => {
       const c = document.querySelector('#app canvas') as any;
@@ -144,7 +165,6 @@ test.describe('film maker tab', () => {
 
     await page.evaluate(() => {
       const v = (window as any).__viewer;
-      v.filmMakerTabActive = true;
       v.addKeyFrameFromCamera();
       v.cameraCenter.set(2, 0, 0);
       v.updateCamera();
@@ -171,13 +191,11 @@ test.describe('film maker tab', () => {
   });
 
   test('jumpToKeyFrame moves the camera center to the stored keyframe pose', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?mode=film_maker');
     await page.waitForFunction(() => (window as any).__viewer);
-    await page.locator('select').first().selectOption('__film_maker__');
 
     await page.evaluate(() => {
       const v = (window as any).__viewer;
-      v.filmMakerTabActive = true;
       v.cameraCenter.set(10, 20, 30);
       v.updateCamera();
       v.addKeyFrameFromCamera();
@@ -197,12 +215,11 @@ test.describe('film maker tab', () => {
 
   test('integrates with a loaded point cloud without errors', async ({ page }) => {
     const { pageErrors } = attachErrorSinks(page);
-    await page.goto('/');
+    await page.goto('/?mode=film_maker');
     await page.waitForFunction(() => (window as any).__viewer);
     await dropFile(page, 'synth.ply', makeAsciiPLY(800));
     await waitForPointCount(page);
 
-    await page.locator('select').first().selectOption('__film_maker__');
     await page.locator('#app canvas').click({ position: { x: 500, y: 300 } });
     await page.keyboard.press('Space');
     await page.keyboard.press('Space');

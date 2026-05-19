@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { FilmMaker, KeyFrame } from '../src/filmMaker';
+import { FilmMaker, KeyFrame } from '../src/viewer/filmMaker';
 
 function poseAt(x: number, y: number, z: number): THREE.Matrix4 {
     return new THREE.Matrix4().makeTranslation(x, y, z);

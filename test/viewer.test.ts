@@ -23,6 +23,12 @@ vi.mock('three', async () => {
 
 import * as THREE from 'three';
 import { Viewer } from '../src/viewer';
+import { CloudViewer } from '../src/cloud_viewer';
+import { FilmMakerViewer } from '../src/film_maker_viewer';
+import { RealtimeViewer } from '../src/realtime_viewer';
+import { inferPointCloudFilename, parseCloudUrlOptions } from '../src/cloudUrlOptions';
+import { parseRealtimeUrlOptions } from '../src/realtimeUrlOptions';
+import { getHostViewerMode, installViewerModeSelector, navigateToViewerMode, normalizeViewerMode } from '../src/viewerMode';
 
 function makeContainer(id = 'app'): HTMLElement {
   const c = document.createElement('div');
@@ -33,6 +39,12 @@ function makeContainer(id = 'app'): HTMLElement {
 
 function cleanupContainers() {
   document.body.innerHTML = '';
+}
+
+function toArrayBuffer(data: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  return copy.buffer as ArrayBuffer;
 }
 
 describe('Viewer construction & errors', () => {
@@ -145,12 +157,59 @@ describe('Viewer settings panel', () => {
   beforeEach(() => { makeContainer(); v = new Viewer('app'); });
   afterEach(cleanupContainers);
 
-  it('toggleSettingsPanel hides and shows', () => {
+  it('toggleSettingsPanel minimizes and expands', () => {
     expect(v.settingsPanel?.style.display).toBe('block');
-    v.toggleSettingsPanel();
-    expect(v.settingsPanel?.style.display).toBe('none');
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
     v.toggleSettingsPanel();
     expect(v.settingsPanel?.style.display).toBe('block');
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('true');
+    expect(v.settingsPanel?.style.width).toBe('36px');
+    expect(v.settingsPanel?.style.padding).toBe('0px');
+    expect(v.settingsPanel?.style.background).toBe('transparent');
+    expect(v.settingsPanel?.style.border).toBe('0px');
+    const itemSelectWrapper = v.settingsItemSelect?.closest('.q3d-material-select') as HTMLElement;
+    expect(itemSelectWrapper.style.display).toBe('none');
+    v.toggleSettingsPanel();
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
+    expect(v.settingsPanel?.style.display).toBe('block');
+    expect(v.settingsPanel?.style.width).toBe('280px');
+    expect(v.settingsPanel?.style.background).toBe('rgba(18, 18, 18, 0.94)');
+    expect(v.settingsPanel?.style.border).toBe('1px solid rgb(63, 63, 63)');
+    expect(itemSelectWrapper.style.display).not.toBe('none');
+  });
+
+  it('settings minimize button toggles the panel', () => {
+    const button = v.settingsPanel!.querySelector('[data-role="settings-minimize-button"]') as HTMLButtonElement;
+    expect(button).toBeDefined();
+    button.click();
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('true');
+    expect(button.textContent).toBe('\u2699');
+    expect(button.style.flex).toBe('0 0 36px');
+    expect(button.style.width).toBe('36px');
+    expect(button.style.height).toBe('36px');
+    expect(button.style.border).toBe('1px solid rgb(95, 99, 104)');
+    expect(button.style.borderRadius).toBe('999px');
+    expect(button.classList.contains('md-typescale-label-large')).toBe(true);
+    expect(button.querySelector('md-ripple')).toBeTruthy();
+    button.click();
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
+    expect(button.textContent).toBe('-');
+    expect(button.style.flex).toBe('0 0 36px');
+    expect(button.style.width).toBe('36px');
+    expect(button.style.height).toBe('36px');
+    expect(button.style.border).toBe('1px solid rgb(95, 99, 104)');
+    expect(button.style.borderRadius).toBe('999px');
+    expect(button.querySelector('md-ripple')).toBeTruthy();
+  });
+
+  it('shows the viewer setting label above the item selector', () => {
+    const label = v.settingsPanel!.querySelector('[data-role="settings-item-label"]') as HTMLElement;
+    const itemSelectWrapper = v.settingsItemSelect!.closest('.q3d-material-select') as HTMLElement;
+    expect(label.textContent).toBe('Viewer Setting:');
+    expect(label.classList.contains('q3d-setting-label')).toBe(true);
+    expect(Array.from(v.settingsPanel!.children).indexOf(label)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
+    );
   });
 
   it('refreshSettingsItemList preserves preferred selection', () => {
@@ -255,9 +314,67 @@ describe('Viewer settings panel', () => {
   });
 });
 
-describe('Viewer Film Maker controls', () => {
+describe('viewer mode selector', () => {
   let v: Viewer;
   beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  afterEach(cleanupContainers);
+
+  it('is installed above item settings without adding mode logic to Viewer', () => {
+    const navigate = vi.fn();
+    const modeSelect = installViewerModeSelector(v, 'cloud', navigate)!;
+    const itemSelect = v.settingsPanel!.querySelector('[data-role="settings-item-select"]') as HTMLSelectElement;
+
+    expect(modeSelect).toBeTruthy();
+    expect(itemSelect).toBe(v.settingsItemSelect);
+    const modeSelectWrapper = modeSelect.closest('.q3d-material-select') as HTMLElement;
+    const itemSelectWrapper = itemSelect.closest('.q3d-material-select') as HTMLElement;
+    expect(modeSelectWrapper).toBeTruthy();
+    expect(itemSelectWrapper).toBeTruthy();
+    expect(Array.from(v.settingsPanel!.children).indexOf(modeSelectWrapper)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
+    );
+    expect(v.settingsPanel!.querySelector('[data-role="viewer-mode-select-menu"]')).toBeTruthy();
+    expect(v.settingsPanel!.querySelector('[data-role="viewer-mode-menu-button"]')).toBeTruthy();
+    expect(Array.from(modeSelect.options).map((option) => option.textContent)).toEqual([
+      'cloud_viewer',
+      'film_maker',
+      'realtime_viewer',
+    ]);
+    expect(modeSelect.value).toBe('cloud');
+
+    modeSelect.value = 'film_maker';
+    modeSelect.onchange?.(new Event('change'));
+    expect(navigate).toHaveBeenCalledWith('film_maker');
+
+    modeSelect.value = 'cloud';
+    modeSelect.onchange?.(new Event('change'));
+    expect(navigate).toHaveBeenNthCalledWith(2, 'cloud');
+  });
+
+  it('normalizes unknown modes to cloud', () => {
+    expect(normalizeViewerMode(null)).toBe('cloud');
+    expect(normalizeViewerMode('cloud')).toBe('cloud');
+    expect(normalizeViewerMode('film_maker')).toBe('film_maker');
+    expect(normalizeViewerMode('realtime')).toBe('realtime');
+    expect(normalizeViewerMode('other')).toBe('cloud');
+  });
+
+  it('uses VS Code host mode and posts mode changes without browser navigation', () => {
+    const host = { postMessage: vi.fn() };
+    (globalThis as any).__Q3DWEB_INITIAL_MODE = 'realtime';
+
+    expect(getHostViewerMode()).toBe('realtime');
+    navigateToViewerMode('film_maker', host);
+
+    expect(host.postMessage).toHaveBeenCalledWith({ type: 'changeMode', mode: 'film_maker' });
+    delete (globalThis as any).__Q3DWEB_INITIAL_MODE;
+    expect(getHostViewerMode()).toBeNull();
+  });
+});
+
+describe('Viewer Film Maker controls', () => {
+  let v: FilmMakerViewer;
+  beforeEach(() => { makeContainer(); v = new FilmMakerViewer('app'); });
   afterEach(() => {
     v.stopPlayback();
     vi.useRealTimers();
@@ -276,38 +393,47 @@ describe('Viewer Film Maker controls', () => {
     return { first, second };
   }
 
-  it('builds the Film Maker tab and wires list, buttons, inputs, and shortcuts', () => {
-    v.onSettingsItemSelected('__film_maker__');
+  it('builds the Film Maker UI and wires list, buttons, inputs, and shortcuts', () => {
+    // Film maker UI is built during construction and visible in film_maker mode
     expect(v.filmMakerTabActive).toBe(true);
-    expect(v.settingsContent?.textContent).toContain('Video File Name:');
+    const fm = v.settingsPanel!.querySelector('[data-role="film-maker"]') as HTMLElement;
+    const itemLabel = v.settingsPanel!.querySelector('[data-role="settings-item-label"]') as HTMLElement;
+    const itemSelectWrapper = v.settingsItemSelect!.closest('.q3d-material-select') as HTMLElement;
+    expect(fm.textContent).toContain('Video File Name:');
+    expect(Array.from(v.settingsPanel!.children).indexOf(fm)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemLabel),
+    );
+    expect(Array.from(v.settingsPanel!.children).indexOf(itemLabel)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
+    );
 
-    const buttons = Array.from(v.settingsContent!.querySelectorAll('button'));
+    const buttons = Array.from(fm.querySelectorAll('button'));
     buttons[0].click();
     buttons[0].click();
     expect(v.filmMaker.keyFrames.length).toBe(2);
 
-    const rows = Array.from(v.settingsContent!.querySelectorAll('div[data-index]')) as HTMLElement[];
+    const rows = Array.from(fm.querySelectorAll('div[data-index]')) as HTMLElement[];
     expect(rows.map((row) => row.textContent)).toEqual(['Frame 1', 'Frame 2']);
     rows[0].click();
     expect(v.filmMaker.currentIndex).toBe(0);
     rows[1].dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 
-    const checkbox = v.settingsContent!.querySelector('input[type=checkbox]') as HTMLInputElement;
+    const checkbox = fm.querySelector('input[type=checkbox]') as HTMLInputElement;
     checkbox.checked = true;
     checkbox.onchange?.(new Event('change'));
     expect(v.isRecordingFilm).toBe(true);
 
-    const textInput = v.settingsContent!.querySelector('input[type=text]') as HTMLInputElement;
+    const textInput = fm.querySelector('input[type=text]') as HTMLInputElement;
     textInput.value = 'demo.webm';
     textInput.onchange?.(new Event('change'));
     expect(v.videoFileName).toBe('demo.webm');
 
-    const codecSelect = v.settingsContent!.querySelector('select') as HTMLSelectElement;
+    const codecSelect = fm.querySelector('select') as HTMLSelectElement;
     codecSelect.value = 'video/webm;codecs=vp8';
     codecSelect.onchange?.(new Event('change'));
     expect(v.videoMimeType).toBe('video/webm;codecs=vp8');
 
-    const numbers = Array.from(v.settingsContent!.querySelectorAll('input[type=number]')) as HTMLInputElement[];
+    const numbers = Array.from(fm.querySelectorAll('input[type=number]')) as HTMLInputElement[];
     numbers[0].value = '2.5';
     numbers[0].onchange?.(new Event('change'));
     numbers[1].value = '90';
@@ -335,17 +461,39 @@ describe('Viewer Film Maker controls', () => {
     expect(ignoredSpace.defaultPrevented).toBe(false);
   });
 
-  it('handles select-target M shortcut and stale settings selection fallback', () => {
-    v.onSettingsItemSelected('__film_maker__');
+  it('toggles the Film Maker section and shortcuts without rebuilding the viewer', () => {
+    const fm = v.settingsPanel!.querySelector('[data-role="film-maker"]') as HTMLElement;
+
+    v.setViewerMode('cloud');
+    expect(v.currentViewerMode).toBe('cloud');
+    expect(v.filmMakerTabActive).toBe(false);
+    expect(fm.hidden).toBe(true);
+
+    const ignoredSpace = new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true });
+    window.dispatchEvent(ignoredSpace);
+    expect(v.filmMaker.keyFrames.length).toBe(0);
+
+    v.setViewerMode('film_maker');
+    expect(v.currentViewerMode).toBe('film_maker');
+    expect(v.filmMakerTabActive).toBe(true);
+    expect(fm.hidden).toBe(false);
+
+    const activeSpace = new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true });
+    window.dispatchEvent(activeSpace);
+    expect(activeSpace.defaultPrevented).toBe(true);
+    expect(v.filmMaker.keyFrames.length).toBe(1);
+  });
+
+  it('handles select-target M shortcut and panel re-show', () => {
     const select = v.settingsItemSelect!;
     const event = new KeyboardEvent('keydown', { key: 'm', bubbles: true, cancelable: true });
     select.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
-    expect(v.settingsPanel?.style.display).toBe('none');
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('true');
 
-    (v as any).settingsItemSelect = { value: 'stale', options: [] };
+    // Expand panel: should re-render the last active tab (Film Maker)
     v.toggleSettingsPanel();
-    expect(v.settingsItemSelect?.value).toBe('__main_win__');
+    expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
     expect(v.settingsContent?.children.length).toBeGreaterThan(0);
   });
 
@@ -372,7 +520,6 @@ describe('Viewer Film Maker controls', () => {
     }
     (globalThis as any).MediaRecorder = FakeMediaRecorder;
 
-    v.onSettingsItemSelected('__film_maker__');
     addTwoKeyFrames();
     v.filmMaker.updateIntervalMs = 100;
     v.isRecordingFilm = true;
@@ -462,9 +609,139 @@ describe('Viewer Film Maker controls', () => {
   });
 });
 
+describe('RealtimeViewer settings layout', () => {
+  let v: RealtimeViewer;
+  beforeEach(() => { makeContainer(); v = new RealtimeViewer('app'); });
+  afterEach(cleanupContainers);
+
+  it('places realtime controls above the item selector with a clear boundary', () => {
+    const realtime = v.settingsPanel!.querySelector('[data-role="realtime"]') as HTMLElement;
+    const itemLabel = v.settingsPanel!.querySelector('[data-role="settings-item-label"]') as HTMLElement;
+    const itemSelectWrapper = v.settingsItemSelect!.closest('.q3d-material-select') as HTMLElement;
+    expect(realtime.textContent).toContain('ROS Bridge URL');
+    expect(Array.from(v.settingsPanel!.children).indexOf(realtime)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemLabel),
+    );
+    expect(Array.from(v.settingsPanel!.children).indexOf(itemLabel)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemSelectWrapper),
+    );
+    expect(realtime.classList.contains('q3d-settings-section')).toBe(true);
+    expect(itemSelectWrapper.style.marginTop).toBe('2px');
+  });
+
+  it('applies realtime options to settings inputs', () => {
+    cleanupContainers();
+    makeContainer();
+    v = new RealtimeViewer('app', {
+      rosbridgeUrl: 'ws://robot.local:9090',
+      cloudTopicName: '/points_raw',
+      odomTopicName: '/odom/wheel',
+      maxPointsPerScan: 3200,
+      maxAccumulatedPoints: 1_200_000,
+    });
+
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-ros-url"]') as HTMLInputElement).value)
+      .toBe('ws://robot.local:9090');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-cloud-topic"]') as HTMLInputElement).value)
+      .toBe('/points_raw');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-odom-topic"]') as HTMLInputElement).value)
+      .toBe('/odom/wheel');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-max-points-per-scan"]') as HTMLInputElement).value)
+      .toBe('3200');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-max-accumulated-points"]') as HTMLInputElement).value)
+      .toBe('1200000');
+  });
+});
+
+describe('realtime URL options', () => {
+  it('parses rosbridge, topics, and point budgets from URL params', () => {
+    const options = parseRealtimeUrlOptions(new URLSearchParams({
+      ros: 'ws://robot.local:9090',
+      cloudTopic: '/points_raw',
+      odomTopic: '/odom/wheel',
+      maxPointsPerScan: '3200',
+      maxAccumulatedPoints: '1200000',
+    }));
+
+    expect(options).toEqual({
+      rosbridgeUrl: 'ws://robot.local:9090',
+      cloudTopicName: '/points_raw',
+      odomTopicName: '/odom/wheel',
+      maxPointsPerScan: 3200,
+      maxAccumulatedPoints: 1_200_000,
+    });
+  });
+
+  it('supports aliases and ignores invalid point budgets', () => {
+    const options = parseRealtimeUrlOptions(new URLSearchParams({
+      rosbridgeUrl: 'ws://host:9090',
+      topic: '/cloud_alias',
+      odom: '/odom_alias',
+      scanPoints: '-5',
+      maxPoints: '2500000.9',
+    }));
+
+    expect(options.rosbridgeUrl).toBe('ws://host:9090');
+    expect(options.cloudTopicName).toBe('/cloud_alias');
+    expect(options.odomTopicName).toBe('/odom_alias');
+    expect(options.maxPointsPerScan).toBeUndefined();
+    expect(options.maxAccumulatedPoints).toBe(2_500_000);
+  });
+});
+
+describe('cloud URL options', () => {
+  it('parses point cloud URL aliases and optional filename', () => {
+    const options = parseCloudUrlOptions(new URLSearchParams({
+      cloudUrl: 'https://example.com/data/sample.las',
+      filename: 'sample.las',
+    }));
+
+    expect(options).toEqual({
+      pointCloudUrl: 'https://example.com/data/sample.las',
+      filename: 'sample.las',
+    });
+  });
+
+  it('infers filenames from URLs with query strings', () => {
+    expect(inferPointCloudFilename('https://example.com/clouds/mihara%20binary.e57?token=abc'))
+      .toBe('mihara binary.e57');
+  });
+});
+
+describe('CloudViewer URL loading', () => {
+  let v: CloudViewer;
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
+  afterEach(() => {
+    (globalThis as any).fetch = originalFetch;
+    cleanupContainers();
+  });
+
+  function makeAsciiPCD(): Uint8Array {
+    const pcd =
+      'VERSION 0.7\nFIELDS x y z intensity\nSIZE 4 4 4 4\nTYPE F F F F\nCOUNT 1 1 1 1\nWIDTH 2\nHEIGHT 1\nVIEWPOINT 0 0 0 1 0 0 0\nPOINTS 2\nDATA ascii\n' +
+      '0 0 0 10\n1 1 1 20\n';
+    return new TextEncoder().encode(pcd);
+  }
+
+  it('loads a remote point cloud through fetch streaming', async () => {
+    const data = makeAsciiPCD();
+    (globalThis as any).fetch = vi.fn().mockResolvedValue(new Response(toArrayBuffer(data), {
+      headers: { 'content-length': String(data.byteLength) },
+    }));
+
+    await v.loadUrl('https://example.com/clouds/sample.pcd');
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('https://example.com/clouds/sample.pcd');
+    expect(v.streamFilename).toBe('sample.pcd');
+    expect(v.items.cloud).toBeDefined();
+  });
+});
+
 describe('Viewer streaming - PCD', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   function makeBinaryPCD(points: Array<[number, number, number, number]>): Uint8Array {
@@ -530,7 +807,7 @@ describe('Viewer streaming - PCD', () => {
           },
         };
       };
-      const f = new File([data], 'foo.pcd');
+      const f = new File([toArrayBuffer(data)], 'foo.pcd');
       await v.loadFile(f);
       expect(v.items.cloud).toBeDefined();
       expect(checkSpy).not.toHaveBeenCalled();
@@ -544,6 +821,39 @@ describe('Viewer streaming - PCD', () => {
     const data = makeAsciiPCD([[0, 0, 0, 10], [1, 1, 1, 20], [2, 2, 2, 30]]);
     v.loadData(data, 'foo.pcd');
     expect(v.items.cloud).toBeDefined();
+  });
+
+  it('streams fake 2GiB+ ASCII PCD without allocating the full file', async () => {
+    const data = makeAsciiPCD([
+      [0, 0, 0, 10], [1, 1, 1, 20], [2, 2, 2, 30],
+      [3, 3, 3, 40], [4, 4, 4, 50], [5, 5, 5, 60],
+    ]);
+    const renderSpy = vi.spyOn(v, 'renderPoints');
+    const fakeFile = {
+      name: 'huge_ascii.pcd',
+      size: 2 * 1024 * 1024 * 1024 + 1,
+      stream() {
+        let sent = false;
+        return {
+          getReader() {
+            return {
+              async read() {
+                if (sent) return { done: true, value: undefined };
+                sent = true;
+                return { done: false, value: data };
+              },
+              async cancel() {},
+            };
+          },
+        };
+      },
+    } as any as File;
+    await v.loadFile(fakeFile);
+    expect(renderSpy).toHaveBeenCalled();
+    const renderedPoints = (renderSpy.mock.calls[0][0] as Float32Array).length / 3;
+    expect(renderedPoints).toBeGreaterThan(0);
+    expect(renderedPoints).toBeLessThan(6);
+    expect((v as any).fullBuffer).toBeNull();
   });
 
   it('loads binary PCD with RGB', () => {
@@ -595,8 +905,8 @@ describe('Viewer streaming - PCD', () => {
 });
 
 describe('Viewer PLY parsing', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   function asciiPLY(withColors = true, withIntensity = true): Uint8Array {
@@ -639,6 +949,39 @@ describe('Viewer PLY parsing', () => {
     expect(v.items.cloud).toBeDefined();
   });
 
+  it('streams fake 2GiB+ ASCII PLY with source-size thinning', async () => {
+    let header = 'ply\nformat ascii 1.0\nelement vertex 6\n';
+    header += 'property float x\nproperty float y\nproperty float z\nproperty float intensity\nend_header\n';
+    const body = '0 0 0 0\n1 1 1 1\n2 2 2 2\n3 3 3 3\n4 4 4 4\n5 5 5 5\n';
+    const data = new TextEncoder().encode(header + body);
+    const renderSpy = vi.spyOn(v, 'renderPoints');
+    const fakeFile = {
+      name: 'huge_ascii.ply',
+      size: 2 * 1024 * 1024 * 1024 + 1,
+      stream() {
+        let sent = false;
+        return {
+          getReader() {
+            return {
+              async read() {
+                if (sent) return { done: true, value: undefined };
+                sent = true;
+                return { done: false, value: data };
+              },
+              async cancel() {},
+            };
+          },
+        };
+      },
+    } as any as File;
+    await v.loadFile(fakeFile);
+    expect(renderSpy).toHaveBeenCalled();
+    const renderedPoints = (renderSpy.mock.calls[0][0] as Float32Array).length / 3;
+    expect(renderedPoints).toBeGreaterThan(0);
+    expect(renderedPoints).toBeLessThan(6);
+    expect((v as any).chunkList.length).toBe(0);
+  });
+
   it('parses ASCII PLY with intensity only (no colors)', () => {
     v.loadData(asciiPLY(false, true), 'a.ply');
     expect(v.items.cloud).toBeDefined();
@@ -671,8 +1014,8 @@ describe('Viewer PLY parsing', () => {
 });
 
 describe('Viewer LAS parsing', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   function makeLAS(version: [number, number] = [1, 2], format = 0, n = 2, withRGB = false): Uint8Array {
@@ -777,7 +1120,7 @@ describe('Viewer LAS parsing', () => {
           },
         };
       };
-      const f = new File([data], 'foo.las');
+      const f = new File([toArrayBuffer(data)], 'foo.las');
       await v.loadFile(f);
       expect(v.items.cloud).toBeDefined();
       expect(checkSpy).not.toHaveBeenCalled();
@@ -797,7 +1140,39 @@ describe('Viewer LAS parsing', () => {
 describe('Viewer measurement & mouse/keyboard events', () => {
   let v: Viewer;
   beforeEach(() => { makeContainer(); v = new Viewer('app'); });
-  afterEach(cleanupContainers);
+  afterEach(() => { vi.useRealTimers(); cleanupContainers(); });
+
+  function makeTouchEvent(type: string, touches: Array<{ x: number; y: number }>): TouchEvent {
+    const event = new Event(type, { bubbles: true, cancelable: true }) as TouchEvent;
+    const touchList = touches.map((point, index) => ({
+      identifier: index,
+      target: v.renderer.domElement,
+      clientX: point.x,
+      clientY: point.y,
+      pageX: point.x,
+      pageY: point.y,
+      screenX: point.x,
+      screenY: point.y,
+    })) as unknown as TouchList;
+    Object.defineProperty(event, 'touches', { value: touchList });
+    Object.defineProperty(event, 'targetTouches', { value: touchList });
+    Object.defineProperty(event, 'changedTouches', { value: touchList });
+    return event;
+  }
+
+  function makePointerEvent(type: string, pointerId: number, x: number, y: number): PointerEvent {
+    const event = new Event(type, { bubbles: true, cancelable: true }) as PointerEvent;
+    Object.defineProperty(event, 'pointerId', { value: pointerId });
+    Object.defineProperty(event, 'pointerType', { value: 'touch' });
+    Object.defineProperty(event, 'clientX', { value: x });
+    Object.defineProperty(event, 'clientY', { value: y });
+    return event;
+  }
+
+  function installTouchViewport(): void {
+    Object.defineProperty(v.container, 'clientWidth', { value: 800, configurable: true });
+    Object.defineProperty(v.container, 'clientHeight', { value: 600, configurable: true });
+  }
 
   it('removeMeasurementPoint with empty list is safe', () => {
     v.removeMeasurementPoint();
@@ -850,6 +1225,342 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     canvas.dispatchEvent(new MouseEvent('mousemove'));
   });
 
+  it('touch gestures pan, two-finger twist/pitch rotate, and pinch zoom', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      delete (window as any).PointerEvent;
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+      expect(canvas.style.touchAction).toBe('none');
+
+      const beforeCenter = v.cameraCenter.clone();
+      const beforeEuler = [...v.euler];
+      canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 140, y: 120 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchend', []));
+      expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
+      expect(v.euler).toEqual(beforeEuler);
+
+      const beforeDist = v.cameraDist;
+      const beforeTwoFingerEuler = [...v.euler];
+      canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }, { x: 200, y: 100 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 130, y: 80 }, { x: 240, y: 140 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchend', []));
+      expect(v.euler[2] - beforeTwoFingerEuler[2]).toBeGreaterThan(0.2);
+      expect(v.cameraDist).toBeLessThan(beforeDist - 6);
+
+      const beforeParallelEuler = [...v.euler];
+      const beforeParallelDist = v.cameraDist;
+      canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 180 }, { x: 220, y: 180 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 100, y: 120 }, { x: 220, y: 120 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchend', []));
+      expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.08);
+      expect(Math.abs(v.euler[2] - beforeParallelEuler[2])).toBeLessThan(0.001);
+      expect(Math.abs(v.cameraDist - beforeParallelDist)).toBeLessThan(0.001);
+    } finally {
+      if (originalPointerEvent !== undefined) (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('pointer touch gestures pan, two-finger twist/pitch rotate, and pinch zoom', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+
+      const canvas = v.renderer.domElement;
+      const beforeCenter = v.cameraCenter.clone();
+      const beforeEuler = [...v.euler];
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 140, 120));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 140, 120));
+      expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
+      expect(v.euler).toEqual(beforeEuler);
+
+      const beforeDist = v.cameraDist;
+      const beforeTwoFingerEuler = [...v.euler];
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 200, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 120, 80));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 240, 140));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 120, 80));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 240, 140));
+      expect(v.euler[2] - beforeTwoFingerEuler[2]).toBeGreaterThan(0.2);
+      expect(v.cameraDist).toBeLessThan(beforeDist);
+
+      const beforeParallelEuler = [...v.euler];
+      const beforeParallelDist = v.cameraDist;
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 180));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 220, 180));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 100, 120));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 120));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 100, 120));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 220, 120));
+      expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.08);
+      expect(Math.abs(v.euler[2] - beforeParallelEuler[2])).toBeLessThan(0.001);
+      expect(Math.abs(v.cameraDist - beforeParallelDist)).toBeLessThan(0.001);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('two-finger pointer pitch keeps distance from the rotation center during staggered finger movement', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      v.cameraDist = 40;
+      v.updateCamera();
+
+      const canvas = v.renderer.domElement;
+      const beforeEuler = [...v.euler];
+      const beforeCameraDist = v.cameraDist;
+      const beforeCenterDistance = v.camera.position.distanceTo(v.cameraCenter);
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 180));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 220, 180));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 100, 60));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 60));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 100, 60));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 220, 60));
+
+      expect(v.euler[0] - beforeEuler[0]).toBeGreaterThan(0.3);
+      expect(v.cameraDist).toBeCloseTo(beforeCameraDist, 6);
+      expect(v.camera.position.distanceTo(v.cameraCenter)).toBeCloseTo(beforeCenterDistance, 6);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('two-finger pointer pinch keeps the rotation center fixed until all fingers are released', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      v.cameraCenter.set(4, 5, 6);
+      v.cameraDist = 40;
+      v.updateCamera();
+
+      const canvas = v.renderer.domElement;
+      const beforeCenter = v.cameraCenter.clone();
+      const beforeDist = v.cameraDist;
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 200, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 80, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 100));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 80, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 260, 160));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 260, 160));
+
+      expect(v.cameraDist).toBeLessThan(beforeDist);
+      expect(v.cameraCenter.distanceTo(beforeCenter)).toBeLessThan(1e-6);
+
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 130, 130));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 130, 130));
+      expect(v.cameraCenter.distanceTo(beforeCenter)).toBeGreaterThan(0);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('two-finger pointer pitch amount stays constant across zoom levels', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+
+      const runPitchAtDistance = (cameraDist: number): number => {
+        v.cameraCenter.set(0, 0, 0);
+        v.cameraDist = cameraDist;
+        v.euler = [Math.PI / 3, 0, 0];
+        v.updateCamera();
+
+        const beforePitch = v.euler[0];
+        canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 180));
+        canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 220, 180));
+        canvas.dispatchEvent(makePointerEvent('pointermove', 1, 100, 140));
+        canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 140));
+        canvas.dispatchEvent(makePointerEvent('pointerup', 1, 100, 140));
+        canvas.dispatchEvent(makePointerEvent('pointerup', 2, 220, 140));
+        return v.euler[0] - beforePitch;
+      };
+
+      const nearPitchDelta = runPitchAtDistance(10);
+      const farPitchDelta = runPitchAtDistance(80);
+
+      expect(nearPitchDelta).toBeGreaterThan(0);
+      expect(farPitchDelta).toBeCloseTo(nearPitchDelta, 6);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('one-finger touch panning scales with distance from the rotation center', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+
+      const runPanAtDistance = (cameraDist: number) => {
+        v.cameraCenter.set(0, 0, 0);
+        v.cameraDist = cameraDist;
+        v.updateCamera();
+        canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+        canvas.dispatchEvent(makePointerEvent('pointermove', 1, 120, 120));
+        canvas.dispatchEvent(makePointerEvent('pointerup', 1, 120, 120));
+        return v.cameraCenter.length();
+      };
+
+      const nearPan = runPanAtDistance(5);
+      const farPan = runPanAtDistance(50);
+      expect(nearPan).toBeGreaterThan(0);
+      expect(farPan).toBeGreaterThan(nearPan * 5);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('one-finger touch pan matches mouse pan for the same screen delta', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+
+      const resetCamera = () => {
+        v.cameraCenter.set(0, 0, 0);
+        v.cameraDist = 40;
+        v.euler = [Math.PI / 3, 0, Math.PI / 4];
+        v.updateCamera();
+      };
+
+      resetCamera();
+      canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, button: 0 }));
+      canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 130, clientY: 125, button: 0 }));
+      canvas.dispatchEvent(new MouseEvent('mouseup'));
+      const mousePan = v.cameraCenter.clone();
+
+      resetCamera();
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 130, 125));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 130, 125));
+      const touchPan = v.cameraCenter.clone();
+
+      expect(touchPan.x).toBeCloseTo(mousePan.x, 6);
+      expect(touchPan.y).toBeCloseTo(mousePan.y, 6);
+      expect(touchPan.z).toBeCloseTo(mousePan.z, 6);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('one-finger touch pan uses CSS pixels on high DPI screens', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      const canvas = v.renderer.domElement;
+
+      const runTouchPan = (rendererPixelRatio: number) => {
+        v.cameraCenter.set(0, 0, 0);
+        v.cameraDist = 40;
+        v.euler = [Math.PI / 3, 0, Math.PI / 4];
+        v.rendererPixelRatio = rendererPixelRatio;
+        v.updateCamera();
+        canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 100));
+        canvas.dispatchEvent(makePointerEvent('pointermove', 1, 130, 125));
+        canvas.dispatchEvent(makePointerEvent('pointerup', 1, 130, 125));
+        return v.cameraCenter.clone();
+      };
+
+      const normalDpiPan = runTouchPan(1);
+      const highDpiPan = runTouchPan(3);
+      expect(highDpiPan.x).toBeCloseTo(normalDpiPan.x, 6);
+      expect(highDpiPan.y).toBeCloseTo(normalDpiPan.y, 6);
+      expect(highDpiPan.z).toBeCloseTo(normalDpiPan.z, 6);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('touch input does not drive measurement shortcuts', () => {
+    const canvas = v.renderer.domElement;
+    const addSpy = vi.spyOn(v, 'addMeasurementPoint');
+    const removeSpy = vi.spyOn(v, 'removeMeasurementPoint');
+
+    canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 120, y: 120 }]));
+    canvas.dispatchEvent(makeTouchEvent('touchend', []));
+    expect(addSpy).not.toHaveBeenCalled();
+
+    canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }, { x: 150, y: 100 }]));
+    canvas.dispatchEvent(makeTouchEvent('touchend', []));
+    expect(removeSpy).not.toHaveBeenCalled();
+
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
+  });
+
+  it('primary touch devices disable measurement APIs', () => {
+    const originalMatchMedia = window.matchMedia;
+    const originalMaxTouchPoints = navigator.maxTouchPoints;
+    try {
+      cleanupContainers();
+      Object.defineProperty(navigator, 'maxTouchPoints', { value: 5, configurable: true });
+      (window as any).matchMedia = vi.fn((query: string) => ({
+        matches: query.includes('pointer: coarse') || query.includes('hover: none'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+      makeContainer();
+      v = new Viewer('app');
+      expect(v.isTouchPrimaryDevice).toBe(true);
+      v.selectedPoints = [new THREE.Vector3(1, 2, 3)];
+      v.removeMeasurementPoint();
+      expect(v.selectedPoints).toHaveLength(1);
+    } finally {
+      window.matchMedia = originalMatchMedia;
+      Object.defineProperty(navigator, 'maxTouchPoints', { value: originalMaxTouchPoints, configurable: true });
+    }
+  });
+
   it('keyboard events', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift' }));
@@ -863,8 +1574,8 @@ describe('Viewer measurement & mouse/keyboard events', () => {
 });
 
 describe('Viewer drag and drop & loadFile', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   it('handleDrop with no dataTransfer does nothing', async () => {
@@ -880,20 +1591,20 @@ describe('Viewer drag and drop & loadFile', () => {
 
   it('loadFile with .pcd reads stream', async () => {
     const data = new TextEncoder().encode('VERSION 0.7\nFIELDS x y z\nSIZE 4 4 4\nTYPE F F F\nCOUNT 1 1 1\nWIDTH 1\nHEIGHT 1\nPOINTS 1\nDATA ascii\n0 0 0\n');
-    const f = new File([data], 'foo.pcd');
+    const f = new File([toArrayBuffer(data)], 'foo.pcd');
     await v.loadFile(f);
   });
 
   it('loadFile append=true does not remove cloud', async () => {
     const data = new TextEncoder().encode('VERSION 0.7\nFIELDS x y z\nSIZE 4 4 4\nTYPE F F F\nCOUNT 1 1 1\nWIDTH 1\nHEIGHT 1\nPOINTS 1\nDATA ascii\n0 0 0\n');
-    const f = new File([data], 'foo.pcd');
+    const f = new File([toArrayBuffer(data)], 'foo.pcd');
     await v.loadFile(f, true);
   });
 });
 
 describe('Viewer global error handlers + window resize + animation', () => {
-  let v: Viewer;
-  beforeEach(() => { makeContainer(); v = new Viewer('app'); });
+  let v: CloudViewer;
+  beforeEach(() => { makeContainer(); v = new CloudViewer('app'); });
   afterEach(cleanupContainers);
 
   it('onWindowResize updates renderer & camera', () => {
