@@ -28,7 +28,7 @@ import { FilmMakerViewer } from '../src/film_maker_viewer';
 import { RealtimeViewer } from '../src/realtime_viewer';
 import { inferPointCloudFilename, parseCloudUrlOptions } from '../src/cloudUrlOptions';
 import { parseRealtimeUrlOptions } from '../src/realtimeUrlOptions';
-import { installViewerModeSelector, normalizeViewerMode } from '../src/viewerMode';
+import { getHostViewerMode, installViewerModeSelector, navigateToViewerMode, normalizeViewerMode } from '../src/viewerMode';
 
 function makeContainer(id = 'app'): HTMLElement {
   const c = document.createElement('div');
@@ -183,11 +183,19 @@ describe('Viewer settings panel', () => {
     button.click();
     expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('true');
     expect(button.textContent).toBe('+');
-    expect(button.style.border).toBe('0px');
+    expect(button.style.flex).toBe('0 0 30px');
+    expect(button.style.width).toBe('30px');
+    expect(button.style.height).toBe('30px');
+    expect(button.style.border).toBe('1px solid rgb(102, 102, 102)');
+    expect(button.style.borderRadius).toBe('4px');
     button.click();
     expect(v.settingsPanel?.getAttribute('data-minimized')).toBe('false');
     expect(button.textContent).toBe('-');
+    expect(button.style.flex).toBe('0 0 30px');
+    expect(button.style.width).toBe('30px');
+    expect(button.style.height).toBe('30px');
     expect(button.style.border).toBe('1px solid rgb(102, 102, 102)');
+    expect(button.style.borderRadius).toBe('4px');
   });
 
   it('refreshSettingsItemList preserves preferred selection', () => {
@@ -325,6 +333,18 @@ describe('viewer mode selector', () => {
     expect(normalizeViewerMode('film_maker')).toBe('film_maker');
     expect(normalizeViewerMode('realtime')).toBe('realtime');
     expect(normalizeViewerMode('other')).toBe('cloud');
+  });
+
+  it('uses VS Code host mode and posts mode changes without browser navigation', () => {
+    const host = { postMessage: vi.fn() };
+    (globalThis as any).__Q3DWEB_INITIAL_MODE = 'realtime';
+
+    expect(getHostViewerMode()).toBe('realtime');
+    navigateToViewerMode('film_maker', host);
+
+    expect(host.postMessage).toHaveBeenCalledWith({ type: 'changeMode', mode: 'film_maker' });
+    delete (globalThis as any).__Q3DWEB_INITIAL_MODE;
+    expect(getHostViewerMode()).toBeNull();
   });
 });
 

@@ -4,7 +4,7 @@ import { attachErrorSinks } from './helpers';
 test.describe('mobile touch operation', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
-  test('minimizes the settings menu with a tap and keeps the compact button borderless', async ({ page }) => {
+  test('minimizes the settings menu with a tap and keeps the compact button frame matching the expanded button', async ({ page }) => {
     const { pageErrors } = attachErrorSinks(page);
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__viewer);
@@ -23,11 +23,17 @@ test.describe('mobile touch operation', () => {
         panelBorder: panelStyle.borderTopWidth,
         panelBackground: panelStyle.backgroundColor,
         toggleBorder: toggleStyle.borderTopWidth,
+        toggleBorderRadius: toggleStyle.borderTopLeftRadius,
+        toggleWidth: toggleStyle.width,
+        toggleHeight: toggleStyle.height,
       };
     });
     expect(minimizedStyle.panelBorder).toBe('0px');
     expect(minimizedStyle.panelBackground).toBe('rgba(0, 0, 0, 0)');
-    expect(minimizedStyle.toggleBorder).toBe('0px');
+    expect(minimizedStyle.toggleBorder).toBe('1px');
+    expect(minimizedStyle.toggleBorderRadius).toBe('4px');
+    expect(minimizedStyle.toggleWidth).toBe('30px');
+    expect(minimizedStyle.toggleHeight).toBe('30px');
 
     await button.tap();
     await expect(page.locator('[data-minimized]').first()).toHaveAttribute('data-minimized', 'false');

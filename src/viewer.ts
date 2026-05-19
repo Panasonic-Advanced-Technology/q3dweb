@@ -179,7 +179,7 @@ export class Viewer {
         toggleButton.title = 'Minimize menu';
         toggleButton.setAttribute('aria-label', 'Minimize menu');
         toggleButton.setAttribute('data-role', 'settings-minimize-button');
-        toggleButton.style.cssText = 'flex:0 0 30px;width:30px;height:30px;line-height:26px;background:#333;color:#eee;border:1px solid #666;border-radius:4px;cursor:pointer;font-size:18px;font-family:monospace;padding:0;touch-action:manipulation;';
+        toggleButton.style.cssText = 'flex:0 0 30px;width:30px;height:30px;line-height:26px;box-sizing:border-box;background:#333;color:#eee;border:1px solid #666;border-radius:4px;cursor:pointer;font-size:18px;font-family:monospace;padding:0;touch-action:manipulation;';
         toggleButton.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSettingsPanel(); });
         const titleText = document.createElement('span');
         titleText.textContent = 'Settings';
@@ -232,10 +232,12 @@ export class Viewer {
         this.settingsPanelToggleButton.textContent = minimized ? '+' : '-';
         this.settingsPanelToggleButton.title = minimized ? 'Expand menu' : 'Minimize menu';
         this.settingsPanelToggleButton.setAttribute('aria-label', this.settingsPanelToggleButton.title);
-        this.settingsPanelToggleButton.style.width = minimized ? '40px' : '30px';
-        this.settingsPanelToggleButton.style.height = minimized ? '40px' : '30px';
-        this.settingsPanelToggleButton.style.lineHeight = minimized ? '36px' : '26px';
-        this.settingsPanelToggleButton.style.border = minimized ? '0' : '1px solid #666';
+        this.settingsPanelToggleButton.style.flex = '0 0 30px';
+        this.settingsPanelToggleButton.style.width = '30px';
+        this.settingsPanelToggleButton.style.height = '30px';
+        this.settingsPanelToggleButton.style.lineHeight = '26px';
+        this.settingsPanelToggleButton.style.border = '1px solid #666';
+        this.settingsPanelToggleButton.style.borderRadius = '4px';
     }
 
     refreshSettingsItemList(preferredSelection?: string) {

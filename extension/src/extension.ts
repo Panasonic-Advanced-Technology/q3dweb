@@ -3,6 +3,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as v8 from 'v8';
 
+type ViewerMode = 'cloud' | 'film_maker' | 'realtime';
+
+function normalizeViewerMode(mode: unknown): ViewerMode {
+    return mode === 'film_maker' || mode === 'realtime' ? mode : 'cloud';
+}
+
 export function activate(context: vscode.ExtensionContext) {
     // Register the custom editor provider
     context.subscriptions.push(
@@ -60,19 +66,39 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
         };
 
         let webviewReady = false;
+        let currentMode: ViewerMode = 'cloud';
+        let webviewGeneration = 0;
         const tryUpdateWebview = () => {
-            if (webviewReady) {
-                void this.updateWebview(webviewPanel, document);
+            if (webviewReady && currentMode !== 'realtime') {
+                const generation = webviewGeneration;
+                void this.updateWebview(
+                    webviewPanel,
+                    document,
+                    () => webviewReady && currentMode !== 'realtime' && generation === webviewGeneration
+                );
             }
+        };
+
+        const reloadWebview = (mode: ViewerMode) => {
+            currentMode = mode;
+            webviewReady = false;
+            webviewGeneration += 1;
+            webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, currentMode);
         };
 
         // Receive messages before setting HTML to avoid missing an early "ready".
         const messageSubscription = webviewPanel.webview.onDidReceiveMessage(async e => {
             switch (e.type) {
                 case 'ready':
+                    currentMode = normalizeViewerMode(e.mode ?? currentMode);
                     webviewReady = true;
                     tryUpdateWebview();
                     return;
+                case 'changeMode': {
+                    const nextMode = normalizeViewerMode(e.mode);
+                    if (nextMode !== currentMode) reloadWebview(nextMode);
+                    return;
+                }
                 case 'saveVideo': {
                     try {
                         const defaultName = typeof e.filename === 'string' && e.filename ? e.filename : 'q3dweb.webm';
@@ -102,7 +128,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
             }
         });
 
-        webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
+        webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, currentMode);
 
         // Listen for changes in the document (file change on disk)
         const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(_e => {
@@ -126,12 +152,9 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
         });
     }
 
-    private getHtmlForWebview(webview: vscode.Webview): string {
+    private getHtmlForWebview(webview: vscode.Webview, mode: ViewerMode): string {
         const scriptUri = webview.asWebviewUri(vscode.Uri.file(
             path.join(this.context.extensionPath, 'webview-dist', 'assets', 'main.js')
-        ));
-        const viewerChunkUri = webview.asWebviewUri(vscode.Uri.file(
-            path.join(this.context.extensionPath, 'webview-dist', 'assets', 'viewer.js')
         ));
         const styleUri = webview.asWebviewUri(vscode.Uri.file(
             path.join(this.context.extensionPath, 'webview-dist', 'assets', 'viewer.css')
@@ -146,7 +169,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; connect-src 'self' data: blob: ${webview.cspSource} https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://cyberjapandata.gsi.go.jp; img-src ${webview.cspSource} 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://cyberjapandata.gsi.go.jp; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource} 'unsafe-eval' 'wasm-unsafe-eval';">
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; connect-src 'self' data: blob: ${webview.cspSource} https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://cyberjapandata.gsi.go.jp ws: wss:; img-src ${webview.cspSource} 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://cyberjapandata.gsi.go.jp; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource} 'unsafe-eval' 'wasm-unsafe-eval';">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <link rel="stylesheet" type="text/css" href="${styleUri}" />
                 <title>q3dviewer</title>
@@ -158,6 +181,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
             <body>
                 <div id="app"></div>
                 <script nonce="${nonce}">
+                    globalThis.__Q3DWEB_INITIAL_MODE = ${JSON.stringify(mode)};
                     globalThis.__Q3DWEB_HOST_HEAP_LIMIT_BYTES = ${heapBudget.hostHeapLimitBytes};
                     globalThis.__Q3DWEB_HOST_HEAP_USED_BYTES = ${heapBudget.hostHeapUsedBytes};
                 </script>
@@ -169,8 +193,13 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
     /**
      * Send data to webview
      */
-    private async updateWebview(webviewPanel: vscode.WebviewPanel, document: PcdDocument) {
+    private async updateWebview(
+        webviewPanel: vscode.WebviewPanel,
+        document: PcdDocument,
+        shouldContinue: () => boolean = () => true,
+    ) {
         try {
+             if (!shouldContinue()) return;
              if (document.uri.scheme === 'file') {
                  const filePath = document.uri.fsPath;
                  const stats = fs.statSync(filePath);
@@ -181,7 +210,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
                  const heapBudget = getNodeHeapBudget();
                  
                  const startDelivered = await webviewPanel.webview.postMessage({ type: 'startStream', totalSize, filename: path.basename(filePath), ...heapBudget });
-                 if (!startDelivered) {
+                 if (!startDelivered || !shouldContinue()) {
                      console.warn('Webview is not ready to receive startStream message.');
                      fs.closeSync(fd);
                      return;
@@ -189,7 +218,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
 
                  let offset = 0;
                  try {
-                     while (offset < totalSize) {
+                     while (offset < totalSize && shouldContinue()) {
                          const bytesRead = fs.readSync(fd, buffer, 0, chunkSize, offset);
                          const dataToSend = new Uint8Array(buffer.subarray(0, bytesRead));
                          
@@ -198,7 +227,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
                              data: dataToSend,
                              offset 
                          });
-                         if (!delivered) {
+                         if (!delivered || !shouldContinue()) {
                              console.warn('Webview rejected a chunk message. Stopping stream.');
                              break;
                          }
@@ -208,7 +237,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
                          await new Promise(resolve => setTimeout(resolve, 1));
                      }
                      
-                     await webviewPanel.webview.postMessage({ type: 'endStream' });
+                     if (shouldContinue()) await webviewPanel.webview.postMessage({ type: 'endStream' });
                      
                  } catch(err) {
                     console.error("Error reading file chunks", err);
@@ -220,6 +249,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
                  // Fallback for non-file schemes (e.g. remote)
                  const fileData = await vscode.workspace.fs.readFile(document.uri);
                  const heapBudget = getNodeHeapBudget();
+                 if (!shouldContinue()) return;
                  webviewPanel.webview.postMessage({
                      type: 'loadData',
                      value: fileData,

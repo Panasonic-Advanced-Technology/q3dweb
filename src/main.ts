@@ -2,7 +2,7 @@ import './style.css'
 import { FilmMakerViewer } from './film_maker_viewer';
 import { RealtimeViewer } from './realtime_viewer';
 import { CloudViewer } from './cloud_viewer';
-import { installViewerModeSelector, normalizeViewerMode } from './viewerMode';
+import { getHostViewerMode, installViewerModeSelector, navigateToViewerMode, normalizeViewerMode } from './viewerMode';
 import { configureSamplingHeapBudget } from './parsers/sampling';
 import { parseRealtimeUrlOptions } from './realtimeUrlOptions';
 import { parseCloudUrlOptions } from './cloudUrlOptions';
@@ -39,15 +39,23 @@ declare function acquireVsCodeApi(): any;
 
 // Initialize Viewer
 try {
+    let vscode: any = null;
+    try {
+        vscode = acquireVsCodeApi();
+        console.log("VS Code API detected");
+    } catch(e) {
+        console.log("Running in Standalone mode");
+    }
+
     const params = new URLSearchParams(window.location.search);
-    const mode = normalizeViewerMode(params.get('mode'));
+    const mode = getHostViewerMode() ?? normalizeViewerMode(params.get('mode'));
     const realtimeOptions = mode === 'realtime' ? parseRealtimeUrlOptions(params) : undefined;
     const cloudOptions = mode === 'cloud' ? parseCloudUrlOptions(params) : undefined;
     const viewer: CloudViewer | RealtimeViewer =
         mode === 'realtime'   ? new RealtimeViewer('app', realtimeOptions) :
         mode === 'film_maker' ? new FilmMakerViewer('app') :
                                 new CloudViewer('app', cloudOptions);  // default: no param or ?mode=cloud
-    installViewerModeSelector(viewer, mode);
+    installViewerModeSelector(viewer, mode, nextMode => navigateToViewerMode(nextMode, vscode));
 
     if (mode === 'realtime' && viewer instanceof RealtimeViewer) {
         if (realtimeOptions?.rosbridgeUrl) {
@@ -65,15 +73,6 @@ try {
     (window as any).__viewer = viewer;
     console.log("q3dviewer Initialized.");
     
-    // Check if running in VS Code
-    let vscode: any = null;
-    try {
-        vscode = acquireVsCodeApi();
-        console.log("VS Code API detected");
-    } catch(e) {
-        console.log("Running in Standalone mode");
-    }
-
     if (vscode) {
         // Share vscode API with the viewer (for host-side file save dialogs, etc.)
         (viewer as any).vscode = vscode;
@@ -114,7 +113,7 @@ try {
         });
 
         // Signal readiness
-        vscode.postMessage({ type: 'ready' });
+        vscode.postMessage({ type: 'ready', mode });
     } else {
         // Standalone Mode
         console.log("Drag and drop a point cloud file (.pcd, .ply, .las, .laz, .e57) to view it.");

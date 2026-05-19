@@ -12,11 +12,24 @@ export interface ViewerModeSelectorHost {
     settingsPanel: HTMLElement | null;
 }
 
+export interface ViewerModeHostApi {
+    postMessage(message: { type: 'changeMode'; mode: ViewerMode }): void;
+}
+
 export function normalizeViewerMode(mode: string | null): ViewerMode {
     return mode === 'film_maker' || mode === 'realtime' ? mode : 'cloud';
 }
 
-export function navigateToViewerMode(mode: ViewerMode): void {
+export function getHostViewerMode(): ViewerMode | null {
+    const hostMode = (globalThis as { __Q3DWEB_INITIAL_MODE?: unknown }).__Q3DWEB_INITIAL_MODE;
+    return typeof hostMode === 'string' ? normalizeViewerMode(hostMode) : null;
+}
+
+export function navigateToViewerMode(mode: ViewerMode, host?: ViewerModeHostApi | null): void {
+    if (host) {
+        host.postMessage({ type: 'changeMode', mode });
+        return;
+    }
     const url = new URL(window.location.href);
     url.searchParams.set('mode', mode);
     window.location.assign(url.toString());
