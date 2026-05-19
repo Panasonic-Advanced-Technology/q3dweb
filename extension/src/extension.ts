@@ -157,7 +157,7 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
             path.join(this.context.extensionPath, 'webview-dist', 'assets', 'main.js')
         ));
         const styleUri = webview.asWebviewUri(vscode.Uri.file(
-            path.join(this.context.extensionPath, 'webview-dist', 'assets', 'viewer.css')
+            path.join(this.context.extensionPath, 'webview-dist', 'assets', 'main.css')
         ));
 
         // Use a nonce to whitelist which scripts can be run
