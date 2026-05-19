@@ -1284,6 +1284,37 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     }
   });
 
+  it('two-finger pointer pitch keeps distance from the rotation center during staggered finger movement', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+      v.cameraDist = 40;
+      v.updateCamera();
+
+      const canvas = v.renderer.domElement;
+      const beforeEuler = [...v.euler];
+      const beforeCameraDist = v.cameraDist;
+      const beforeCenterDistance = v.camera.position.distanceTo(v.cameraCenter);
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 180));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 220, 180));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 100, 60));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 60));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 100, 60));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 220, 60));
+
+      expect(v.euler[0] - beforeEuler[0]).toBeGreaterThan(0.3);
+      expect(v.cameraDist).toBeCloseTo(beforeCameraDist, 6);
+      expect(v.camera.position.distanceTo(v.cameraCenter)).toBeCloseTo(beforeCenterDistance, 6);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
   it('one-finger touch panning scales with distance from the rotation center', () => {
     const originalPointerEvent = (window as any).PointerEvent;
     try {

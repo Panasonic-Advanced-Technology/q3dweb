@@ -37,6 +37,7 @@ interface TouchPoint { x: number; y: number; }
 
 interface TouchGestureState {
     mode: 'none' | 'single' | 'multi';
+    multiIntent: 'undecided' | 'pitch' | 'pinch';
     lastPoint: TouchPoint | null;
     lastCenter: TouchPoint | null;
     lastDistance: number;
@@ -46,7 +47,8 @@ interface TouchGestureState {
 const TOUCH_PAN_SPEED = 1;
 const TOUCH_PINCH_ZOOM_SPEED = 0.01;
 const TOUCH_TWO_FINGER_PITCH_SPEED = 0.2 * Math.PI / 180;
-const TOUCH_PITCH_PINCH_SUPPRESSION_RATIO = 0.75;
+const TOUCH_PITCH_PINCH_SUPPRESSION_RATIO = 1;
+const TOUCH_MULTI_INTENT_THRESHOLD_PX = 2;
 
 function isEditable(t: EventTarget | null): boolean {
     if (!t) return false;
@@ -98,6 +100,13 @@ function shouldApplyPinchZoom(pinchDelta: number, centerDeltaY: number): boolean
     return Math.abs(pinchDelta) > Math.abs(centerDeltaY) * TOUCH_PITCH_PINCH_SUPPRESSION_RATIO;
 }
 
+function detectMultiTouchIntent(pinchDelta: number, centerDeltaY: number): TouchGestureState['multiIntent'] {
+    const pinchMagnitude = Math.abs(pinchDelta);
+    const pitchMagnitude = Math.abs(centerDeltaY);
+    if (pinchMagnitude < TOUCH_MULTI_INTENT_THRESHOLD_PX && pitchMagnitude < TOUCH_MULTI_INTENT_THRESHOLD_PX) return 'undecided';
+    return shouldApplyPinchZoom(pinchDelta, centerDeltaY) ? 'pinch' : 'pitch';
+}
+
 function isTouchLikePointer(e: PointerEvent): boolean {
     return e.pointerType === 'touch' || e.pointerType === 'pen';
 }
@@ -105,6 +114,7 @@ function isTouchLikePointer(e: PointerEvent): boolean {
 export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void {
     const touchState: TouchGestureState = {
         mode: 'none',
+        multiIntent: 'undecided',
         lastPoint: null,
         lastCenter: null,
         lastDistance: 0,
@@ -114,6 +124,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
 
     const resetTouchState = (): void => {
         touchState.mode = 'none';
+        touchState.multiIntent = 'undecided';
         touchState.lastPoint = null;
         touchState.lastCenter = null;
         touchState.lastDistance = 0;
@@ -123,6 +134,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
     const startTouchGesture = (points: TouchPoint[]): void => {
         if (points.length === 1) {
             touchState.mode = 'single';
+            touchState.multiIntent = 'undecided';
             touchState.lastPoint = points[0];
             touchState.lastCenter = null;
             touchState.lastDistance = 0;
@@ -131,6 +143,7 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
         }
         if (points.length >= 2) {
             touchState.mode = 'multi';
+            touchState.multiIntent = 'undecided';
             touchState.lastPoint = null;
             touchState.lastCenter = centerBetweenPoints(points);
             touchState.lastDistance = distanceBetweenPoints(points);
@@ -163,8 +176,12 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
             const pinchDelta = pinchDistance - touchState.lastDistance;
             const centerDeltaY = center.y - touchState.lastCenter.y;
             const pitchDelta = -centerDeltaY * TOUCH_TWO_FINGER_PITCH_SPEED;
+            const pinchZoomFrame = shouldApplyPinchZoom(pinchDelta, centerDeltaY);
+            if (touchState.multiIntent === 'undecided') {
+                touchState.multiIntent = detectMultiTouchIntent(pinchDelta, centerDeltaY);
+            }
             if (pitchDelta !== 0 || angleDelta !== 0) ctx.rotateCam(pitchDelta, 0, angleDelta);
-            if (shouldApplyPinchZoom(pinchDelta, centerDeltaY)) {
+            if (touchState.multiIntent === 'pinch' && pinchZoomFrame) {
                 ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
             }
             touchState.lastCenter = center;
