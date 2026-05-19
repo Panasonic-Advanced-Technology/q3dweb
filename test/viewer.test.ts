@@ -1148,7 +1148,7 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     canvas.dispatchEvent(new MouseEvent('mousemove'));
   });
 
-  it('touch gestures pan, two-finger twist rotate, and pinch zoom', () => {
+  it('touch gestures pan, two-finger twist/pitch rotate, and pinch zoom', () => {
     const originalPointerEvent = (window as any).PointerEvent;
     try {
       delete (window as any).PointerEvent;
@@ -1172,14 +1172,21 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 100 }, { x: 200, y: 100 }]));
       canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 130, y: 80 }, { x: 240, y: 140 }]));
       canvas.dispatchEvent(makeTouchEvent('touchend', []));
-      expect(Math.abs(v.euler[2] - beforeTwoFingerEuler[2])).toBeGreaterThan(0.2);
+      expect(v.euler[2] - beforeTwoFingerEuler[2]).toBeGreaterThan(0.2);
       expect(v.cameraDist).toBeLessThan(beforeDist - 6);
+
+      const beforeParallelEuler = [...v.euler];
+      canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 180 }, { x: 220, y: 180 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 100, y: 120 }, { x: 220, y: 120 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchend', []));
+      expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.15);
+      expect(Math.abs(v.euler[2] - beforeParallelEuler[2])).toBeLessThan(0.001);
     } finally {
       if (originalPointerEvent !== undefined) (window as any).PointerEvent = originalPointerEvent;
     }
   });
 
-  it('pointer touch gestures pan, two-finger twist rotate, and pinch zoom', () => {
+  it('pointer touch gestures pan, two-finger twist/pitch rotate, and pinch zoom', () => {
     const originalPointerEvent = (window as any).PointerEvent;
     try {
       (window as any).PointerEvent = function PointerEvent() {};
@@ -1205,8 +1212,18 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       canvas.dispatchEvent(makePointerEvent('pointermove', 2, 240, 140));
       canvas.dispatchEvent(makePointerEvent('pointerup', 1, 120, 80));
       canvas.dispatchEvent(makePointerEvent('pointerup', 2, 240, 140));
-      expect(Math.abs(v.euler[2] - beforeTwoFingerEuler[2])).toBeGreaterThan(0.2);
+      expect(v.euler[2] - beforeTwoFingerEuler[2]).toBeGreaterThan(0.2);
       expect(v.cameraDist).toBeLessThan(beforeDist);
+
+      const beforeParallelEuler = [...v.euler];
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 180));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 220, 180));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 100, 120));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 220, 120));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 100, 120));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 220, 120));
+      expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.15);
+      expect(Math.abs(v.euler[2] - beforeParallelEuler[2])).toBeLessThan(0.001);
     } finally {
       if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
       else (window as any).PointerEvent = originalPointerEvent;

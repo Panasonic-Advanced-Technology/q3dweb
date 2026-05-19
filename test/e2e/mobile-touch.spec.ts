@@ -35,7 +35,7 @@ test.describe('mobile touch operation', () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test('one-finger pan and two-finger twist rotate/pinch update the camera without measurement mode', async ({ page }) => {
+  test('one-finger pan and two-finger twist/pitch rotate update the camera without measurement mode', async ({ page }) => {
     const { pageErrors } = attachErrorSinks(page);
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__viewer);
@@ -72,16 +72,25 @@ test.describe('mobile touch operation', () => {
       dispatchPointer('pointerup', 1, 120, 80, 0);
       dispatchPointer('pointerup', 2, 245, 145, 0);
 
-      const eulerDelta = Math.max(
-        Math.abs(viewer.euler[0] - beforeEuler[0]),
-        Math.abs(viewer.euler[1] - beforeEuler[1]),
-        Math.abs(viewer.euler[2] - beforeEuler[2]),
-      );
+      const twistYawDelta = viewer.euler[2] - beforeEuler[2];
+
+      const beforeParallelEuler = [...viewer.euler];
+      dispatchPointer('pointerdown', 1, 100, 180, 1);
+      dispatchPointer('pointerdown', 2, 220, 180, 1);
+      dispatchPointer('pointermove', 1, 100, 120, 1);
+      dispatchPointer('pointermove', 2, 220, 120, 1);
+      dispatchPointer('pointerup', 1, 100, 120, 0);
+      dispatchPointer('pointerup', 2, 220, 120, 0);
+
+      const parallelPitchDelta = viewer.euler[0] - beforeParallelEuler[0];
+      const parallelYawDelta = Math.abs(viewer.euler[2] - beforeParallelEuler[2]);
 
       return {
         isTouchPrimaryDevice: viewer.isTouchPrimaryDevice,
         panDistance,
-        eulerDelta,
+        twistYawDelta,
+        parallelPitchDelta,
+        parallelYawDelta,
         distanceDelta: Math.abs(viewer.cameraDist - beforeDistance),
         selectedPointCount: viewer.selectedPoints.length,
       };
@@ -89,7 +98,9 @@ test.describe('mobile touch operation', () => {
 
     expect(result.isTouchPrimaryDevice).toBe(true);
     expect(result.panDistance).toBeGreaterThan(0);
-    expect(result.eulerDelta).toBeGreaterThan(0.1);
+    expect(result.twistYawDelta).toBeGreaterThan(0.1);
+    expect(result.parallelPitchDelta).toBeGreaterThan(0.1);
+    expect(result.parallelYawDelta).toBeLessThan(0.01);
     expect(result.distanceDelta).toBeGreaterThan(0);
     expect(result.selectedPointCount).toBe(0);
     expect(pageErrors).toEqual([]);
