@@ -20,7 +20,7 @@ export function parsePointChunksSampled(chunks: Array<any>, max_points: number, 
 
 /**
  * Parse the first point cloud of an E57 file.
- * Returns recentered positions (xyz interleaved), colors (rgb 0..255 interleaved) and
+ * Returns original positions (xyz interleaved), colors (rgb 0..255 interleaved) and
  * intensities (0..255 normalized by the library based on the intensity limits).
  */
 export function parsePoints(data: Uint8Array): Points;

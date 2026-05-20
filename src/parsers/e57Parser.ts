@@ -30,7 +30,7 @@ function mergeChunks(chunks: readonly Uint8Array[], totalBytes: number): Uint8Ar
     return merged;
 }
 
-/** Parse an E57 file. Recenters points around their mean for float32 stability. */
+/** Parse an E57 file while preserving the original scanner coordinates. */
 export async function parseE57(data: E57Input, maxPoints: number, sourceBytes: number = getInputByteLength(data)): Promise<ParsedCloud> {
     const inputBytes = getInputByteLength(data);
     console.log(`E57: parsing ${inputBytes} bytes via vendor/e57-wasm...`);
