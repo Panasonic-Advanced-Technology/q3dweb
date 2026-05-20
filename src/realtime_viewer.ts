@@ -44,11 +44,19 @@ export class RealtimeViewer extends Viewer {
     private readonly odomItemName = 'odom';
     realtimeMaxPoints: number = 5_000_000;
 
+    private get nativeRenderer(): THREE.WebGLRenderer {
+        return this.renderer as THREE.WebGLRenderer;
+    }
+
     constructor(containerId: string, options: RealtimeUrlOptions = {}) {
         super(containerId);
         this.setRealtimeOptions(options);
         this.setupRealtimeItems();
         this.installRealtimeSection();
+    }
+
+    protected override createRenderer(): THREE.WebGLRenderer {
+        return new THREE.WebGLRenderer({ antialias: true });
     }
 
     /** Inserts the realtime connection panel above the item dropdown and settings area. */
@@ -249,7 +257,7 @@ export class RealtimeViewer extends Viewer {
         super.render();
         const map = this.items[this.mapItemName];
         if (map instanceof NativeCloudItem) {
-            map.draw(this.renderer, this.camera);
+            map.draw(this.nativeRenderer, this.camera);
         }
 
         if (this.pendingChunks.length > 0 || this.pendingScanChunk) {
@@ -354,7 +362,7 @@ export class RealtimeViewer extends Viewer {
                 const chunk = this.pendingChunks.shift();
                 if (!chunk) break;
 
-                map.appendPoints(this.renderer, chunk.positions, chunk.values, chunk.maxAccumulatedPoints);
+                map.appendPoints(this.nativeRenderer, chunk.positions, chunk.values, chunk.maxAccumulatedPoints);
                 applied++;
                 lastScanCount = chunk.values.length;
             }

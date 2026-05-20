@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WebGPURenderer } from 'three/webgpu';
 import { AxisItem } from './items/AxisItem';
 import { GridItem } from './items/GridItem';
 import { Text2DItem } from './items/Text2DItem';
@@ -26,11 +27,13 @@ interface SettingBuilder { addSetting(container: HTMLElement): void; }
 let globalErrorViewer: Viewer | null = null;
 let globalErrorHandlersInstalled = false;
 
+export type ViewerRenderer = THREE.WebGLRenderer | WebGPURenderer;
+
 export class Viewer {
     container: HTMLElement;
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
-    renderer: THREE.WebGLRenderer;
+    renderer: ViewerRenderer;
     items: { [name: string]: THREE.Object3D } = {};
     hiddenSettingItems: Set<string> = new Set();
 
@@ -64,6 +67,8 @@ export class Viewer {
 
     rendererPixelRatio: number = 1;
     isTouchPrimaryDevice: boolean = false;
+    private rendererReady: boolean = false;
+    private rendererInitPromise: Promise<void> | null = null;
 
     constructor(containerId: string) {
         const container = document.getElementById(containerId);
@@ -79,7 +84,7 @@ export class Viewer {
         this.scene.background = new THREE.Color(0x000000);
         this.camera = new THREE.PerspectiveCamera(60, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
         this.camera.up.set(0, 0, 1);
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer = this.createRenderer();
         this.rendererPixelRatio = this.getBaseRendererPixelRatio();
         this.renderer.setPixelRatio(this.rendererPixelRatio);
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
@@ -94,6 +99,47 @@ export class Viewer {
         this.createSettingsPanel();
         window.addEventListener('resize', this.onWindowResize.bind(this), false);
         this.startAnimationLoop();
+        void this.initializeRenderer().catch((error) => {
+            this.handleRendererInitializationError(error);
+        });
+    }
+
+    protected createRenderer(): ViewerRenderer {
+        return new WebGPURenderer({ antialias: true });
+    }
+
+    protected async initializeRenderer(): Promise<void> {
+        if (this.rendererInitPromise) {
+            await this.rendererInitPromise;
+            return;
+        }
+
+        this.rendererInitPromise = (async () => {
+            const maybeInit = (this.renderer as { init?: () => Promise<void> }).init;
+            if (typeof maybeInit === 'function') {
+                await maybeInit.call(this.renderer);
+            }
+
+            this.renderer.setPixelRatio(this.rendererPixelRatio);
+            this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+            this.rendererReady = true;
+            this.requestRender();
+        })();
+
+        try {
+            await this.rendererInitPromise;
+        } catch (error) {
+            this.rendererInitPromise = null;
+            throw error;
+        }
+    }
+
+    protected handleRendererInitializationError(error: unknown): void {
+        console.error('Renderer initialization failed:', error);
+        if (this.statusElement) {
+            this.statusElement.textContent = 'Renderer initialization failed';
+            this.statusElement.style.backgroundColor = 'rgba(255,0,0,0.8)';
+        }
     }
 
     addDefaultItems() {
@@ -400,5 +446,9 @@ export class Viewer {
         loop();
     }
 
-    render() { this.renderRequested = false; this.renderer.render(this.scene, this.camera); }
+    render() {
+        this.renderRequested = false;
+        if (!this.rendererReady) return;
+        this.renderer.render(this.scene, this.camera);
+    }
 }

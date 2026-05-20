@@ -1,4 +1,27 @@
+import { vi } from 'vitest';
+
 // Test setup: polyfills for jsdom environment
+
+vi.mock('three/webgpu', async () => {
+  const actual = await vi.importActual<any>('three');
+  class FakeWebGPURenderer {
+    domElement: HTMLCanvasElement;
+    capabilities = { isWebGL2: true, maxTextures: 16 };
+    readonly isWebGPURenderer = true;
+    constructor(_params?: any) {
+      this.domElement = document.createElement('canvas');
+    }
+    async init() {}
+    setPixelRatio() {}
+    setSize(w: number, h: number) {
+      this.domElement.width = w;
+      this.domElement.height = h;
+    }
+    render() {}
+    dispose() {}
+  }
+  return { ...actual, WebGPURenderer: FakeWebGPURenderer };
+});
 
 if (typeof (globalThis as any).ImageData === 'undefined') {
   (globalThis as any).ImageData = class ImageData {

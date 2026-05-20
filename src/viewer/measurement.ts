@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 
 export interface MeasurementContext {
-    renderer: THREE.WebGLRenderer;
+    renderer: { domElement: HTMLCanvasElement };
     camera: THREE.PerspectiveCamera;
     items: { [name: string]: THREE.Object3D };
     centerPointMesh: THREE.Points | null;
