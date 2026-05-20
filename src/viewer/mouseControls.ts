@@ -37,7 +37,7 @@ interface TouchPoint { x: number; y: number; }
 
 interface TouchGestureState {
     mode: 'none' | 'single' | 'multi';
-    multiIntent: 'undecided' | 'pitch' | 'pinch';
+    multiIntent: 'undecided' | 'pitch' | 'yaw' | 'pinch';
     lastPoint: TouchPoint | null;
     lastCenter: TouchPoint | null;
     intentStartCenter: TouchPoint | null;
@@ -54,6 +54,7 @@ const TOUCH_TWO_FINGER_YAW_SPEED = 0.2 * Math.PI / 180;
 const TOUCH_PITCH_PINCH_SUPPRESSION_RATIO = 1;
 const TOUCH_MULTI_INTENT_THRESHOLD_PX = 2;
 const TOUCH_MULTI_INTENT_ANGLE_THRESHOLD = 2 * Math.PI / 180;
+const TOUCH_HORIZONTAL_YAW_INTENT_ANGLE_LIMIT = 20 * Math.PI / 180;
 
 function isEditable(t: EventTarget | null): boolean {
     if (!t) return false;
@@ -126,10 +127,19 @@ function detectMultiTouchIntent(
     if (
         pinchMagnitude >= TOUCH_MULTI_INTENT_THRESHOLD_PX
         && horizontalMagnitude >= TOUCH_MULTI_INTENT_THRESHOLD_PX
-        && pitchMagnitude < TOUCH_MULTI_INTENT_THRESHOLD_PX
-        && angleMagnitude < TOUCH_MULTI_INTENT_ANGLE_THRESHOLD
+        && pinchMagnitude > horizontalMagnitude * 1.1
+        && horizontalMagnitude > pitchMagnitude * 1.25
+        && angleMagnitude < TOUCH_HORIZONTAL_YAW_INTENT_ANGLE_LIMIT
     ) {
         return 'undecided';
+    }
+    if (
+        horizontalMagnitude >= TOUCH_MULTI_INTENT_THRESHOLD_PX
+        && horizontalMagnitude > pinchMagnitude * 1.25
+        && horizontalMagnitude > pitchMagnitude * 1.25
+        && angleMagnitude < TOUCH_HORIZONTAL_YAW_INTENT_ANGLE_LIMIT
+    ) {
+        return 'yaw';
     }
     return shouldApplyPinchZoom(pinchDelta, centerDeltaY) ? 'pinch' : 'pitch';
 }
@@ -237,7 +247,10 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
                     normalizeAngleDelta(angle - touchState.intentStartAngle),
                 );
             }
-            if (pitchDelta !== 0 || yawDelta !== 0 || angleDelta !== 0) ctx.rotateCam(pitchDelta, 0, yawDelta + angleDelta);
+            const effectiveAngleDelta = touchState.multiIntent === 'yaw' ? 0 : angleDelta;
+            if (pitchDelta !== 0 || yawDelta !== 0 || effectiveAngleDelta !== 0) {
+                ctx.rotateCam(pitchDelta, 0, yawDelta + effectiveAngleDelta);
+            }
             if (touchState.multiIntent === 'pinch' && pinchZoomFrame) {
                 ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
             }

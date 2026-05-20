@@ -1332,6 +1332,33 @@ describe('Viewer measurement & mouse/keyboard events', () => {
     }
   });
 
+  it('pointer touch horizontal swipe keeps yaw even with slight finger skew', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+
+      const canvas = v.renderer.domElement;
+      const beforeEuler = [...v.euler];
+      const beforeDist = v.cameraDist;
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 180));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 220, 180));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 150, 176));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 272, 186));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 150, 176));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 272, 186));
+
+      expect(v.euler[2] - beforeEuler[2]).toBeLessThan(-0.08);
+      expect(Math.abs(v.cameraDist - beforeDist)).toBeLessThan(0.001);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
   it('two-finger pointer pitch keeps distance from the rotation center during staggered finger movement', () => {
     const originalPointerEvent = (window as any).PointerEvent;
     try {
