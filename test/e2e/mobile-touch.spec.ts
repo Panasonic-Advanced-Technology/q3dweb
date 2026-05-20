@@ -135,6 +135,31 @@ test.describe('mobile touch operation', () => {
       const parallelDistanceDelta = Math.abs(viewer.cameraDist - beforeParallelDistance);
       const parallelCenterDistanceDelta = Math.abs(viewer.camera.position.distanceTo(viewer.cameraCenter) - beforeParallelCenterDistance);
 
+      const beforeHorizontalEuler = [...viewer.euler];
+      const beforeHorizontalDistance = viewer.cameraDist;
+      dispatchPointer('pointerdown', 1, 100, 180, 1);
+      dispatchPointer('pointerdown', 2, 220, 180, 1);
+      dispatchPointer('pointermove', 1, 160, 180, 1);
+      dispatchPointer('pointermove', 2, 280, 180, 1);
+      dispatchPointer('pointerup', 1, 160, 180, 0);
+      dispatchPointer('pointerup', 2, 280, 180, 0);
+
+      const horizontalYawDelta = viewer.euler[2] - beforeHorizontalEuler[2];
+      const horizontalPitchDelta = Math.abs(viewer.euler[0] - beforeHorizontalEuler[0]);
+      const horizontalDistanceDelta = Math.abs(viewer.cameraDist - beforeHorizontalDistance);
+
+      const beforeSkewedHorizontalEuler = [...viewer.euler];
+      const beforeSkewedHorizontalDistance = viewer.cameraDist;
+      dispatchPointer('pointerdown', 1, 100, 180, 1);
+      dispatchPointer('pointerdown', 2, 220, 180, 1);
+      dispatchPointer('pointermove', 1, 150, 176, 1);
+      dispatchPointer('pointermove', 2, 272, 186, 1);
+      dispatchPointer('pointerup', 1, 150, 176, 0);
+      dispatchPointer('pointerup', 2, 272, 186, 0);
+
+      const skewedHorizontalYawDelta = viewer.euler[2] - beforeSkewedHorizontalEuler[2];
+      const skewedHorizontalDistanceDelta = Math.abs(viewer.cameraDist - beforeSkewedHorizontalDistance);
+
       return {
         isTouchPrimaryDevice: viewer.isTouchPrimaryDevice,
         panDistance,
@@ -145,6 +170,11 @@ test.describe('mobile touch operation', () => {
         parallelYawDelta,
         parallelDistanceDelta,
         parallelCenterDistanceDelta,
+        horizontalYawDelta,
+        horizontalPitchDelta,
+        horizontalDistanceDelta,
+        skewedHorizontalYawDelta,
+        skewedHorizontalDistanceDelta,
         distanceDelta: Math.abs(viewer.cameraDist - beforeDistance),
         selectedPointCount: viewer.selectedPoints.length,
       };
@@ -159,6 +189,11 @@ test.describe('mobile touch operation', () => {
     expect(result.parallelYawDelta).toBeLessThan(0.01);
     expect(result.parallelDistanceDelta).toBeLessThan(0.01);
     expect(result.parallelCenterDistanceDelta).toBeLessThan(0.01);
+    expect(result.horizontalYawDelta).toBeLessThan(-0.08);
+    expect(result.horizontalPitchDelta).toBeLessThan(0.01);
+    expect(result.horizontalDistanceDelta).toBeLessThan(0.01);
+    expect(result.skewedHorizontalYawDelta).toBeLessThan(-0.08);
+    expect(result.skewedHorizontalDistanceDelta).toBeLessThan(0.01);
     expect(result.distanceDelta).toBeGreaterThan(0);
     expect(result.selectedPointCount).toBe(0);
     expect(pageErrors).toEqual([]);

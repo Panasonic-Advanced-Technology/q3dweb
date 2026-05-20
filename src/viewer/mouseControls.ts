@@ -37,18 +37,24 @@ interface TouchPoint { x: number; y: number; }
 
 interface TouchGestureState {
     mode: 'none' | 'single' | 'multi';
-    multiIntent: 'undecided' | 'pitch' | 'pinch';
+    multiIntent: 'undecided' | 'pitch' | 'yaw' | 'pinch';
     lastPoint: TouchPoint | null;
     lastCenter: TouchPoint | null;
+    intentStartCenter: TouchPoint | null;
     lastDistance: number;
+    intentStartDistance: number;
     lastAngle: number;
+    intentStartAngle: number;
 }
 
 const TOUCH_PAN_SPEED = 1;
 const TOUCH_PINCH_ZOOM_SPEED = 0.01;
 const TOUCH_TWO_FINGER_PITCH_SPEED = 0.2 * Math.PI / 180;
+const TOUCH_TWO_FINGER_YAW_SPEED = 0.2 * Math.PI / 180;
 const TOUCH_PITCH_PINCH_SUPPRESSION_RATIO = 1;
 const TOUCH_MULTI_INTENT_THRESHOLD_PX = 2;
+const TOUCH_MULTI_INTENT_ANGLE_THRESHOLD = 2 * Math.PI / 180;
+const TOUCH_HORIZONTAL_YAW_INTENT_ANGLE_LIMIT = 20 * Math.PI / 180;
 
 function isEditable(t: EventTarget | null): boolean {
     if (!t) return false;
@@ -100,15 +106,50 @@ function shouldApplyPinchZoom(pinchDelta: number, centerDeltaY: number): boolean
     return Math.abs(pinchDelta) > Math.abs(centerDeltaY) * TOUCH_PITCH_PINCH_SUPPRESSION_RATIO;
 }
 
-function detectMultiTouchIntent(pinchDelta: number, centerDeltaY: number): TouchGestureState['multiIntent'] {
+function detectMultiTouchIntent(
+    pinchDelta: number,
+    centerDeltaX: number,
+    centerDeltaY: number,
+    angleDelta: number,
+): TouchGestureState['multiIntent'] {
     const pinchMagnitude = Math.abs(pinchDelta);
     const pitchMagnitude = Math.abs(centerDeltaY);
-    if (pinchMagnitude < TOUCH_MULTI_INTENT_THRESHOLD_PX && pitchMagnitude < TOUCH_MULTI_INTENT_THRESHOLD_PX) return 'undecided';
+    const horizontalMagnitude = Math.abs(centerDeltaX);
+    const angleMagnitude = Math.abs(angleDelta);
+    if (
+        pinchMagnitude < TOUCH_MULTI_INTENT_THRESHOLD_PX
+        && pitchMagnitude < TOUCH_MULTI_INTENT_THRESHOLD_PX
+        && horizontalMagnitude < TOUCH_MULTI_INTENT_THRESHOLD_PX
+        && angleMagnitude < TOUCH_MULTI_INTENT_ANGLE_THRESHOLD
+    ) {
+        return 'undecided';
+    }
+    if (
+        pinchMagnitude >= TOUCH_MULTI_INTENT_THRESHOLD_PX
+        && horizontalMagnitude >= TOUCH_MULTI_INTENT_THRESHOLD_PX
+        && pinchMagnitude > horizontalMagnitude * 1.1
+        && horizontalMagnitude > pitchMagnitude * 1.25
+        && angleMagnitude < TOUCH_HORIZONTAL_YAW_INTENT_ANGLE_LIMIT
+    ) {
+        return 'undecided';
+    }
+    if (
+        horizontalMagnitude >= TOUCH_MULTI_INTENT_THRESHOLD_PX
+        && horizontalMagnitude > pinchMagnitude * 1.25
+        && horizontalMagnitude > pitchMagnitude * 1.25
+        && angleMagnitude < TOUCH_HORIZONTAL_YAW_INTENT_ANGLE_LIMIT
+    ) {
+        return 'yaw';
+    }
     return shouldApplyPinchZoom(pinchDelta, centerDeltaY) ? 'pinch' : 'pitch';
 }
 
 function getTouchPitchDelta(centerDeltaY: number): number {
     return -centerDeltaY * TOUCH_TWO_FINGER_PITCH_SPEED;
+}
+
+function getTouchYawDelta(centerDeltaX: number): number {
+    return -centerDeltaX * TOUCH_TWO_FINGER_YAW_SPEED;
 }
 
 function isTouchLikePointer(e: PointerEvent): boolean {
@@ -121,8 +162,11 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
         multiIntent: 'undecided',
         lastPoint: null,
         lastCenter: null,
+        intentStartCenter: null,
         lastDistance: 0,
+        intentStartDistance: 0,
         lastAngle: 0,
+        intentStartAngle: 0,
     };
     const activeTouchPointers = new Map<number, TouchPoint>();
 
@@ -131,8 +175,11 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
         touchState.multiIntent = 'undecided';
         touchState.lastPoint = null;
         touchState.lastCenter = null;
+        touchState.intentStartCenter = null;
         touchState.lastDistance = 0;
+        touchState.intentStartDistance = 0;
         touchState.lastAngle = 0;
+        touchState.intentStartAngle = 0;
     };
 
     const startTouchGesture = (points: TouchPoint[]): void => {
@@ -141,17 +188,26 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
             touchState.multiIntent = 'undecided';
             touchState.lastPoint = points[0];
             touchState.lastCenter = null;
+            touchState.intentStartCenter = null;
             touchState.lastDistance = 0;
+            touchState.intentStartDistance = 0;
             touchState.lastAngle = 0;
+            touchState.intentStartAngle = 0;
             return;
         }
         if (points.length >= 2) {
+            const center = centerBetweenPoints(points);
+            const distance = distanceBetweenPoints(points);
+            const angle = angleBetweenPoints(points);
             touchState.mode = 'multi';
             touchState.multiIntent = 'undecided';
             touchState.lastPoint = null;
-            touchState.lastCenter = centerBetweenPoints(points);
-            touchState.lastDistance = distanceBetweenPoints(points);
-            touchState.lastAngle = angleBetweenPoints(points);
+            touchState.lastCenter = center;
+            touchState.intentStartCenter = center;
+            touchState.lastDistance = distance;
+            touchState.intentStartDistance = distance;
+            touchState.lastAngle = angle;
+            touchState.intentStartAngle = angle;
         }
     };
 
@@ -178,13 +234,23 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
 
             const angleDelta = normalizeAngleDelta(angle - touchState.lastAngle);
             const pinchDelta = pinchDistance - touchState.lastDistance;
+            const centerDeltaX = center.x - touchState.lastCenter.x;
             const centerDeltaY = center.y - touchState.lastCenter.y;
             const pitchDelta = getTouchPitchDelta(centerDeltaY);
+            const yawDelta = getTouchYawDelta(centerDeltaX);
             const pinchZoomFrame = shouldApplyPinchZoom(pinchDelta, centerDeltaY);
-            if (touchState.multiIntent === 'undecided') {
-                touchState.multiIntent = detectMultiTouchIntent(pinchDelta, centerDeltaY);
+            if (touchState.multiIntent === 'undecided' && touchState.intentStartCenter) {
+                touchState.multiIntent = detectMultiTouchIntent(
+                    pinchDistance - touchState.intentStartDistance,
+                    center.x - touchState.intentStartCenter.x,
+                    center.y - touchState.intentStartCenter.y,
+                    normalizeAngleDelta(angle - touchState.intentStartAngle),
+                );
             }
-            if (pitchDelta !== 0 || angleDelta !== 0) ctx.rotateCam(pitchDelta, 0, angleDelta);
+            const effectiveAngleDelta = touchState.multiIntent === 'yaw' ? 0 : angleDelta;
+            if (pitchDelta !== 0 || yawDelta !== 0 || effectiveAngleDelta !== 0) {
+                ctx.rotateCam(pitchDelta, 0, yawDelta + effectiveAngleDelta);
+            }
             if (touchState.multiIntent === 'pinch' && pinchZoomFrame) {
                 ctx.updateDist(-pinchDelta * ctx.cameraDist * TOUCH_PINCH_ZOOM_SPEED);
             }
@@ -203,8 +269,11 @@ export function setupMouseControls(canvas: HTMLElement, ctx: InputContext): void
             touchState.multiIntent = 'undecided';
             touchState.lastPoint = null;
             touchState.lastCenter = null;
+            touchState.intentStartCenter = null;
             touchState.lastDistance = 0;
+            touchState.intentStartDistance = 0;
             touchState.lastAngle = 0;
+            touchState.intentStartAngle = 0;
         }
         else startTouchGesture(points);
     };

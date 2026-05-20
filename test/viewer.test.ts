@@ -1260,6 +1260,15 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.08);
       expect(Math.abs(v.euler[2] - beforeParallelEuler[2])).toBeLessThan(0.001);
       expect(Math.abs(v.cameraDist - beforeParallelDist)).toBeLessThan(0.001);
+
+      const beforeHorizontalEuler = [...v.euler];
+      const beforeHorizontalDist = v.cameraDist;
+      canvas.dispatchEvent(makeTouchEvent('touchstart', [{ x: 100, y: 180 }, { x: 220, y: 180 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchmove', [{ x: 160, y: 180 }, { x: 280, y: 180 }]));
+      canvas.dispatchEvent(makeTouchEvent('touchend', []));
+      expect(v.euler[2] - beforeHorizontalEuler[2]).toBeLessThan(-0.08);
+      expect(Math.abs(v.euler[0] - beforeHorizontalEuler[0])).toBeLessThan(0.001);
+      expect(Math.abs(v.cameraDist - beforeHorizontalDist)).toBeLessThan(0.001);
     } finally {
       if (originalPointerEvent !== undefined) (window as any).PointerEvent = originalPointerEvent;
     }
@@ -1305,6 +1314,45 @@ describe('Viewer measurement & mouse/keyboard events', () => {
       expect(v.euler[0] - beforeParallelEuler[0]).toBeGreaterThan(0.08);
       expect(Math.abs(v.euler[2] - beforeParallelEuler[2])).toBeLessThan(0.001);
       expect(Math.abs(v.cameraDist - beforeParallelDist)).toBeLessThan(0.001);
+
+      const beforeHorizontalEuler = [...v.euler];
+      const beforeHorizontalDist = v.cameraDist;
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 180));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 220, 180));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 160, 180));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 280, 180));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 160, 180));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 280, 180));
+      expect(v.euler[2] - beforeHorizontalEuler[2]).toBeLessThan(-0.08);
+      expect(Math.abs(v.euler[0] - beforeHorizontalEuler[0])).toBeLessThan(0.001);
+      expect(Math.abs(v.cameraDist - beforeHorizontalDist)).toBeLessThan(0.001);
+    } finally {
+      if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
+      else (window as any).PointerEvent = originalPointerEvent;
+    }
+  });
+
+  it('pointer touch horizontal swipe keeps yaw even with slight finger skew', () => {
+    const originalPointerEvent = (window as any).PointerEvent;
+    try {
+      (window as any).PointerEvent = function PointerEvent() {};
+      cleanupContainers();
+      makeContainer();
+      v = new Viewer('app');
+      installTouchViewport();
+
+      const canvas = v.renderer.domElement;
+      const beforeEuler = [...v.euler];
+      const beforeDist = v.cameraDist;
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 1, 100, 180));
+      canvas.dispatchEvent(makePointerEvent('pointerdown', 2, 220, 180));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 1, 150, 176));
+      canvas.dispatchEvent(makePointerEvent('pointermove', 2, 272, 186));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 1, 150, 176));
+      canvas.dispatchEvent(makePointerEvent('pointerup', 2, 272, 186));
+
+      expect(v.euler[2] - beforeEuler[2]).toBeLessThan(-0.08);
+      expect(Math.abs(v.cameraDist - beforeDist)).toBeLessThan(0.001);
     } finally {
       if (originalPointerEvent === undefined) delete (window as any).PointerEvent;
       else (window as any).PointerEvent = originalPointerEvent;

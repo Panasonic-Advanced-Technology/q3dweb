@@ -68,7 +68,7 @@ impl Points {
 }
 
 /// Parse the first point cloud of an E57 file.
-/// Returns recentered positions (xyz interleaved), colors (rgb 0..255 interleaved) and
+/// Returns original positions (xyz interleaved), colors (rgb 0..255 interleaved) and
 /// intensities (0..255 normalized by the library based on the intensity limits).
 #[wasm_bindgen(js_name = parsePoints)]
 pub fn parse_points(data: js_sys::Uint8Array) -> Result<Points, JsError> {
@@ -163,10 +163,6 @@ where
         Vec::new()
     };
     let mut intensities: Vec<f32> = Vec::with_capacity(estimated);
-    let mut sum_x = 0.0_f64;
-    let mut sum_y = 0.0_f64;
-    let mut sum_z = 0.0_f64;
-
     for (raw_index, point) in iter.enumerate() {
         if raw_index % sample_ratio != 0 {
             continue;
@@ -177,9 +173,6 @@ where
                 positions.push(x as f32);
                 positions.push(y as f32);
                 positions.push(z as f32);
-                sum_x += x;
-                sum_y += y;
-                sum_z += z;
             }
             _ => continue,
         }
@@ -204,19 +197,6 @@ where
         }
     }
 
-    let point_count = positions.len() / 3;
-    if point_count > 0 {
-        let inv_count = 1.0 / point_count as f64;
-        let center_x = (sum_x * inv_count) as f32;
-        let center_y = (sum_y * inv_count) as f32;
-        let center_z = (sum_z * inv_count) as f32;
-        for coords in positions.chunks_exact_mut(3) {
-            coords[0] -= center_x;
-            coords[1] -= center_y;
-            coords[2] -= center_z;
-        }
-    }
-
     Ok(Points {
         positions,
         colors,
@@ -224,4 +204,55 @@ where
         has_color,
         has_intensity,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::path::PathBuf;
+
+    fn sample_e57_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../test_sample/mihara.e57")
+    }
+
+    fn first_valid_cartesian_position(path: &PathBuf) -> (f32, f32, f32) {
+        let mut reader = E57Reader::new(File::open(path).expect("open sample E57"))
+            .expect("read sample E57 header");
+        let cloud = reader
+            .pointclouds()
+            .into_iter()
+            .next()
+            .expect("sample E57 point cloud");
+        let iter = reader
+            .pointcloud_simple(&cloud)
+            .expect("iterate sample E57 points");
+        for point in iter {
+            let point = point.expect("decode E57 point");
+            if let CartesianCoordinate::Valid { x, y, z } = point.cartesian {
+                return (x as f32, y as f32, z as f32);
+            }
+        }
+        panic!("sample E57 contains no valid cartesian points");
+    }
+
+    #[test]
+    fn keeps_original_cartesian_origin() {
+        let sample_path = sample_e57_path();
+        assert!(sample_path.exists(), "sample E57 fixture is missing: {}", sample_path.display());
+
+        let first_position = first_valid_cartesian_position(&sample_path);
+        let parsed = parse_points_inner(
+            File::open(&sample_path).expect("open sample E57 for parser"),
+            None,
+            0.0,
+            DEFAULT_SAMPLING_THRESHOLD_BYTES,
+        )
+        .expect("parse sample E57");
+
+        assert!(parsed.positions.len() >= 3, "parsed sample E57 has no positions");
+        assert_eq!(parsed.positions[0], first_position.0);
+        assert_eq!(parsed.positions[1], first_position.1);
+        assert_eq!(parsed.positions[2], first_position.2);
+    }
 }
