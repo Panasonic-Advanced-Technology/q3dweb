@@ -10,7 +10,7 @@ type CloudRenderOptions = {
     vmax?: number;
 };
 
-function colorModeToUniformValue(colorMode: 'I' | 'RGB' | 'FLAT'): 0 | 1 | 2 {
+function colorModeToUniformValue(colorMode: 'I' | 'RGB' | 'FLAT'): number {
     if (colorMode === 'RGB') return 1;
     if (colorMode === 'FLAT') return 2;
     return 0;
@@ -58,7 +58,8 @@ export function renderPoints(v: any, positions: Float32Array, values: Float32Arr
     material.uniforms.alpha.value = alpha;
     material.uniforms.colorMode.value = colorModeToUniformValue(colorMode);
     material.uniforms.vmin.value = effectiveMin; material.uniforms.vmax.value = effectiveMax;
-    material.needsUpdate = true;
+    material.transparent = alpha < 0.99 || pointType === 'SPHERE';
+    material.depthWrite = alpha >= 0.99 && pointType !== 'SPHERE';
     cloud.name = 'cloud'; cloud.frustumCulled = false;
     cloud.geometry.computeBoundingBox();
     if (cloud.geometry.boundingBox) {

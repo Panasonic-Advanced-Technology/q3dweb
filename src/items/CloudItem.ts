@@ -1,37 +1,6 @@
 import * as THREE from 'three';
 
-type CloudColorModeUniform = 0 | 1 | 2;
-
-type CloudUniformState = {
-    pointSize: { value: number };
-    alpha: { value: number };
-    vmin: { value: number };
-    vmax: { value: number };
-    colorMode: { value: CloudColorModeUniform };
-    flatColor: { value: THREE.Color };
-    pointType: { value: number };
-    viewportHeight: { value: number };
-};
-
-const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
-const clampByte = (value: number): number => Math.max(0, Math.min(255, Math.round(value)));
-const fract = (value: number): number => value - Math.floor(value);
-
-function rainbowChannel(hue: number, offset: number): number {
-    const p = Math.abs(fract(hue + offset) * 6 - 3);
-    return clamp01(p - 1);
-}
-
-function writeRainbowColor(valueRaw: number, vmin: number, vmax: number, target: Uint8Array, offset: number): void {
-    const range = Math.max(vmax - vmin, 1e-6);
-    const value = clamp01((valueRaw - vmin) / range);
-    const hue = value * 0.6666;
-    target[offset] = clampByte(rainbowChannel(hue, 1.0) * 255);
-    target[offset + 1] = clampByte(rainbowChannel(hue, 2.0 / 3.0) * 255);
-    target[offset + 2] = clampByte(rainbowChannel(hue, 1.0 / 3.0) * 255);
-}
-
-function colorModeToUniformValue(colorMode?: 'FLAT' | 'I' | 'RGB'): CloudColorModeUniform {
+function colorModeToUniformValue(colorMode?: 'FLAT' | 'I' | 'RGB'): number {
     switch (colorMode) {
         case 'RGB':
             return 1;
@@ -66,7 +35,6 @@ export interface CloudItemOptions {
 export class CloudItem extends THREE.Points {
     private static readonly GROWTH_STEP_POINTS = 1_000_000;
     private pointCount: number;
-    private sourceColorArray: Uint8Array;
     private lastAppendMeta: {
         appendRequested: number;
         appendActual: number;
@@ -85,23 +53,19 @@ export class CloudItem extends THREE.Points {
         geometry.setAttribute('position', CloudItem.makeDynamicAttribute(positions, 3));
         geometry.setAttribute('value', CloudItem.makeDynamicAttribute(values, 1));
 
-        const displayColors = new Uint8Array(positions.length);
-        const sourceColors = new Uint8Array(positions.length);
-
         if (rgbColors) {
-            sourceColors.set(CloudItem.toUint8Colors(rgbColors), 0);
+            geometry.setAttribute('color', CloudItem.makeDynamicAttribute(CloudItem.toUint8Colors(rgbColors), 3, true));
             options.colorMode = 'RGB';
+        } else {
+            geometry.setAttribute('color', CloudItem.makeDynamicAttribute(new Uint8Array(positions.length), 3, true));
         }
-        geometry.setAttribute('color', CloudItem.makeDynamicAttribute(displayColors, 3, true));
         geometry.setDrawRange(0, values.length);
 
         const material = new CloudShaderMaterial(options);
 
         super(geometry, material);
         this.pointCount = values.length;
-        this.sourceColorArray = sourceColors;
         this.frustumCulled = false; // often necessary for custom shaders or dynamic bounds
-        material.attachCloudItem(this);
     }
 
     getPointCount(): number {
@@ -129,19 +93,18 @@ export class CloudItem extends THREE.Points {
 
         const positionArray = this.getPositionArray();
         const valueArray = this.getValueArray();
-        const sourceColorArray = this.getSourceColorArray();
+        const colorArray = this.getColorArray();
 
         positionArray.set(positions, 0);
         valueArray.set(values, 0);
 
         if (rgbColors) {
-            sourceColorArray.set(CloudItem.toUint8Colors(rgbColors), 0);
+            colorArray.set(CloudItem.toUint8Colors(rgbColors), 0);
         } else if (nextCount > 0) {
-            sourceColorArray.fill(0, 0, nextCount * 3);
+            colorArray.fill(0, 0, nextCount * 3);
         }
 
         this.pointCount = nextCount;
-        this.updateDisplayedColors(0, nextCount);
         this.markAttributesDirtyRange(0, nextCount);
     }
 
@@ -191,7 +154,7 @@ export class CloudItem extends THREE.Points {
 
         const positionArray = this.getPositionArray();
         const valueArray = this.getValueArray();
-        const sourceColorArray = this.getSourceColorArray();
+        const colorArray = this.getColorArray();
 
         let currentCount = this.pointCount;
 
@@ -214,9 +177,9 @@ export class CloudItem extends THREE.Points {
         positionArray.set(appendPositions, dstOffsetPos);
         valueArray.set(appendValues, currentCount);
         if (incomingColors) {
-            sourceColorArray.set(incomingColors, dstOffsetPos);
+            colorArray.set(incomingColors, dstOffsetPos);
         } else {
-            sourceColorArray.fill(0, dstOffsetPos, dstOffsetPos + appendActualCount * 3);
+            colorArray.fill(0, dstOffsetPos, dstOffsetPos + appendActualCount * 3);
         }
 
         this.pointCount = currentCount + appendActualCount;
@@ -227,7 +190,6 @@ export class CloudItem extends THREE.Points {
         const dirtyCountPoints = (didDownsample || resetToIncomingTailOnly)
             ? this.pointCount
             : appendActualCount;
-        this.updateDisplayedColors(dirtyStartPoint, dirtyCountPoints);
         this.markAttributesDirtyRange(dirtyStartPoint, dirtyCountPoints);
         this.lastAppendMeta = {
             appendRequested: appendCount,
@@ -245,7 +207,6 @@ export class CloudItem extends THREE.Points {
 
         const positionArray = this.getPositionArray();
         const valueArray = this.getValueArray();
-        const sourceColorArray = this.getSourceColorArray();
         const colorArray = this.getColorArray();
 
         let writePoint = 0;
@@ -258,10 +219,6 @@ export class CloudItem extends THREE.Points {
             positionArray[writePos + 2] = positionArray[readPos + 2];
 
             valueArray[writePoint] = valueArray[readPoint];
-
-            sourceColorArray[writePos] = sourceColorArray[readPos];
-            sourceColorArray[writePos + 1] = sourceColorArray[readPos + 1];
-            sourceColorArray[writePos + 2] = sourceColorArray[readPos + 2];
 
             colorArray[writePos] = colorArray[readPos];
             colorArray[writePos + 1] = colorArray[readPos + 1];
@@ -277,12 +234,6 @@ export class CloudItem extends THREE.Points {
         material.uniforms.viewportHeight.value = Math.max(height, 1);
     }
 
-    applyMaterialState(): void {
-        if (this.pointCount <= 0) return;
-        this.updateDisplayedColors(0, this.pointCount);
-        this.markColorDirtyRange(0, this.pointCount);
-    }
-
     private ensureCapacity(requiredPoints: number): void {
         const positionAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
         const currentCapacity = positionAttr.array.length / 3;
@@ -292,22 +243,18 @@ export class CloudItem extends THREE.Points {
         const nextPos = new Float32Array(newCapacity * 3);
         const nextVal = new Float32Array(newCapacity);
         const nextColor = new Uint8Array(newCapacity * 3);
-        const nextSourceColor = new Uint8Array(newCapacity * 3);
 
         const positionArray = this.getPositionArray();
         const valueArray = this.getValueArray();
         const colorArray = this.getColorArray();
-        const sourceColorArray = this.getSourceColorArray();
         const copiedPosLen = this.pointCount * 3;
 
         if (copiedPosLen > 0) {
             nextPos.set(positionArray.subarray(0, copiedPosLen), 0);
             nextVal.set(valueArray.subarray(0, this.pointCount), 0);
             nextColor.set(colorArray.subarray(0, copiedPosLen), 0);
-            nextSourceColor.set(sourceColorArray.subarray(0, copiedPosLen), 0);
         }
 
-        this.sourceColorArray = nextSourceColor;
         this.geometry.setAttribute('position', CloudItem.makeDynamicAttribute(nextPos, 3));
         this.geometry.setAttribute('value', CloudItem.makeDynamicAttribute(nextVal, 1));
         this.geometry.setAttribute('color', CloudItem.makeDynamicAttribute(nextColor, 3, true));
@@ -363,13 +310,6 @@ export class CloudItem extends THREE.Points {
         attr.addUpdateRange(start, count);
     }
 
-    private markColorDirtyRange(startPoint: number, countPoints: number): void {
-        const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute;
-        this.setUpdateRange(colorAttr, startPoint * 3, countPoints * 3);
-        colorAttr.needsUpdate = true;
-        this.geometry.setDrawRange(0, this.pointCount);
-    }
-
     private getCapacityPoints(): number {
         const positionAttr = this.geometry.getAttribute('position') as THREE.BufferAttribute;
         return (positionAttr.array as Float32Array).length / 3;
@@ -388,48 +328,6 @@ export class CloudItem extends THREE.Points {
     private getColorArray(): Uint8Array {
         const attr = this.geometry.getAttribute('color') as THREE.BufferAttribute;
         return attr.array as Uint8Array;
-    }
-
-    private getSourceColorArray(): Uint8Array {
-        return this.sourceColorArray;
-    }
-
-    private updateDisplayedColors(startPoint: number, countPoints: number): void {
-        if (countPoints <= 0 || this.pointCount <= 0) return;
-
-        const material = this.material as CloudShaderMaterial;
-        const displayColors = this.getColorArray();
-        const sourceColors = this.getSourceColorArray();
-        const values = this.getValueArray();
-        const pointCount = Math.min(this.pointCount, startPoint + countPoints);
-        const mode = material.uniforms.colorMode.value;
-
-        if (mode === 1) {
-            const srcStart = startPoint * 3;
-            const srcEnd = pointCount * 3;
-            displayColors.set(sourceColors.subarray(srcStart, srcEnd), srcStart);
-            return;
-        }
-
-        if (mode === 2) {
-            const flatColor = material.uniforms.flatColor.value;
-            const r = clampByte(flatColor.r * 255);
-            const g = clampByte(flatColor.g * 255);
-            const b = clampByte(flatColor.b * 255);
-            for (let point = startPoint; point < pointCount; point++) {
-                const offset = point * 3;
-                displayColors[offset] = r;
-                displayColors[offset + 1] = g;
-                displayColors[offset + 2] = b;
-            }
-            return;
-        }
-
-        const vmin = material.uniforms.vmin.value;
-        const vmax = material.uniforms.vmax.value;
-        for (let point = startPoint; point < pointCount; point++) {
-            writeRainbowColor(values[point], vmin, vmax, displayColors, point * 3);
-        }
     }
 
     private static toUint8Colors(rgbColors: Float32Array | Uint8Array): Uint8Array {
@@ -481,101 +379,84 @@ export class CloudItem extends THREE.Points {
     }
 }
 
-export class CloudShaderMaterial extends THREE.PointsMaterial {
-    declare uniforms: CloudUniformState;
-    private cloudItem: CloudItem | null = null;
-    private static sphereAlphaMap: THREE.Texture | null = null;
-
+export class CloudShaderMaterial extends THREE.ShaderMaterial {
     constructor(options: CloudItemOptions) {
         const alpha = options.alpha !== undefined ? options.alpha : 1.0;
         const pointType = pointTypeToUniformValue(options.pointType);
-        const uniforms: CloudUniformState = {
+        const uniforms = {
             pointSize: { value: options.size || 1.0 },
             alpha: { value: alpha },
             vmin: { value: 0.0 },
             vmax: { value: 255.0 },
-            colorMode: { value: colorModeToUniformValue(options.colorMode) as CloudColorModeUniform },
+            colorMode: { value: colorModeToUniformValue(options.colorMode) },
             flatColor: { value: new THREE.Color(options.color || 'white') },
             pointType: { value: pointType },
             viewportHeight: { value: 1.0 },
         };
 
+        const vertexShader = `
+            attribute float value;
+            attribute vec3 color;
+            varying vec3 vColor;
+            uniform float vmin;
+            uniform float vmax;
+            uniform float pointSize;
+            uniform float colorMode;
+            uniform vec3 flatColor;
+            uniform float pointType;
+            uniform float viewportHeight;
+
+            vec3 getRainbowColor(float value_raw) {
+                float range = vmax - vmin;
+                float val = (value_raw - vmin) / range;
+                val = clamp(val, 0.0, 1.0);
+
+                float h = val * 0.6666; 
+                float s = 1.0; 
+                float v = 1.0;
+
+                vec3 c = vec3(h, s, v);
+                vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+                vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+                return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+            }
+
+            void main() {
+                vec3 rainbowColor = getRainbowColor(value);
+                float rgbWeight = 1.0 - step(0.5, abs(colorMode - 1.0));
+                float flatWeight = step(1.5, colorMode);
+                vec3 mixedColor = mix(rainbowColor, color, rgbWeight);
+                vColor = mix(mixedColor, flatColor, flatWeight);
+
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+
+                float worldPointSize = (pointSize * 0.01) * projectionMatrix[1][1] * viewportHeight * 0.5 / max(abs(gl_Position.w), 0.0001);
+                float worldMode = step(0.5, pointType);
+                gl_PointSize = mix(pointSize, worldPointSize, worldMode);
+            }
+        `;
+
+        const fragmentShader = `
+            varying vec3 vColor;
+            uniform float alpha;
+            uniform float pointType;
+
+            void main() {
+                vec2 coord = gl_PointCoord * 2.0 - 1.0;
+                float sphereMask = 1.0 - step(1.0, dot(coord, coord));
+                float sphereMode = step(1.5, pointType);
+                gl_FragColor = vec4(vColor, alpha * mix(1.0, sphereMask, sphereMode));
+            }
+        `;
+
         super({
-            size: uniforms.pointSize.value,
-            opacity: alpha,
+            uniforms: uniforms,
+            vertexShader: vertexShader,
+            fragmentShader: fragmentShader,
             transparent: alpha < 0.99 || pointType > 1.5,
             depthTest: true,
             depthWrite: alpha >= 0.99 && pointType <= 1.5,
-            vertexColors: true,
-            sizeAttenuation: pointType !== 0,
         });
-
-        this.uniforms = uniforms;
-        this.applyUniformState();
-    }
-
-    attachCloudItem(cloudItem: CloudItem): void {
-        this.cloudItem = cloudItem;
-        this.applyUniformState();
-    }
-
-    override set needsUpdate(value: boolean) {
-        if (value) {
-            this.applyUniformState();
-            return;
-        }
-        super.needsUpdate = value;
-    }
-
-    override get needsUpdate(): boolean {
-        return super.needsUpdate;
-    }
-
-    private applyUniformState(): void {
-        const pointType = this.uniforms.pointType.value;
-        const alpha = this.uniforms.alpha.value;
-
-        this.size = this.uniforms.pointSize.value;
-        this.opacity = alpha;
-        this.transparent = alpha < 0.99 || pointType > 1.5;
-        this.depthWrite = alpha >= 0.99 && pointType <= 1.5;
-        this.sizeAttenuation = pointType !== 0;
-
-        if (pointType > 1.5) {
-            this.alphaMap = CloudShaderMaterial.getSphereAlphaMap();
-            this.alphaTest = 0.5;
-        } else {
-            this.alphaMap = null;
-            this.alphaTest = 0;
-        }
-
-        this.cloudItem?.applyMaterialState();
-        super.needsUpdate = true;
-    }
-
-    private static getSphereAlphaMap(): THREE.Texture {
-        if (CloudShaderMaterial.sphereAlphaMap) return CloudShaderMaterial.sphereAlphaMap;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = 64;
-        canvas.height = 64;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            CloudShaderMaterial.sphereAlphaMap = new THREE.Texture();
-            CloudShaderMaterial.sphereAlphaMap.needsUpdate = true;
-            return CloudShaderMaterial.sphereAlphaMap;
-        }
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2, canvas.width / 2 - 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        CloudShaderMaterial.sphereAlphaMap = new THREE.CanvasTexture(canvas);
-        CloudShaderMaterial.sphereAlphaMap.needsUpdate = true;
-        return CloudShaderMaterial.sphereAlphaMap;
     }
 }

@@ -72,14 +72,16 @@ describe('CloudItem geometry & uniforms', () => {
     expect(m.uniforms.viewportHeight.value).toBe(720);
   });
 
-  it('uses a WebGPU-compatible points material while preserving cloud uniforms', () => {
+  it('uses branch-light shader code for color selection and point masking', () => {
     const cloud = new CloudItem(new Float32Array(3), new Float32Array(1), { pointType: 'SPHERE', colorMode: 'RGB' }, new Uint8Array([255, 0, 0]));
-    const m = cloud.material as THREE.PointsMaterial & { uniforms: any };
-    expect(m).toBeInstanceOf(THREE.PointsMaterial);
-    expect(m.alphaMap).toBeTruthy();
-    expect(m.uniforms.colorMode.value).toBe(1);
-    expect(m.uniforms.pointType.value).toBe(2);
-    expect(m.uniforms.viewportHeight.value).toBe(1);
+    const m = cloud.material as THREE.ShaderMaterial;
+    expect(m.vertexShader).not.toContain('if (colorMode');
+    expect(m.fragmentShader).not.toContain('if (pointType');
+    expect(m.fragmentShader).not.toContain('discard');
+    expect(m.vertexShader).toContain('mix(');
+    expect(m.fragmentShader).toContain('step(');
+    expect(m.vertexShader).toContain('viewportHeight');
+    expect(m.vertexShader).toContain('projectionMatrix[1][1]');
   });
 
   it('rejects mismatched position and value lengths', () => {
@@ -97,7 +99,7 @@ describe('CloudItem geometry & uniforms', () => {
   });
 
   it('replaces points, grows attributes, converts float colors, and updates draw range', () => {
-    const cloud = new CloudItem(new Float32Array([0, 0, 0]), new Float32Array([1]), { colorMode: 'RGB' });
+    const cloud = new CloudItem(new Float32Array([0, 0, 0]), new Float32Array([1]));
 
     cloud.replacePoints(
       new Float32Array([1, 2, 3, 4, 5, 6]),
@@ -136,7 +138,7 @@ describe('CloudItem geometry & uniforms', () => {
   });
 
   it('ignores empty appends and records regular append metadata', () => {
-    const cloud = new CloudItem(new Float32Array([0, 0, 0]), new Float32Array([1]), { colorMode: 'RGB' });
+    const cloud = new CloudItem(new Float32Array([0, 0, 0]), new Float32Array([1]));
 
     expect(cloud.appendPoints(new Float32Array(0), new Float32Array(0))).toBe(1);
     expect(cloud.getLastAppendMeta()).toBeNull();
@@ -153,7 +155,7 @@ describe('CloudItem geometry & uniforms', () => {
   });
 
   it('downsamples oversized incoming chunks before appending', () => {
-    const cloud = new CloudItem(new Float32Array([0, 0, 0]), new Float32Array([1]), { colorMode: 'RGB' });
+    const cloud = new CloudItem(new Float32Array([0, 0, 0]), new Float32Array([1]));
 
     cloud.appendPoints(
       makePositions(10),
@@ -183,7 +185,7 @@ describe('CloudItem geometry & uniforms', () => {
   });
 
   it('downsamples existing points when the fixed capacity is full', () => {
-    const cloud = new CloudItem(makePositions(4), makeValues(4), { colorMode: 'RGB' }, new Uint8Array([
+    const cloud = new CloudItem(makePositions(4), makeValues(4), {}, new Uint8Array([
       10, 11, 12,
       20, 21, 22,
       30, 31, 32,
