@@ -23,6 +23,8 @@ export const TILE_PRESETS: { label: string; url: string; maxZoom?: number }[] = 
     { label: 'GSI 白地図', url: 'https://cyberjapandata.gsi.go.jp/xyz/blank/{z}/{x}/{y}.png', maxZoom: 14 },
 ];
 
+const MARKER_PIXEL_SIZE = 12;
+
 // ============================================================
 // Options
 // ============================================================
@@ -110,7 +112,7 @@ export class GNSSMapItem extends THREE.Group {
     private readonly MAX_TRAIL = 50000;
 
     // Current marker
-    private marker: THREE.Mesh;
+    private marker: THREE.Points;
     private currentLatLon: { lat: number; lon: number; alt: number; status: number } | null = null;
 
     // Tile group (separate so we can set renderOrder)
@@ -149,11 +151,12 @@ export class GNSSMapItem extends THREE.Group {
         this.trailLine.frustumCulled = false;
         this.add(this.trailLine);
 
-        // Current position marker (sphere)
-        const markerGeo = new THREE.SphereGeometry(0.3, 16, 12);
-        this.marker = new THREE.Mesh(
+        // Current position marker: screen-space size, independent of camera zoom.
+        const markerGeo = new THREE.BufferGeometry();
+        markerGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+        this.marker = new THREE.Points(
             markerGeo,
-            new THREE.MeshBasicMaterial({ color: 0x44bb44 })
+            new THREE.PointsMaterial({ color: 0x44bb44, size: MARKER_PIXEL_SIZE, sizeAttenuation: false })
         );
         this.marker.visible = false;
         this.marker.renderOrder = 2;
@@ -513,6 +516,6 @@ export class GNSSMapItem extends THREE.Group {
             1: 0x44ddff,    // sbas
             2: 0xff8800,    // gbas
         };
-        (this.marker.material as THREE.MeshBasicMaterial).color.setHex(colors[status] ?? 0x888888);
+        (this.marker.material as THREE.PointsMaterial).color.setHex(colors[status] ?? 0x888888);
     }
 }

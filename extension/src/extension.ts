@@ -3,10 +3,14 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as v8 from 'v8';
 
-type ViewerMode = 'cloud' | 'film_maker' | 'realtime';
+type ViewerMode = 'cloud' | 'film_maker' | 'realtime' | 'realtime_gnss';
 
 function normalizeViewerMode(mode: unknown): ViewerMode {
-    return mode === 'film_maker' || mode === 'realtime' ? mode : 'cloud';
+    return mode === 'film_maker' || mode === 'realtime' || mode === 'realtime_gnss' ? mode : 'cloud';
+}
+
+function isFileBackedMode(mode: ViewerMode): boolean {
+    return mode === 'cloud' || mode === 'film_maker';
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -69,12 +73,12 @@ class PcdViewerProvider implements vscode.CustomReadonlyEditorProvider<PcdDocume
         let currentMode: ViewerMode = 'cloud';
         let webviewGeneration = 0;
         const tryUpdateWebview = () => {
-            if (webviewReady && currentMode !== 'realtime') {
+            if (webviewReady && isFileBackedMode(currentMode)) {
                 const generation = webviewGeneration;
                 void this.updateWebview(
                     webviewPanel,
                     document,
-                    () => webviewReady && currentMode !== 'realtime' && generation === webviewGeneration
+                    () => webviewReady && isFileBackedMode(currentMode) && generation === webviewGeneration
                 );
             }
         };

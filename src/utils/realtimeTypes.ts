@@ -35,6 +35,8 @@ export interface RealtimeTopicOptions {
     topicName?: string;
     cloudTopicName?: string;
     odomTopicName?: string;
+    gnss1TopicName?: string;
+    gnss2TopicName?: string;
     maxPointsPerScan?: number;
     maxAccumulatedPoints?: number;
     autoFitOnFirstChunk?: boolean;
@@ -47,4 +49,11 @@ export interface OdomJson {
             orientation?: { x?: number; y?: number; z?: number; w?: number };
         };
     };
+}
+
+export interface NavSatFixJson {
+    status?: { status?: number; service?: number };
+    latitude?: number;
+    longitude?: number;
+    altitude?: number;
 }

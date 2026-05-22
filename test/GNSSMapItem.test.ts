@@ -32,6 +32,8 @@ describe('GNSSMapItem', () => {
     expect(g.altitude).toBe(0);
     expect(g.trailLength).toBe(0);
     expect(g.lastFix).toBeNull();
+    expect((g as any).marker).toBeInstanceOf(THREE.Points);
+    expect(((g as any).marker.material as THREE.PointsMaterial).sizeAttenuation).toBe(false);
   });
 
   it('creates with custom options', () => {
