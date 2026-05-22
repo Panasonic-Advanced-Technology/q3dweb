@@ -100,6 +100,7 @@ On primary touch devices, distance measurement shortcuts are disabled so touch g
 `cloud_viewer` is the default mode. You can:
 
 - Drag and drop `.pcd`, `.ply`, `.las`, `.laz`, or `.e57` files.
+- Use the `Open Files` button just below `Viewer Mode` in the settings panel to pick local `.pcd`, `.ply`, `.las`, `.laz`, or `.e57` files.
 - Open a remote point cloud by URL.
 - Tune point rendering from the settings panel or URL parameters.
 - Let q3dweb automatically down-sample very large files when needed.

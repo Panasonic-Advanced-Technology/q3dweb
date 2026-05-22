@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Viewer } from './viewer';
 import type { CloudUrlOptions } from './cloudUrlOptions';
+import { makeButton } from './viewer/settingsUI';
 import {
     PCDHeader, getFieldSpec, readPackedRGB as _readPackedRGB,
     parseAsciiPackedRGB as _parseAsciiPackedRGB, readNumericValue as _readNumericValue,
@@ -26,6 +27,7 @@ import {
 export class CloudViewer extends Viewer {
     static readonly SUPPORTED_EXTENSIONS = ['.pcd', '.ply', '.las', '.laz', '.e57'];
     skipMemoryCheck: boolean = false;
+    private fileOpenSection: HTMLElement | null = null;
 
     // --- streaming state ---
     currentFormat: ReturnType<typeof detectFormat> = 'pcd';
@@ -58,6 +60,7 @@ export class CloudViewer extends Viewer {
         super(containerId);
         this.applyUrlOptions(options);
         this.setupDragDrop();
+        this.installFileOpenSection();
     }
 
     applyUrlOptions(options: CloudUrlOptions): void {
@@ -78,6 +81,50 @@ export class CloudViewer extends Viewer {
             vmax: options.vmax,
         };
         if (this.settingsItemSelect?.value === '__main_win__') this.onSettingsItemSelected('__main_win__');
+    }
+
+    private installFileOpenSection(): void {
+        if (!this.settingsPanel || this.fileOpenSection?.isConnected) return;
+
+        const section = document.createElement('div');
+        section.className = 'q3d-settings-section';
+        section.setAttribute('data-role', 'cloud-open-file-section');
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.multiple = true;
+        fileInput.accept = CloudViewer.SUPPORTED_EXTENSIONS.join(',');
+        fileInput.hidden = true;
+        fileInput.setAttribute('data-role', 'cloud-open-file-input');
+        fileInput.addEventListener('change', () => {
+            const files = Array.from(fileInput.files ?? []);
+            fileInput.value = '';
+            void this.openSelectedFiles(files);
+        });
+
+        const openButton = makeButton('Open Files', () => {
+            fileInput.value = '';
+            fileInput.click();
+        });
+        openButton.setAttribute('data-role', 'cloud-open-file-button');
+
+        section.appendChild(openButton);
+        section.appendChild(fileInput);
+
+        const itemLabel = this.settingsPanel.querySelector('[data-role="settings-item-label"]') as HTMLElement | null;
+        const anchor = itemLabel ?? this.settingsContent;
+        if (anchor?.parentElement === this.settingsPanel) {
+            this.settingsPanel.insertBefore(section, anchor);
+        } else {
+            this.settingsPanel.appendChild(section);
+        }
+        this.fileOpenSection = section;
+    }
+
+    private async openSelectedFiles(files: File[]): Promise<void> {
+        for (let i = 0; i < files.length; i++) {
+            await this.loadFile(files[i], i > 0);
+        }
     }
 
     setupDragDrop() {
