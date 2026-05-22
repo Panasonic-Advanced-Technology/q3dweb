@@ -484,6 +484,8 @@ export class GNSSMapItem extends THREE.Group {
                 });
 
                 const mesh = new THREE.Mesh(geo, mat);
+                mesh.name = `gnss_tile_${key}`;
+                mesh.userData.measurementTarget = true;
                 mesh.position.set(centerE, centerN, this._altitude);
                 mesh.renderOrder = -1;
                 mesh.frustumCulled = false;
