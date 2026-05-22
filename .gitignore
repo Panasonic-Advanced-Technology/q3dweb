@@ -47,3 +47,4 @@ test-results/
 # artifacts must be ignored.
 vendor/**/target/
 vendor/**/Cargo.lock
+test_output.log
