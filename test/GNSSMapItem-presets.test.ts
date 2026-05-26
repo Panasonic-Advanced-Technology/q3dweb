@@ -77,8 +77,11 @@ describe('GNSSMapItem tile server switching', () => {
         g.addSetting(container);
         const checkbox = container.querySelector('input[type=checkbox]') as HTMLInputElement;
         const select = container.querySelector('select') as HTMLSelectElement;
+        const selectButton = Array.from(container.querySelectorAll('button')).find(button =>
+            (button.textContent ?? '').includes('OpenStreetMap'));
         expect(checkbox).toBeTruthy();
         expect(select).toBeTruthy();
+        expect(selectButton).toBeTruthy();
         expect(select.options.length).toBeGreaterThanOrEqual(TILE_PRESETS.length);
         document.body.removeChild(container);
     });

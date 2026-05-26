@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeCheckbox, makeLabel, makeNumberInput } from '../viewer/settingsUI';
 
 export interface GridItemOptions {
     size?: number;
@@ -74,45 +75,12 @@ export class GridItem extends THREE.LineSegments {
     }
 
     addSetting(container: HTMLElement): void {
-        const mkLabel = (text: string) => {
-            const el = document.createElement('div');
-            el.textContent = text;
-            el.style.cssText = 'font-size:11px;color:#bbb;margin:4px 0 2px 0;';
-            container.appendChild(el);
-        };
-        const mkNumber = (val: number, min: number, max: number, step: number, cb: (v: number) => void) => {
-            const el = document.createElement('input');
-            el.type = 'number';
-            el.value = String(val);
-            el.min = String(min);
-            el.max = String(max);
-            el.step = String(step);
-            el.style.cssText = 'width:100%;box-sizing:border-box;background:#333;color:#eee;border:1px solid #555;padding:3px 6px;border-radius:3px;margin-bottom:4px;font-family:monospace;font-size:11px;';
-            el.onchange = () => {
-                const v = parseFloat(el.value);
-                if (!isNaN(v)) cb(v);
-            };
-            container.appendChild(el);
-        };
-
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;margin:6px 0;';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = this.visible;
-        cb.onchange = () => {
-            this.visible = cb.checked;
+        container.appendChild(makeCheckbox('Show Grid', this.visible, (visible) => {
+            this.visible = visible;
             this.renderCb?.();
-        };
-        const txt = document.createElement('label');
-        txt.textContent = 'Show Grid';
-        txt.style.marginLeft = '6px';
-        row.appendChild(cb);
-        row.appendChild(txt);
-        container.appendChild(row);
-
-        mkLabel('Spacing:');
-        mkNumber(this.gridSpacing, 0.1, 100000, 0.1, (v) => this.setSpacing(v));
+        }));
+        container.appendChild(makeLabel('Spacing:'));
+        container.appendChild(makeNumberInput(this.gridSpacing, 0.1, 100000, 0.1, (v) => this.setSpacing(v)));
     }
 
     private rebuild() {

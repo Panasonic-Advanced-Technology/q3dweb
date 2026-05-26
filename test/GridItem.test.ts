@@ -64,6 +64,7 @@ describe('GridItem', () => {
     const c = document.createElement('div');
     g.addSetting(c);
     expect(c.children.length).toBeGreaterThan(0);
+    expect(c.querySelector('.q3d-setting-checkbox')).toBeTruthy();
 
     // Toggle visibility checkbox
     const cb = c.querySelector('input[type=checkbox]') as HTMLInputElement;
@@ -74,6 +75,7 @@ describe('GridItem', () => {
 
     // Spacing input change
     const num = c.querySelector('input[type=number]') as HTMLInputElement;
+  expect(num.className).toContain('q3d-setting-control');
     num.value = '5';
     num.onchange?.(new Event('change'));
 

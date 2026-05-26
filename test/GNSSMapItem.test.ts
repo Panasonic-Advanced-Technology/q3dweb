@@ -119,9 +119,13 @@ describe('GNSSMapItem', () => {
     g.addFix(35, 139, 0);
     vi.advanceTimersByTime(600);
 
-    const buttons = c.querySelectorAll('button');
-    buttons[0].click();
-    buttons[1].click();
+    const actionButtons = Array.from(c.querySelectorAll('button')).filter((button) => {
+      const label = button.textContent ?? '';
+      return label.includes('Clear Trail') || label.includes('Reset Origin');
+    });
+    expect(actionButtons).toHaveLength(2);
+    actionButtons[0].click();
+    actionButtons[1].click();
 
     const nums = c.querySelectorAll('input[type=number]');
     (nums[0] as HTMLInputElement).value = '15';
