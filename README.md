@@ -11,7 +11,7 @@ It is a WebGL (Three.js) port of [q3dviewer](https://github.com/scomup/q3dviewer
 
 1. Runs directly in the browser with no dedicated viewer install.
 2. Also works as a VS Code extension.
-3. Supports three viewer modes: `cloud_viewer`, `film_maker`, and `realtime_viewer`.
+3. Supports four viewer modes: `cloud_viewer`, `film_maker`, `realtime_viewer`, and `realtime_gnss_viewer`.
 4. Accepts URL query parameters for remote point clouds and realtime ROS configuration.
 5. Automatically down-samples very large point clouds to fit the available memory budget.
 6. Supports mouse, keyboard, and mobile touch controls.
@@ -39,6 +39,7 @@ The default mode is `cloud_viewer`. You can also open a specific viewer mode dir
 https://Panasonic-Advanced-Technology.github.io/q3dweb/?mode=cloud
 https://Panasonic-Advanced-Technology.github.io/q3dweb/?mode=film_maker
 https://Panasonic-Advanced-Technology.github.io/q3dweb/?mode=realtime
+https://Panasonic-Advanced-Technology.github.io/q3dweb/?mode=realtime_gnss
 ```
 
 ### VS Code
@@ -48,7 +49,7 @@ https://Panasonic-Advanced-Technology.github.io/q3dweb/?mode=realtime
 <img width="1186" height="617" alt="vscode_install2" src="https://github.com/user-attachments/assets/34de4d3a-2953-4db0-ad72-470223968d52" />
 
 2. Open a supported point cloud file in VS Code and q3dweb will launch.
-3. Use the `Viewer Mode` selector at the top of the settings panel to switch between `cloud_viewer`, `film_maker`, and `realtime_viewer`.
+3. Use the `Viewer Mode` selector at the top of the settings panel to switch between `cloud_viewer`, `film_maker`, `realtime_viewer`, and `realtime_gnss_viewer`.
 
 ## Usage
 
@@ -61,6 +62,7 @@ The settings panel starts with a `Viewer Mode` selector.
 | `cloud_viewer` | `cloud` | Open local or remote point cloud files and inspect them interactively. |
 | `film_maker` | `film_maker` | Create key frames, preview camera motion, and export recordings. |
 | `realtime_viewer` | `realtime` | Subscribe to ROS data through rosbridge and render PointCloud2 streams in realtime. |
+| `realtime_gnss_viewer` | `realtime_gnss` | Subscribe to two ROS GNSS topics through rosbridge and render tracks on OpenStreetMap tiles. |
 
 ### 2. Basic Controls
 
@@ -98,6 +100,7 @@ On primary touch devices, distance measurement shortcuts are disabled so touch g
 `cloud_viewer` is the default mode. You can:
 
 - Drag and drop `.pcd`, `.ply`, `.las`, `.laz`, or `.e57` files.
+- Use the `Open Files` button just below `Viewer Mode` in the settings panel to pick local `.pcd`, `.ply`, `.las`, `.laz`, or `.e57` files.
 - Open a remote point cloud by URL.
 - Tune point rendering from the settings panel or URL parameters.
 - Let q3dweb automatically down-sample very large files when needed.
@@ -176,7 +179,35 @@ https://Panasonic-Advanced-Technology.github.io/q3dweb/?mode=realtime&ros=ws://l
 
 If you open q3dweb from an `https://` origin, most browsers require a secure WebSocket endpoint (`wss://`).
 
-### 6. Creating Demo Videos
+### 6. Realtime GNSS Viewer
+
+`realtime_gnss_viewer` connects to a rosbridge WebSocket and consumes two `sensor_msgs/NavSatFix` topics. The settings panel shows `GNSS1 Topic` and `GNSS2 Topic` instead of the cloud and odometry topic fields, then draws both tracks on OpenStreetMap tiles.
+
+To use it interactively:
+
+1. Switch `Viewer Mode` to `realtime_gnss_viewer`.
+2. Enter the ROS Bridge URL, GNSS1 Topic, and GNSS2 Topic.
+3. Click `Connect`.
+
+#### Realtime GNSS Viewer Query Parameters
+
+Use `?mode=realtime_gnss` with the following parameters.
+
+| Parameter | Meaning |
+| --- | --- |
+| `ros` | rosbridge WebSocket URL such as `ws://localhost:9090` or `wss://robot.example.com/rosbridge`. |
+| `gnss1Topic` | First `sensor_msgs/NavSatFix` topic name. |
+| `gnss2Topic` | Second `sensor_msgs/NavSatFix` topic name. |
+
+Canonical parameter names are shown above. q3dweb also accepts aliases such as `rosbridgeUrl`, `gnss1`, `gnss2`, `fix1`, `fix2`, `topic1`, and `topic2`.
+
+Example:
+
+```text
+https://Panasonic-Advanced-Technology.github.io/q3dweb/?mode=realtime_gnss&ros=ws://localhost:9090&gnss1Topic=/gnss1&gnss2Topic=/gnss2
+```
+
+### 7. Creating Demo Videos
 
 q3dweb also includes a Film Maker workflow for creating camera fly-throughs. Switch `Viewer Mode` to `film_maker`, save camera positions as key frames, and preview the interpolated camera motion.
 
@@ -184,7 +215,7 @@ You can then record and download the playback as a video file. The default setti
 
 ![firm_l.gif](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/3953399/15a0b61b-453d-4579-ba71-665d21289389.gif)
 
-### 7. Distance Measuring
+### 8. Distance Measuring
 
 You can measure distance by holding Control and left-clicking.
 

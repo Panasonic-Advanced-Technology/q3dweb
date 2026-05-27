@@ -101,7 +101,7 @@ export function createMaterialMenuSelect(
     if (config.menuDataRole) menu.setAttribute('data-role', config.menuDataRole);
     menu.anchorElement = button;
     menu.quick = true;
-    menu.positioning = 'fixed';
+    menu.positioning = 'popover';
     menu.defaultFocus = 'list-root';
 
     const updateButtonLabel = () => {

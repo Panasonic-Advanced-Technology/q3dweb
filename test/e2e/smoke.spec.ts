@@ -52,6 +52,35 @@ test.describe('smoke', () => {
     await expect(select).toHaveValue('__main_win__');
   });
 
+  test('Viewer Setting menu remains visible in a short viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 170 });
+    await page.goto('/');
+
+    const button = page.locator('[data-role="settings-item-menu-button"]');
+    const menu = page.locator('[data-role="settings-item-select-menu"]');
+
+    await button.click();
+    await expect(menu).toBeVisible();
+
+    const rect = await page.evaluate(() => {
+      const buttonEl = document.querySelector('[data-role="settings-item-menu-button"]') as HTMLElement;
+      const menuEl = document.querySelector('[data-role="settings-item-select-menu"]') as HTMLElement;
+      const buttonRect = buttonEl.getBoundingClientRect();
+      const menuRect = menuEl.getBoundingClientRect();
+      return {
+        buttonTop: buttonRect.top,
+        buttonBottom: buttonRect.bottom,
+        menuTop: menuRect.top,
+        menuBottom: menuRect.bottom,
+        innerHeight: window.innerHeight,
+      };
+    });
+
+    expect(rect.menuTop).toBeGreaterThanOrEqual(0);
+    expect(rect.menuBottom).toBeLessThanOrEqual(rect.innerHeight);
+    expect(rect.menuBottom).toBeGreaterThan(rect.buttonTop);
+  });
+
   test('settings panel uses the refreshed material-style surface and controls', async ({ page }) => {
     await page.goto('/');
     await page.waitForFunction(() => (window as any).__viewer);

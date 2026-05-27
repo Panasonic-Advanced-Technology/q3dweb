@@ -26,6 +26,7 @@ import { Viewer } from '../src/viewer';
 import { CloudViewer } from '../src/cloud_viewer';
 import { FilmMakerViewer } from '../src/film_maker_viewer';
 import { RealtimeViewer } from '../src/realtime_viewer';
+import { RealtimeGnssViewer } from '../src/realtime_gnss_viewer';
 import { inferPointCloudFilename, parseCloudUrlOptions } from '../src/cloudUrlOptions';
 import { parseRealtimeUrlOptions } from '../src/realtimeUrlOptions';
 import { getHostViewerMode, installViewerModeSelector, navigateToViewerMode, normalizeViewerMode } from '../src/viewerMode';
@@ -339,6 +340,7 @@ describe('viewer mode selector', () => {
       'cloud_viewer',
       'film_maker',
       'realtime_viewer',
+      'realtime_gnss_viewer',
     ]);
     expect(modeSelect.value).toBe('cloud');
 
@@ -356,6 +358,7 @@ describe('viewer mode selector', () => {
     expect(normalizeViewerMode('cloud')).toBe('cloud');
     expect(normalizeViewerMode('film_maker')).toBe('film_maker');
     expect(normalizeViewerMode('realtime')).toBe('realtime');
+    expect(normalizeViewerMode('realtime_gnss')).toBe('realtime_gnss');
     expect(normalizeViewerMode('other')).toBe('cloud');
   });
 
@@ -653,6 +656,41 @@ describe('RealtimeViewer settings layout', () => {
   });
 });
 
+describe('RealtimeGnssViewer settings layout', () => {
+  let v: RealtimeGnssViewer;
+  beforeEach(() => { makeContainer(); v = new RealtimeGnssViewer('app'); });
+  afterEach(cleanupContainers);
+
+  it('places GNSS realtime controls above the item selector', () => {
+    const realtime = v.settingsPanel!.querySelector('[data-role="realtime-gnss"]') as HTMLElement;
+    const itemLabel = v.settingsPanel!.querySelector('[data-role="settings-item-label"]') as HTMLElement;
+    expect(realtime.textContent).toContain('GNSS1 Topic');
+    expect(realtime.textContent).toContain('GNSS2 Topic');
+    expect(realtime.textContent).not.toContain('Cloud Topic');
+    expect(realtime.textContent).not.toContain('Odom Topic');
+    expect(Array.from(v.settingsPanel!.children).indexOf(realtime)).toBeLessThan(
+      Array.from(v.settingsPanel!.children).indexOf(itemLabel),
+    );
+  });
+
+  it('applies GNSS realtime options to settings inputs', () => {
+    cleanupContainers();
+    makeContainer();
+    v = new RealtimeGnssViewer('app', {
+      rosbridgeUrl: 'ws://robot.local:9090',
+      gnss1TopicName: '/fix/main',
+      gnss2TopicName: '/fix/sub',
+    });
+
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-gnss-ros-url"]') as HTMLInputElement).value)
+      .toBe('ws://robot.local:9090');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-gnss1-topic"]') as HTMLInputElement).value)
+      .toBe('/fix/main');
+    expect((v.settingsPanel!.querySelector('[data-role="realtime-gnss2-topic"]') as HTMLInputElement).value)
+      .toBe('/fix/sub');
+  });
+});
+
 describe('realtime URL options', () => {
   it('parses rosbridge, topics, and point budgets from URL params', () => {
     const options = parseRealtimeUrlOptions(new URLSearchParams({
@@ -667,9 +705,23 @@ describe('realtime URL options', () => {
       rosbridgeUrl: 'ws://robot.local:9090',
       cloudTopicName: '/points_raw',
       odomTopicName: '/odom/wheel',
+      gnss1TopicName: undefined,
+      gnss2TopicName: undefined,
       maxPointsPerScan: 3200,
       maxAccumulatedPoints: 1_200_000,
     });
+  });
+
+  it('parses GNSS topic URL params', () => {
+    const options = parseRealtimeUrlOptions(new URLSearchParams({
+      ros: 'ws://robot.local:9090',
+      gnss1Topic: '/fix/main',
+      gnss2: '/fix/sub',
+    }));
+
+    expect(options.rosbridgeUrl).toBe('ws://robot.local:9090');
+    expect(options.gnss1TopicName).toBe('/fix/main');
+    expect(options.gnss2TopicName).toBe('/fix/sub');
   });
 
   it('supports aliases and ignores invalid point budgets', () => {

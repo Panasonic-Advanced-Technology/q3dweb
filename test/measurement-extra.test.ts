@@ -56,6 +56,56 @@ describe('measurement helpers extra paths', () => {
     expect(ctx.text2dItem?.setHTML).toHaveBeenCalledWith(expect.stringContaining('Point 1'));
   });
 
+  it('picks GNSS map tile meshes marked as measurement targets', () => {
+    const ctx = makeContext();
+    const gnssMap = new THREE.Group();
+    gnssMap.name = 'gnss_map';
+    const tile = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial());
+    tile.name = 'gnss_tile_18/1/2';
+    tile.userData.measurementTarget = true;
+    const ignoredTile = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial());
+    ignoredTile.name = 'ignored_tile';
+    gnssMap.add(tile);
+    gnssMap.add(ignoredTile);
+    ctx.items = { gnss_map: gnssMap };
+
+    vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockImplementation((objects) => {
+      expect(objects).toEqual([tile]);
+      return [
+        { distance: 4, point: new THREE.Vector3(1.5, -2.5, 0), object: tile } as any,
+      ];
+    });
+
+    addMeasurementPoint(new MouseEvent('mousedown', { clientX: 50, clientY: 50 }), ctx);
+
+    expect(ctx.selectedPoints).toEqual([new THREE.Vector3(1.5, -2.5, 0)]);
+  });
+
+  it('collects visible nested Points under grouped items for measurement picks', () => {
+    const ctx = makeContext();
+    const group = new THREE.Group();
+    group.name = 'gnss_tracks';
+    const nested = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial());
+    nested.name = 'gnss1_trail_points';
+    const hiddenNested = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial());
+    hiddenNested.name = 'hidden_trail_points';
+    hiddenNested.visible = false;
+    group.add(nested);
+    group.add(hiddenNested);
+    ctx.items = { gnss_tracks: group };
+
+    vi.spyOn(THREE.Raycaster.prototype, 'intersectObjects').mockImplementation((objects) => {
+      expect(objects).toEqual([nested]);
+      return [
+        { distanceToRay: 0.1, distance: 1, point: new THREE.Vector3(4, 5, 6), object: nested } as any,
+      ];
+    });
+
+    addMeasurementPoint(new MouseEvent('mousedown', { clientX: 50, clientY: 50 }), ctx);
+
+    expect(ctx.selectedPoints).toEqual([new THREE.Vector3(4, 5, 6)]);
+  });
+
   it('updates marker data, segment text, and empty state directly', () => {
     const marker = { setData: vi.fn() };
     const ctx = makeContext([

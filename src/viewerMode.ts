@@ -1,12 +1,13 @@
 import { makeLabel } from './viewer/settingsUI';
 import { createMaterialMenuSelect } from './viewer/materialSelect';
 
-export type ViewerMode = 'cloud' | 'film_maker' | 'realtime';
+export type ViewerMode = 'cloud' | 'film_maker' | 'realtime' | 'realtime_gnss';
 
 const VIEWER_MODE_OPTIONS: Array<{ value: ViewerMode; label: string }> = [
     { value: 'cloud', label: 'cloud_viewer' },
     { value: 'film_maker', label: 'film_maker' },
     { value: 'realtime', label: 'realtime_viewer' },
+    { value: 'realtime_gnss', label: 'realtime_gnss_viewer' },
 ];
 
 export interface ViewerModeSelectorHost {
@@ -18,7 +19,7 @@ export interface ViewerModeHostApi {
 }
 
 export function normalizeViewerMode(mode: string | null): ViewerMode {
-    return mode === 'film_maker' || mode === 'realtime' ? mode : 'cloud';
+    return mode === 'film_maker' || mode === 'realtime' || mode === 'realtime_gnss' ? mode : 'cloud';
 }
 
 export function getHostViewerMode(): ViewerMode | null {

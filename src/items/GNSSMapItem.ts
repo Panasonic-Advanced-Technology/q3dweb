@@ -11,6 +11,14 @@
  */
 
 import * as THREE from 'three';
+import {
+    makeButton,
+    makeCheckbox,
+    makeLabel,
+    makeNumberInput,
+    makeSelectInput,
+    makeStaticValue,
+} from '../viewer/settingsUI';
 
 // ============================================================
 // Tile server presets
@@ -22,6 +30,8 @@ export const TILE_PRESETS: { label: string; url: string; maxZoom?: number }[] = 
     { label: 'GSI 写真', url: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', maxZoom: 18 },
     { label: 'GSI 白地図', url: 'https://cyberjapandata.gsi.go.jp/xyz/blank/{z}/{x}/{y}.png', maxZoom: 14 },
 ];
+
+const MARKER_PIXEL_SIZE = 12;
 
 // ============================================================
 // Options
@@ -110,7 +120,7 @@ export class GNSSMapItem extends THREE.Group {
     private readonly MAX_TRAIL = 50000;
 
     // Current marker
-    private marker: THREE.Mesh;
+    private marker: THREE.Points;
     private currentLatLon: { lat: number; lon: number; alt: number; status: number } | null = null;
 
     // Tile group (separate so we can set renderOrder)
@@ -149,11 +159,12 @@ export class GNSSMapItem extends THREE.Group {
         this.trailLine.frustumCulled = false;
         this.add(this.trailLine);
 
-        // Current position marker (sphere)
-        const markerGeo = new THREE.SphereGeometry(0.3, 16, 12);
-        this.marker = new THREE.Mesh(
+        // Current position marker: screen-space size, independent of camera zoom.
+        const markerGeo = new THREE.BufferGeometry();
+        markerGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+        this.marker = new THREE.Points(
             markerGeo,
-            new THREE.MeshBasicMaterial({ color: 0x44bb44 })
+            new THREE.PointsMaterial({ color: 0x44bb44, size: MARKER_PIXEL_SIZE, sizeAttenuation: false })
         );
         this.marker.visible = false;
         this.marker.renderOrder = 2;
@@ -294,83 +305,45 @@ export class GNSSMapItem extends THREE.Group {
     // SettingBuilder interface (for M-key settings panel)
     // ============================================================
     addSetting(container: HTMLElement): void {
-        const mkLabel = (text: string) => {
-            const el = document.createElement('div');
-            el.textContent = text;
-            el.style.cssText = 'font-size:11px;color:#bbb;margin:4px 0 2px 0;';
-            container.appendChild(el);
-        };
-        const mkNumber = (val: number, min: number, max: number, step: number, cb: (v: number) => void) => {
-            const el = document.createElement('input');
-            el.type = 'number'; el.value = String(val); el.min = String(min); el.max = String(max); el.step = String(step);
-            el.style.cssText = 'width:100%;box-sizing:border-box;background:#333;color:#eee;border:1px solid #555;padding:3px 6px;border-radius:3px;margin-bottom:4px;font-family:monospace;font-size:11px;';
-            el.onchange = () => { const v = parseFloat(el.value); if (!isNaN(v)) cb(v); };
-            container.appendChild(el);
-        };
-
-        // Map on/off checkbox
-        const visRow = document.createElement('label');
-        visRow.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;color:#eee;margin:4px 0 6px 0;cursor:pointer;';
-        const visCb = document.createElement('input');
-        visCb.type = 'checkbox';
-        visCb.checked = this.tileGroup.visible;
-        visCb.onchange = () => {
-            this.tileGroup.visible = visCb.checked;
+        container.appendChild(makeCheckbox('Show map tiles', this.tileGroup.visible, (visible) => {
+            this.tileGroup.visible = visible;
             this.renderCb?.();
-        };
-        visRow.appendChild(visCb);
-        const visText = document.createElement('span');
-        visText.textContent = 'Show map tiles';
-        visRow.appendChild(visText);
-        container.appendChild(visRow);
+        }));
 
-        // Tile provider select
-        mkLabel('Tile provider:');
-        const select = document.createElement('select');
-        select.style.cssText = 'width:100%;box-sizing:border-box;background:#333;color:#eee;border:1px solid #555;padding:3px 6px;border-radius:3px;margin-bottom:4px;font-family:monospace;font-size:11px;';
-        for (const p of TILE_PRESETS) {
-            const opt = document.createElement('option');
-            opt.value = p.url;
-            opt.textContent = p.label;
-            if (p.url === this.tileServer) opt.selected = true;
-            select.appendChild(opt);
+        const tileProviderOptions = TILE_PRESETS.map((preset) => ({
+            label: preset.label,
+            value: preset.url,
+        }));
+        if (!TILE_PRESETS.some((preset) => preset.url === this.tileServer)) {
+            tileProviderOptions.push({ label: 'Custom', value: this.tileServer });
         }
-        // If current server not in presets, add a "Custom" entry
-        if (!TILE_PRESETS.some(p => p.url === this.tileServer)) {
-            const opt = document.createElement('option');
-            opt.value = this.tileServer;
-            opt.textContent = 'Custom';
-            opt.selected = true;
-            select.appendChild(opt);
-        }
-        select.onchange = () => {
-            const preset = TILE_PRESETS.find(p => p.url === select.value);
-            this.setTileServer(select.value, preset?.maxZoom);
-        };
-        container.appendChild(select);
 
-        mkLabel('Zoom level:');
-        mkNumber(this._zoom, 1, 19, 1, (v) => this.setZoom(v));
+        container.appendChild(makeLabel('Tile provider:'));
+        container.appendChild(makeSelectInput(tileProviderOptions, this.tileServer, (value) => {
+            const preset = TILE_PRESETS.find((candidate) => candidate.url === value);
+            this.setTileServer(value, preset?.maxZoom);
+        }));
 
-        mkLabel('Tile alpha:');
-        mkNumber(this._alpha, 0.1, 1.0, 0.05, (v) => this.setAlpha(v));
+        container.appendChild(makeLabel('Zoom level:'));
+        container.appendChild(makeNumberInput(this._zoom, 1, 19, 1, (v) => this.setZoom(v)));
 
-        mkLabel('Ground altitude:');
-        mkNumber(this._altitude, -100, 1000, 0.5, (v) => this.setAltitude(v));
+        container.appendChild(makeLabel('Tile alpha:'));
+        container.appendChild(makeNumberInput(this._alpha, 0.1, 1.0, 0.05, (v) => this.setAlpha(v)));
 
-        mkLabel('Tile radius:');
-        mkNumber(this._tileRadius, 1, 10, 1, (v) => {
+        container.appendChild(makeLabel('Ground altitude:'));
+        container.appendChild(makeNumberInput(this._altitude, -100, 1000, 0.5, (v) => this.setAltitude(v)));
+
+        container.appendChild(makeLabel('Tile radius:'));
+        container.appendChild(makeNumberInput(this._tileRadius, 1, 10, 1, (v) => {
             this._tileRadius = Math.max(1, Math.round(v));
             if (this.currentLatLon) this.updateTiles(this.currentLatLon.lat, this.currentLatLon.lon);
             this.renderCb?.();
-        });
+        }));
 
         if (!this._showTrailControls) return;
 
-        // Info display
-        const info = document.createElement('div');
-        info.style.cssText = 'font-size:11px;color:#aaa;margin-top:6px;text-align:center;';
-        info.textContent = 'trail: ' + this.trailCount + ' pts';
+        container.appendChild(makeLabel('Trail status:'));
+        const info = makeStaticValue(`trail: ${this.trailCount} pts`);
         container.appendChild(info);
         const id = setInterval(() => {
             if (!container.isConnected) { clearInterval(id); return; }
@@ -380,24 +353,8 @@ export class GNSSMapItem extends THREE.Group {
                 : 'trail: ' + this.trailCount + ' pts';
         }, 500);
 
-        // Buttons
-        const hr = document.createElement('hr');
-        hr.style.cssText = 'border:none;border-top:1px solid #444;margin:8px 0;';
-        container.appendChild(hr);
-
-        const btnStyle = 'width:100%;background:#444;color:#eee;border:1px solid #666;padding:5px 8px;border-radius:3px;cursor:pointer;font-family:monospace;font-size:12px;margin-bottom:4px;';
-
-        const clearBtn = document.createElement('button');
-        clearBtn.textContent = 'Clear Trail';
-        clearBtn.style.cssText = btnStyle;
-        clearBtn.onclick = () => this.clearTrail();
-        container.appendChild(clearBtn);
-
-        const resetBtn = document.createElement('button');
-        resetBtn.textContent = 'Reset Origin';
-        resetBtn.style.cssText = btnStyle;
-        resetBtn.onclick = () => this.resetOrigin();
-        container.appendChild(resetBtn);
+        container.appendChild(makeButton('Clear Trail', () => this.clearTrail()));
+        container.appendChild(makeButton('Reset Origin', () => this.resetOrigin()));
     }
 
     // ============================================================
@@ -481,6 +438,8 @@ export class GNSSMapItem extends THREE.Group {
                 });
 
                 const mesh = new THREE.Mesh(geo, mat);
+                mesh.name = `gnss_tile_${key}`;
+                mesh.userData.measurementTarget = true;
                 mesh.position.set(centerE, centerN, this._altitude);
                 mesh.renderOrder = -1;
                 mesh.frustumCulled = false;
@@ -513,6 +472,6 @@ export class GNSSMapItem extends THREE.Group {
             1: 0x44ddff,    // sbas
             2: 0xff8800,    // gbas
         };
-        (this.marker.material as THREE.MeshBasicMaterial).color.setHex(colors[status] ?? 0x888888);
+        (this.marker.material as THREE.PointsMaterial).color.setHex(colors[status] ?? 0x888888);
     }
 }

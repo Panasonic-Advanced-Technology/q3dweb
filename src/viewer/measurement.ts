@@ -1,5 +1,5 @@
 /**
- * Point measurement tool (Ctrl+click to place/remove measurement points).
+ * Point / surface measurement tool (Ctrl+click to place/remove measurement points).
  * Extracted from viewer.ts for modularity.
  */
 
@@ -15,6 +15,46 @@ export interface MeasurementContext {
     requestRender(): void;
 }
 
+type MeasurementTarget = THREE.Points | THREE.Mesh;
+
+function collectMeasurementTargets(ctx: MeasurementContext): MeasurementTarget[] {
+    const targets: MeasurementTarget[] = [];
+    for (const item of Object.values(ctx.items)) {
+        item.traverseVisible((object) => {
+            if (object === ctx.centerPointMesh) return;
+            if (object instanceof THREE.Points) {
+                if (object.name === '') return;
+                targets.push(object);
+                return;
+            }
+            if (object instanceof THREE.Mesh && object.userData.measurementTarget === true) {
+                targets.push(object);
+            }
+        });
+    }
+    return targets;
+}
+
+function chooseBestMeasurementHit(hits: THREE.Intersection[]): THREE.Intersection {
+    let best = hits[0];
+    for (let i = 1; i < hits.length; i++) {
+        const hit = hits[i];
+        const bestRay = Number.isFinite((best as any).distanceToRay) ? (best as any).distanceToRay : Number.POSITIVE_INFINITY;
+        const hitRay = Number.isFinite((hit as any).distanceToRay) ? (hit as any).distanceToRay : Number.POSITIVE_INFINITY;
+        const bestPriority = Number.isFinite(bestRay) ? 0 : 1;
+        const hitPriority = Number.isFinite(hitRay) ? 0 : 1;
+        if (hitPriority < bestPriority) {
+            best = hit;
+            continue;
+        }
+        if (hitPriority > bestPriority) continue;
+        if (hitRay < bestRay || (hitRay === bestRay && hit.distance < best.distance)) {
+            best = hit;
+        }
+    }
+    return best;
+}
+
 export function addMeasurementPoint(e: MouseEvent, ctx: MeasurementContext): void {
     const rect   = ctx.renderer.domElement.getBoundingClientRect();
     const mouse  = new THREE.Vector2(
@@ -25,18 +65,10 @@ export function addMeasurementPoint(e: MouseEvent, ctx: MeasurementContext): voi
     raycaster.setFromCamera(mouse, ctx.camera);
     raycaster.params.Points = { threshold: 0.5 };
 
-    const intersectables = Object.values(ctx.items).filter(
-        i => i instanceof THREE.Points && i.name !== '' && i !== ctx.centerPointMesh,
-    );
+    const intersectables = collectMeasurementTargets(ctx);
     const hits = raycaster.intersectObjects(intersectables, false);
     if (hits.length > 0) {
-        let best = hits[0] as any;
-        for (let i = 1; i < hits.length; i++) {
-            const h = hits[i] as any;
-            const bestRay = Number.isFinite(best.distanceToRay) ? best.distanceToRay : Infinity;
-            const hRay    = Number.isFinite(h.distanceToRay)    ? h.distanceToRay    : Infinity;
-            if (hRay < bestRay || (hRay === bestRay && h.distance < best.distance)) best = h;
-        }
+        const best = chooseBestMeasurementHit(hits);
         ctx.selectedPoints.push(best.point.clone());
         updateMeasurementMarker(ctx);
     }
