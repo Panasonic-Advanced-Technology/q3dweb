@@ -148,8 +148,13 @@ export function buildCloudItemSettings(
     const syncPointTransparency = () => {
         const alpha = mat.uniforms.alpha?.value ?? 1;
         const pointType = pointTypeUniform?.value ?? 0;
-        mat.transparent = alpha < 0.99 || pointType > 1.5;
-        mat.depthWrite = alpha >= 0.99 && pointType <= 1.5;
+        const nextTransparent = alpha < 0.99 || pointType > 1.5;
+        const nextDepthWrite = alpha >= 0.99 && pointType <= 1.5;
+        if (mat.transparent !== nextTransparent || mat.depthWrite !== nextDepthWrite) {
+            mat.transparent = nextTransparent;
+            mat.depthWrite = nextDepthWrite;
+            mat.needsUpdate = true;
+        }
     };
 
     const isPixelPointType   = (value: number) => value < 0.5;
@@ -191,7 +196,7 @@ export function buildCloudItemSettings(
                 syncPointTransparency();
                 if (sizeLabel) sizeLabel.textContent = getSizeLabelText();
                 if (sizeInput) sizeInput.value = getPointSizeInput().toString();
-                mat.needsUpdate = true; onRender();
+                onRender();
             },
         ));
     }
@@ -200,7 +205,7 @@ export function buildCloudItemSettings(
         sizeLabel = makeLabel(getSizeLabelText());
         container.appendChild(sizeLabel);
         sizeInput = makeNumberInput(getPointSizeInput(), 0, 100, 1, (v) => {
-            setStoredPointSize(v); mat.needsUpdate = true; onRender();
+            setStoredPointSize(v); onRender();
         });
         container.appendChild(sizeInput);
     }
@@ -210,7 +215,7 @@ export function buildCloudItemSettings(
         container.appendChild(makeRangeInput(mat.uniforms.alpha.value, 0, 1, 0.01, (v) => {
             mat.uniforms.alpha.value = v;
             syncPointTransparency();
-            mat.needsUpdate = true; onRender();
+            onRender();
         }));
     }
 
@@ -219,18 +224,18 @@ export function buildCloudItemSettings(
         container.appendChild(makeSelectInput(
             [{ label: 'Intensity', value: '0' }, { label: 'RGB', value: '1' }, { label: 'Flat', value: '2' }],
             String(mat.uniforms.colorMode.value),
-            (value) => { mat.uniforms.colorMode.value = parseInt(value, 10); mat.needsUpdate = true; onRender(); },
+            (value) => { mat.uniforms.colorMode.value = parseInt(value, 10); onRender(); },
         ));
     }
 
     if (mat.uniforms.vmin && mat.uniforms.vmax) {
         container.appendChild(makeLabel('Vmin:'));
         container.appendChild(makeNumberInput(mat.uniforms.vmin.value, -100000, 100000, 1, (v) => {
-            mat.uniforms.vmin.value = v; mat.needsUpdate = true; onRender();
+            mat.uniforms.vmin.value = v; onRender();
         }));
         container.appendChild(makeLabel('Vmax:'));
         container.appendChild(makeNumberInput(mat.uniforms.vmax.value, -100000, 100000, 1, (v) => {
-            mat.uniforms.vmax.value = v; mat.needsUpdate = true; onRender();
+            mat.uniforms.vmax.value = v; onRender();
         }));
     }
 }

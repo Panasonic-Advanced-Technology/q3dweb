@@ -17,6 +17,7 @@ import {
     updateMeasurementMarker as _updateMeasureMarker,
 } from './viewer/measurement';
 import { CloudItem } from './items/CloudItem';
+import { ChunkedCloudItem } from './items/ChunkedCloudItem';
 
 const wrapAngle = (a: number): number =>
     ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
@@ -64,6 +65,11 @@ export class Viewer {
 
     rendererPixelRatio: number = 1;
     isTouchPrimaryDevice: boolean = false;
+    private readonly _camOffset = new THREE.Vector3();
+    private readonly _camUp = new THREE.Vector3();
+    private readonly _camTemp = new THREE.Vector3();
+    private readonly boundRender = () => this.render();
+    private centerHideTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(containerId: string) {
         const container = document.getElementById(containerId);
@@ -123,9 +129,10 @@ export class Viewer {
     updateCamera() {
         const [roll, pitch, yaw] = this.euler;
         const Rwc = eulerToMatrix4(roll, pitch, yaw);
-        const offset = new THREE.Vector3(0, 0, this.cameraDist).applyMatrix4(Rwc);
-        this.camera.position.copy(this.cameraCenter.clone().add(offset));
-        this.camera.up.copy(new THREE.Vector3(0, 1, 0).applyMatrix4(Rwc));
+        this._camOffset.set(0, 0, this.cameraDist).applyMatrix4(Rwc);
+        this.camera.position.copy(this.cameraCenter).add(this._camOffset);
+        this._camUp.set(0, 1, 0).applyMatrix4(Rwc);
+        this.camera.up.copy(this._camUp);
         this.camera.lookAt(this.cameraCenter);
         this.updateProjection();
         this.requestRender();
@@ -155,10 +162,11 @@ export class Viewer {
             wrapAngle(this.euler[2] + rz),
         ];
         const RwcOld = eulerToMatrix4(this.euler[0], this.euler[1], this.euler[2]);
-        const tco = new THREE.Vector3(0, 0, this.cameraDist);
-        const twc = this.cameraCenter.clone().add(tco.clone().applyMatrix4(RwcOld));
+        this._camOffset.set(0, 0, this.cameraDist).applyMatrix4(RwcOld);
+        this._camTemp.copy(this.cameraCenter).add(this._camOffset);
         const RwcNew = eulerToMatrix4(ne[0], ne[1], ne[2]);
-        this.cameraCenter.copy(twc.clone().sub(tco.clone().applyMatrix4(RwcNew)));
+        this._camOffset.set(0, 0, this.cameraDist).applyMatrix4(RwcNew);
+        this.cameraCenter.copy(this._camTemp).sub(this._camOffset);
         this.euler = ne; this.updateCamera();
     }
 
@@ -313,7 +321,11 @@ export class Viewer {
         return coarsePointer || noHover;
     }
     private getCloudViewportHeight(): number { return Math.max(this.container.clientHeight * this.rendererPixelRatio, 1); }
-    protected syncCloudItemViewport(item: THREE.Object3D) { if (item instanceof CloudItem) item.updateViewport(this.getCloudViewportHeight()); }
+    protected syncCloudItemViewport(item: THREE.Object3D) {
+        if (item instanceof CloudItem || typeof (item as any).updateViewport === 'function') {
+            (item as any).updateViewport(this.getCloudViewportHeight());
+        }
+    }
     protected syncAllCloudItemViewports() { Object.values(this.items).forEach(i => this.syncCloudItemViewport(i)); }
 
     applyRendererResolution(pixelRatio: number): void {
@@ -360,9 +372,13 @@ export class Viewer {
         if (item) {
             const sel = this.settingsItemSelect?.value;
             this.scene.remove(item);
-            if ((item as any).geometry?.dispose) (item as any).geometry.dispose();
-            const mats = (item as any).material ? (Array.isArray((item as any).material) ? (item as any).material : [(item as any).material]) : [];
-            mats.forEach((m: any) => { if (typeof m.dispose === 'function') m.dispose(); });
+            if (typeof (item as any).dispose === 'function') {
+                (item as any).dispose();
+            } else {
+                if ((item as any).geometry?.dispose) (item as any).geometry.dispose();
+                const mats = (item as any).material ? (Array.isArray((item as any).material) ? (item as any).material : [(item as any).material]) : [];
+                mats.forEach((m: any) => { if (typeof m.dispose === 'function') m.dispose(); });
+            }
             delete this.items[name];
             this.refreshSettingsItemList(sel === name ? '__main_win__' : sel);
         }
@@ -380,13 +396,13 @@ export class Viewer {
     }
 
     requestRender() {
-        if (!this.renderRequested) { this.renderRequested = true; requestAnimationFrame(this.render.bind(this)); }
+        if (!this.renderRequested) { this.renderRequested = true; requestAnimationFrame(this.boundRender); }
     }
 
     startAnimationLoop() {
         const loop = () => {
             this.animationFrameId = requestAnimationFrame(loop);
-            this.updateMovement();
+            if (this.activeKeys.size > 0) this.updateMovement();
             if (this.enableShowCenter && this.showCenter && this.centerPointMesh) {
                 const pos = this.centerPointMesh.geometry.attributes.position;
                 (pos.array as Float32Array).set([this.cameraCenter.x, this.cameraCenter.y, this.cameraCenter.z]);
@@ -394,11 +410,41 @@ export class Viewer {
                 this.centerPointMesh.visible = true;
                 this.showCenter = false;
                 this.requestRender();
-                setTimeout(() => { if (this.centerPointMesh) this.centerPointMesh.visible = false; this.requestRender(); }, 500);
+                if (this.centerHideTimer !== null) clearTimeout(this.centerHideTimer);
+                this.centerHideTimer = setTimeout(() => {
+                    this.centerHideTimer = null;
+                    if (this.centerPointMesh) this.centerPointMesh.visible = false;
+                    this.requestRender();
+                }, 500);
             }
         };
         loop();
     }
 
-    render() { this.renderRequested = false; this.renderer.render(this.scene, this.camera); }
+    private findChunkedCloudItem(): ChunkedCloudItem | null {
+        const direct = this.items['cloud'];
+        if (direct instanceof ChunkedCloudItem) return direct;
+        for (const obj of Object.values(this.items)) {
+            if (obj instanceof ChunkedCloudItem) return obj;
+        }
+        return null;
+    }
+
+    render() {
+        this.renderRequested = false;
+        const chunked = this.findChunkedCloudItem();
+        if (chunked) {
+            chunked.renderWithBackend(this.renderer, this.camera, (target) => {
+                if (typeof (this.renderer as any).setRenderTarget === 'function') {
+                    this.renderer.setRenderTarget(target);
+                }
+                this.renderer.render(this.scene, this.camera);
+            });
+            if (chunked.needsRefinement()) {
+                this.requestRender();
+            }
+            return;
+        }
+        this.renderer.render(this.scene, this.camera);
+    }
 }

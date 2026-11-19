@@ -5,6 +5,18 @@ export function estimateVisiblePointBufferBytes(pointCount: number, hasRGB: bool
     return pointCount * (3 * 4 + 4 + (hasRGB ? 3 : 0)) + 32 * 1024 * 1024;
 }
 
+/**
+ * Peak JS heap footprint for streaming spatial-chunked ingestion.
+ * Completed chunks are uploaded directly to GPU VRAM and released from CPU memory,
+ * so resident JS heap stays bounded by active staging buffers + pick samples.
+ */
+export function estimateStreamingChunkedWorkspaceBytes(pointCount: number, hasRGB: boolean): number {
+    const stagingBytes = 64 * 1024 * 1024;
+    const pickSampleBytes = Math.min(pointCount, 400_000) * 12;
+    const overhead = (hasRGB ? 24 : 16) * 1024 * 1024;
+    return stagingBytes + pickSampleBytes + overhead;
+}
+
 export function estimateSingleBufferInputBytes(fileSize: number, format: string): number {
     const wasmCopyFactor = format === 'laz' ? 2 : 1;
     return Math.ceil(fileSize * wasmCopyFactor + 32 * 1024 * 1024);

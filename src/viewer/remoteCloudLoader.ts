@@ -75,6 +75,7 @@ export async function loadUrl(v: any, sourceUrl: string, filename?: string): Pro
         }
 
         const reader = response.body.getReader();
+        let lastYieldMs = performance.now();
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
@@ -84,7 +85,11 @@ export async function loadUrl(v: any, sourceUrl: string, filename?: string): Pro
                     await reader.cancel();
                     break;
                 }
-                await new Promise(r => setTimeout(r, 0));
+                const now = performance.now();
+                if (now - lastYieldMs >= 16) {
+                    lastYieldMs = now;
+                    await new Promise(r => setTimeout(r, 0));
+                }
             }
         }
         if (!v.streamAborted) await finalizeStream(v);
