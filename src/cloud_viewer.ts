@@ -18,7 +18,13 @@ import { loadUrl as _loadUrl } from './viewer/remoteCloudLoader';
 import {
     renderPoints as _renderPoints, resetRealtimeCloud as _resetRealtime,
     appendRealtimePoints as _appendRealtime,
+    beginStreamingCloud as _beginStreamingCloud,
+    pushStreamingCloudBatch as _pushStreamingCloudBatch,
+    finishStreamingCloud as _finishStreamingCloud,
 } from './viewer/cloudRenderer';
+import type { StreamingCloudInitOptions } from './cloud/types';
+import type { StreamingChunkBuilder } from './cloud/spatialChunker';
+import type { ChunkedCloudItem } from './items/ChunkedCloudItem';
 
 /**
  * CloudViewer extends the base Viewer with point cloud file loading.
@@ -45,12 +51,17 @@ export class CloudViewer extends Viewer {
     chunkList: Uint8Array[] = [];
 
     // --- render buffers ---
-    MAX_POINTS_VISUAL = 15_000_000;
+    MAX_POINTS_VISUAL = 100_000_000;
     realtimeMaxPoints: number = 5_000_000;
     posBuffer: Float32Array | null = null;
     valBuffer: Float32Array | null = null;
     rgbBuffer: Uint8Array | null = null;
     fullBuffer: Uint8Array | null = null;
+    streamingBuilder: StreamingChunkBuilder | null = null;
+    streamingCloudItem: ChunkedCloudItem | null = null;
+    streamingHasNonZeroRGB: boolean = false;
+    streamingMinVal: number = Infinity;
+    streamingMaxVal: number = -Infinity;
     posIndex: number = 0;
     dataMin: number = 0;
     dataMax: number = 255;
@@ -145,6 +156,11 @@ export class CloudViewer extends Viewer {
     parseAsciiPackedRGB(token: string, type: string, size: number): number { return _parseAsciiPackedRGB(token, type, size); }
     readNumericValue(view: DataView, byteOffset: number, type: string, size: number): number { return _readNumericValue(view, byteOffset, type, size); }
     getFieldSpec(fieldName: string) { return this.pcdHeader ? getFieldSpec(this.pcdHeader, fieldName) : null; }
+    beginStreamingCloud(options: StreamingCloudInitOptions): void { _beginStreamingCloud(this, options); }
+    pushStreamingCloudBatch(positions: Float32Array, values: Float32Array, rgbColors?: Uint8Array, pointCount?: number): void {
+        _pushStreamingCloudBatch(this, positions, values, rgbColors, pointCount);
+    }
+    finishStreamingCloud(): void { _finishStreamingCloud(this); }
     detectFormat(filename?: string) { return detectFormat(filename); }
     checkMemoryBudget(fileSize: number, format: string, filename?: string): boolean { return _checkMemoryBudget(this, fileSize, format, filename); }
     assembleChunkList() { return _assembleChunkList(this); }

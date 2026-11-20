@@ -109,7 +109,9 @@ export function parseLASMetadata(data: Uint8Array): LASMetadata {
     if (versionMajor === 1 && versionMinor >= 4) {
         const legacyCount  = view.getUint32(107, true);
         const count64Low   = view.getUint32(247, true);
-        numberOfPoints = count64Low > 0 ? count64Low : legacyCount;
+        const count64High  = data.byteLength >= 255 ? view.getUint32(251, true) : 0;
+        const count64      = count64High * 4294967296 + count64Low;
+        numberOfPoints = count64 > 0 ? count64 : legacyCount;
     } else {
         numberOfPoints = view.getUint32(107, true);
     }
@@ -285,33 +287,120 @@ export function processLASRecords(
 
     const usableBytes = count * rowSize;
     const view        = new DataView(data.buffer, data.byteOffset, usableBytes);
+    const ratio       = targetSampleRatio > 1 ? targetSampleRatio : 1;
+    const startIndex  = (ratio - (meta.rawPointIndex % ratio)) % ratio;
+    const maxOut      = valBuffer.length;
 
-    for (let i = 0; i < count; i++) {
-        const rawIdx = meta.rawPointIndex++;
-        if (rawIdx % targetSampleRatio !== 0) continue;
-        if (posIndexRef.value >= valBuffer.length) break;
+    const xScale = meta.xScale, yScale = meta.yScale, zScale = meta.zScale;
+    const xBias  = meta.xOff - meta.shiftX;
+    const yBias  = meta.yOff - meta.shiftY;
+    const zBias  = meta.zOff;
+    const rgbOff = meta.rgbOffset;
+    let outIdx   = posIndexRef.value;
 
-        const recordStart = i * rowSize;
-        const rawX = view.getInt32(recordStart,     true);
-        const rawY = view.getInt32(recordStart + 4, true);
-        const rawZ = view.getInt32(recordStart + 8, true);
-        const base = posIndexRef.value * 3;
+    if (rgbBuffer && rgbOff !== -1) {
+        for (let i = startIndex; i < count; i += ratio) {
+            if (outIdx >= maxOut) break;
+            const recordStart = i * rowSize;
+            const base = outIdx * 3;
+            posBuffer[base]     = view.getInt32(recordStart,     true) * xScale + xBias;
+            posBuffer[base + 1] = view.getInt32(recordStart + 4, true) * yScale + yBias;
+            posBuffer[base + 2] = view.getInt32(recordStart + 8, true) * zScale + zBias;
+            valBuffer[outIdx]   = view.getUint16(recordStart + 12, true);
 
-        posBuffer[base]     = rawX * meta.xScale + meta.xOff - meta.shiftX;
-        posBuffer[base + 1] = rawY * meta.yScale + meta.yOff - meta.shiftY;
-        posBuffer[base + 2] = rawZ * meta.zScale + meta.zOff;
-        valBuffer[posIndexRef.value] = view.getUint16(recordStart + 12, true);
-
-        if (rgbBuffer && meta.rgbOffset !== -1) {
-            let r = view.getUint16(recordStart + meta.rgbOffset,     true);
-            let g = view.getUint16(recordStart + meta.rgbOffset + 2, true);
-            let b = view.getUint16(recordStart + meta.rgbOffset + 4, true);
-            if (r > 255 || g > 255 || b > 255) { r = Math.floor(r / 256); g = Math.floor(g / 256); b = Math.floor(b / 256); }
+            let r = view.getUint16(recordStart + rgbOff,     true);
+            let g = view.getUint16(recordStart + rgbOff + 2, true);
+            let b = view.getUint16(recordStart + rgbOff + 4, true);
+            if ((r | g | b) > 255) { r >>>= 8; g >>>= 8; b >>>= 8; }
             rgbBuffer[base] = r; rgbBuffer[base + 1] = g; rgbBuffer[base + 2] = b;
+            outIdx++;
         }
-        posIndexRef.value++;
+    } else {
+        for (let i = startIndex; i < count; i += ratio) {
+            if (outIdx >= maxOut) break;
+            const recordStart = i * rowSize;
+            const base = outIdx * 3;
+            posBuffer[base]     = view.getInt32(recordStart,     true) * xScale + xBias;
+            posBuffer[base + 1] = view.getInt32(recordStart + 4, true) * yScale + yBias;
+            posBuffer[base + 2] = view.getInt32(recordStart + 8, true) * zScale + zBias;
+            valBuffer[outIdx]   = view.getUint16(recordStart + 12, true);
+            outIdx++;
+        }
     }
+
+    meta.rawPointIndex += count;
+    posIndexRef.value = outIdx;
 
     const leftovers = data.byteLength - usableBytes;
     leftoverRef.value = leftovers > 0 ? data.slice(usableBytes) : null;
+}
+
+/**
+ * Decode raw LAS records directly into a streaming sink (zero intermediate Float32 staging buffers).
+ */
+export function processLASRecordsDirect(
+    data: Uint8Array,
+    meta: LASStreamState,
+    targetSampleRatio: number,
+    leftoverRef: { value: Uint8Array | null },
+    onPoint: (x: number, y: number, z: number, intensity: number, r: number, g: number, b: number) => void,
+): { emitted: number; minVal: number; maxVal: number; hasNonZeroRGB: boolean } {
+    const rowSize = meta.pointDataRecordLength;
+    const count = Math.floor(data.byteLength / rowSize);
+    if (count === 0) {
+        leftoverRef.value = data.byteLength > 0 ? data.slice() : null;
+        return { emitted: 0, minVal: Infinity, maxVal: -Infinity, hasNonZeroRGB: false };
+    }
+
+    const usableBytes = count * rowSize;
+    const view = new DataView(data.buffer, data.byteOffset, usableBytes);
+    const ratio = targetSampleRatio > 1 ? targetSampleRatio : 1;
+    const startIndex = (ratio - (meta.rawPointIndex % ratio)) % ratio;
+    const xScale = meta.xScale, yScale = meta.yScale, zScale = meta.zScale;
+    const xBias = meta.xOff - meta.shiftX;
+    const yBias = meta.yOff - meta.shiftY;
+    const zBias = meta.zOff;
+    const rgbOff = meta.rgbOffset;
+    const hasRGB = meta.hasRGB && rgbOff !== -1;
+
+    let emitted = 0;
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+    let hasNonZeroRGB = false;
+
+    if (hasRGB) {
+        for (let i = startIndex; i < count; i += ratio) {
+            const off = i * rowSize;
+            const x = view.getInt32(off, true) * xScale + xBias;
+            const y = view.getInt32(off + 4, true) * yScale + yBias;
+            const z = view.getInt32(off + 8, true) * zScale + zBias;
+            const val = view.getUint16(off + 12, true);
+            if (val < minVal) minVal = val;
+            if (val > maxVal) maxVal = val;
+            let r = view.getUint16(off + rgbOff, true);
+            let g = view.getUint16(off + rgbOff + 2, true);
+            let b = view.getUint16(off + rgbOff + 4, true);
+            if ((r | g | b) > 255) { r >>>= 8; g >>>= 8; b >>>= 8; }
+            if (!hasNonZeroRGB && (r | g | b) > 0) hasNonZeroRGB = true;
+            onPoint(x, y, z, val, r, g, b);
+            emitted++;
+        }
+    } else {
+        for (let i = startIndex; i < count; i += ratio) {
+            const off = i * rowSize;
+            const x = view.getInt32(off, true) * xScale + xBias;
+            const y = view.getInt32(off + 4, true) * yScale + yBias;
+            const z = view.getInt32(off + 8, true) * zScale + zBias;
+            const val = view.getUint16(off + 12, true);
+            if (val < minVal) minVal = val;
+            if (val > maxVal) maxVal = val;
+            onPoint(x, y, z, val, 0, 0, 0);
+            emitted++;
+        }
+    }
+
+    meta.rawPointIndex += count;
+    const leftovers = data.byteLength - usableBytes;
+    leftoverRef.value = leftovers > 0 ? data.slice(usableBytes) : null;
+    return { emitted, minVal, maxVal, hasNonZeroRGB };
 }

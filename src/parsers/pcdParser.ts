@@ -267,35 +267,68 @@ export function processPCDBinaryChunk(
             ? (valOff / 4) : -1;
         const rgbOffFloat = (rgbOff !== -1 && rgbOff % 4 === 0) ? (rgbOff / 4) : -1;
         const doRGB       = (state.rgbBuffer !== null && rgbOffFloat !== -1 && uint32View !== null);
+        const posBuf      = state.posBuffer;
+        const valBuf      = state.valBuffer;
+        const rgbBuf      = state.rgbBuffer;
+        const maxPoints   = posBuf.length / 3;
+        const ratio       = state.targetSampleRatio;
+        let outIdx        = state.posIndex;
 
-        for (let i = startIndex; i < count; i += state.targetSampleRatio) {
-            if (state.posIndex >= state.posBuffer.length / 3) break;
-            const base = i * floatsPerRow;
-            state.posBuffer[state.posIndex * 3]     = floatView[base];
-            state.posBuffer[state.posIndex * 3 + 1] = floatView[base + 1];
-            state.posBuffer[state.posIndex * 3 + 2] = floatView[base + 2];
-
-            if (valOffFloat !== -1) {
-                state.valBuffer[state.posIndex] = floatView[base + valOffFloat];
-            } else if (intensitySpec && intensitySpec.count === 1) {
-                state.valBuffer[state.posIndex] = readNumericValue(dataView, i * rowSize + valOff, intensitySpec.type, intensitySpec.size);
-            } else {
-                state.valBuffer[state.posIndex] = floatView[base + 2];
-            }
-
-            if (doRGB) {
+        if (valOffFloat !== -1 && doRGB) {
+            for (let i = startIndex; i < count && outIdx < maxPoints; i += ratio) {
+                const base = i * floatsPerRow;
+                const p3 = outIdx * 3;
+                posBuf[p3]     = floatView[base];
+                posBuf[p3 + 1] = floatView[base + 1];
+                posBuf[p3 + 2] = floatView[base + 2];
+                valBuf[outIdx] = floatView[base + valOffFloat];
                 const rgbInt = uint32View![base + rgbOffFloat];
-                state.rgbBuffer![state.posIndex * 3]     = (rgbInt >> 16) & 0xFF;
-                state.rgbBuffer![state.posIndex * 3 + 1] = (rgbInt >>  8) & 0xFF;
-                state.rgbBuffer![state.posIndex * 3 + 2] =  rgbInt        & 0xFF;
-            } else if (state.rgbBuffer && rgbOff !== -1 && rgbSpec && rgbSpec.count === 1) {
-                const rgbInt = readPackedRGB(dataView, i * rowSize + rgbOff, rgbSpec.type, rgbSpec.size);
-                state.rgbBuffer[state.posIndex * 3]     = (rgbInt >> 16) & 0xFF;
-                state.rgbBuffer[state.posIndex * 3 + 1] = (rgbInt >>  8) & 0xFF;
-                state.rgbBuffer[state.posIndex * 3 + 2] =  rgbInt        & 0xFF;
+                rgbBuf![p3]     = (rgbInt >> 16) & 0xFF;
+                rgbBuf![p3 + 1] = (rgbInt >>  8) & 0xFF;
+                rgbBuf![p3 + 2] =  rgbInt        & 0xFF;
+                outIdx++;
             }
-            state.posIndex++;
+        } else if (valOffFloat !== -1 && !rgbBuf) {
+            for (let i = startIndex; i < count && outIdx < maxPoints; i += ratio) {
+                const base = i * floatsPerRow;
+                const p3 = outIdx * 3;
+                posBuf[p3]     = floatView[base];
+                posBuf[p3 + 1] = floatView[base + 1];
+                posBuf[p3 + 2] = floatView[base + 2];
+                valBuf[outIdx] = floatView[base + valOffFloat];
+                outIdx++;
+            }
+        } else {
+            for (let i = startIndex; i < count && outIdx < maxPoints; i += ratio) {
+                const base = i * floatsPerRow;
+                const p3 = outIdx * 3;
+                posBuf[p3]     = floatView[base];
+                posBuf[p3 + 1] = floatView[base + 1];
+                posBuf[p3 + 2] = floatView[base + 2];
+
+                if (valOffFloat !== -1) {
+                    valBuf[outIdx] = floatView[base + valOffFloat];
+                } else if (intensitySpec && intensitySpec.count === 1) {
+                    valBuf[outIdx] = readNumericValue(dataView, i * rowSize + valOff, intensitySpec.type, intensitySpec.size);
+                } else {
+                    valBuf[outIdx] = floatView[base + 2];
+                }
+
+                if (doRGB) {
+                    const rgbInt = uint32View![base + rgbOffFloat];
+                    rgbBuf![p3]     = (rgbInt >> 16) & 0xFF;
+                    rgbBuf![p3 + 1] = (rgbInt >>  8) & 0xFF;
+                    rgbBuf![p3 + 2] =  rgbInt        & 0xFF;
+                } else if (rgbBuf && rgbOff !== -1 && rgbSpec && rgbSpec.count === 1) {
+                    const rgbInt = readPackedRGB(dataView, i * rowSize + rgbOff, rgbSpec.type, rgbSpec.size);
+                    rgbBuf[p3]     = (rgbInt >> 16) & 0xFF;
+                    rgbBuf[p3 + 1] = (rgbInt >>  8) & 0xFF;
+                    rgbBuf[p3 + 2] =  rgbInt        & 0xFF;
+                }
+                outIdx++;
+            }
         }
+        state.posIndex = outIdx;
     } else {
         for (let i = startIndex; i < count; i += state.targetSampleRatio) {
             if (state.posIndex >= state.posBuffer.length / 3) break;

@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+.git
+.gitignore
+*.log
+extension/node_modules
+extension/out
+extension/dist

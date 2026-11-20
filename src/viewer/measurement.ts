@@ -15,13 +15,17 @@ export interface MeasurementContext {
     requestRender(): void;
 }
 
-type MeasurementTarget = THREE.Points | THREE.Mesh;
+type MeasurementTarget = THREE.Points | THREE.Mesh | THREE.Object3D;
 
 function collectMeasurementTargets(ctx: MeasurementContext): MeasurementTarget[] {
     const targets: MeasurementTarget[] = [];
     for (const item of Object.values(ctx.items)) {
         item.traverseVisible((object) => {
             if (object === ctx.centerPointMesh) return;
+            if ((object as any).isChunkedCloudItem === true) {
+                targets.push(object);
+                return;
+            }
             if (object instanceof THREE.Points) {
                 if (object.name === '') return;
                 targets.push(object);

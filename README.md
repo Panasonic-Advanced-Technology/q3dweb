@@ -253,7 +253,37 @@ npm run build
 npm run preview -- --host 127.0.0.1 --port 4173
 ```
 
-### 3. Run the VS Code Version
+### 3. Run with Docker (LAN Access Enabled)
+
+The repository includes helper scripts under `docker/` so you can build and run quickly.
+
+```bash
+cd q3dweb
+./docker/docker_build.sh
+./docker/docker_run.sh
+./docker/docker_stop.sh
+```
+
+By default, the container is published on `0.0.0.0:4173`, so another PC on the same LAN can open:
+
+```text
+http://<host-lan-ip>:4173
+```
+
+Optional environment variables:
+
+```bash
+# Default: q3dweb:local
+IMAGE_NAME=q3dweb:local ./docker/docker_build.sh
+
+# Default: q3dweb
+CONTAINER_NAME=q3dweb HOST_PORT=4173 ./docker/docker_run.sh
+
+# Stop container (default: q3dweb)
+CONTAINER_NAME=q3dweb ./docker/docker_stop.sh
+```
+
+### 4. Run the VS Code Version
 
 ```bash
 # Build the extension (viewer build + extension compile)
@@ -263,7 +293,7 @@ npm run build:extension
 npm run package:extension
 ```
 
-### 4. Run the Test Suite
+### 5. Run the Test Suite
 
 ```bash
 # Unit tests

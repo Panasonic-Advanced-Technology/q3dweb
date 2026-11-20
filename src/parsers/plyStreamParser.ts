@@ -184,35 +184,62 @@ function processBinaryChunk(state: PLYStreamState, data: Uint8Array): void {
     const isLE = state.header.format === 'binary_little_endian';
     const view = new DataView(chunk.buffer, chunk.byteOffset, usedBytes);
 
-    for (let i = 0; i < availableVertices; i++) {
-        const rawIndex = state.vertexIndex++;
-        if (rawIndex % state.sampleRatio !== 0) continue;
-        if (state.parsedPoints >= state.values.length) break;
+    const ratio = state.sampleRatio > 1 ? state.sampleRatio : 1;
+    const startIndex = (ratio - (state.vertexIndex % ratio)) % ratio;
+    const rowSize = state.vertexByteSize;
+    const xOff = state.propOffsets[state.xIndex];
+    const yOff = state.propOffsets[state.yIndex];
+    const zOff = state.propOffsets[state.zIndex];
+    const xType = state.header.vertexProps[state.xIndex].type;
+    const yType = state.header.vertexProps[state.yIndex].type;
+    const zType = state.header.vertexProps[state.zIndex].type;
+    const iIdx = state.intensityIndex;
+    const iOff = iIdx >= 0 ? state.propOffsets[iIdx] : -1;
+    const iType = iIdx >= 0 ? state.header.vertexProps[iIdx].type : '';
+    const hasRed = state.hasRed;
+    const hasPackedRGB = state.hasPackedRGB;
+    const rOff = hasRed ? state.propOffsets[state.redIndex] : -1;
+    const gOff = hasRed ? state.propOffsets[state.greenIndex] : -1;
+    const bOff = hasRed ? state.propOffsets[state.blueIndex] : -1;
+    const rType = hasRed ? state.header.vertexProps[state.redIndex].type : '';
+    const gType = hasRed ? state.header.vertexProps[state.greenIndex].type : '';
+    const bType = hasRed ? state.header.vertexProps[state.blueIndex].type : '';
+    const pRgbOff = hasPackedRGB ? state.propOffsets[state.packedRgbIndex] : -1;
+    const pRgbType = state.packedRgbType;
+    const positions = state.positions;
+    const values = state.values;
+    const rgb = state.rgb;
+    const maxPts = values.length;
+    let outIdx = state.parsedPoints;
 
-        const rowOffset = i * state.vertexByteSize;
-        const base = state.parsedPoints * 3;
-        state.positions[base] = readPLYValue(view, rowOffset + state.propOffsets[state.xIndex], state.header.vertexProps[state.xIndex].type, isLE);
-        state.positions[base + 1] = readPLYValue(view, rowOffset + state.propOffsets[state.yIndex], state.header.vertexProps[state.yIndex].type, isLE);
-        state.positions[base + 2] = readPLYValue(view, rowOffset + state.propOffsets[state.zIndex], state.header.vertexProps[state.zIndex].type, isLE);
-        state.values[state.parsedPoints] = state.intensityIndex >= 0
-            ? readPLYValue(view, rowOffset + state.propOffsets[state.intensityIndex], state.header.vertexProps[state.intensityIndex].type, isLE)
-            : state.positions[base + 2];
+    for (let i = startIndex; i < availableVertices && outIdx < maxPts; i += ratio) {
+        const rowOffset = i * rowSize;
+        const base = outIdx * 3;
+        const x = readPLYValue(view, rowOffset + xOff, xType, isLE);
+        const y = readPLYValue(view, rowOffset + yOff, yType, isLE);
+        const z = readPLYValue(view, rowOffset + zOff, zType, isLE);
+        positions[base] = x;
+        positions[base + 1] = y;
+        positions[base + 2] = z;
+        values[outIdx] = iIdx >= 0 ? readPLYValue(view, rowOffset + iOff, iType, isLE) : z;
 
-        if (state.rgb) {
-            if (state.hasRed) {
-                state.rgb[base] = readPLYValue(view, rowOffset + state.propOffsets[state.redIndex], state.header.vertexProps[state.redIndex].type, isLE);
-                state.rgb[base + 1] = readPLYValue(view, rowOffset + state.propOffsets[state.greenIndex], state.header.vertexProps[state.greenIndex].type, isLE);
-                state.rgb[base + 2] = readPLYValue(view, rowOffset + state.propOffsets[state.blueIndex], state.header.vertexProps[state.blueIndex].type, isLE);
-            } else if (state.hasPackedRGB) {
-                const rgbValue = readPLYValue(view, rowOffset + state.propOffsets[state.packedRgbIndex], state.header.vertexProps[state.packedRgbIndex].type, isLE);
-                const rgbInt = decodePLYPackedRGB(rgbValue, state.packedRgbType);
-                state.rgb[base] = (rgbInt >> 16) & 0xFF;
-                state.rgb[base + 1] = (rgbInt >> 8) & 0xFF;
-                state.rgb[base + 2] = rgbInt & 0xFF;
+        if (rgb) {
+            if (hasRed) {
+                rgb[base] = readPLYValue(view, rowOffset + rOff, rType, isLE);
+                rgb[base + 1] = readPLYValue(view, rowOffset + gOff, gType, isLE);
+                rgb[base + 2] = readPLYValue(view, rowOffset + bOff, bType, isLE);
+            } else if (hasPackedRGB) {
+                const rgbValue = readPLYValue(view, rowOffset + pRgbOff, pRgbType, isLE);
+                const rgbInt = decodePLYPackedRGB(rgbValue, pRgbType);
+                rgb[base] = (rgbInt >> 16) & 0xFF;
+                rgb[base + 1] = (rgbInt >> 8) & 0xFF;
+                rgb[base + 2] = rgbInt & 0xFF;
             }
         }
-        state.parsedPoints++;
+        outIdx++;
     }
+    state.vertexIndex += availableVertices;
+    state.parsedPoints = outIdx;
 
     const leftoverStart = usedBytes;
     state.binaryLeftover = leftoverStart < chunk.byteLength && state.vertexIndex < state.header.vertexCount

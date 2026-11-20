@@ -25,6 +25,25 @@ import {
     ensureSingleBufferInputBudget,
     ensureStreamedPointBudget,
 } from './loadBudget';
+import { STATIC_CHUNKED_THRESHOLD } from './cloudRenderer';
+
+const STREAM_YIELD_INTERVAL_MS = 16;
+const OVERLAY_UPDATE_INTERVAL_MS = 100;
+
+function updateProgressOverlay(v: any, progress: number, force: boolean = false): void {
+    if (!v.loadingOverlay || v.streamAborted) return;
+    const now = performance.now();
+    if (!force && v._lastOverlayUpdateMs && now - v._lastOverlayUpdateMs < OVERLAY_UPDATE_INTERVAL_MS) {
+        return;
+    }
+    v._lastOverlayUpdateMs = now;
+    let label = v.loadingOverlay.firstElementChild as HTMLElement | null;
+    if (!label) {
+        v.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;"></div>';
+        label = v.loadingOverlay.firstElementChild as HTMLElement | null;
+    }
+    if (label) label.textContent = `Loading: ${progress.toFixed(1)}%`;
+}
 
 export {
     abortStream,
@@ -57,6 +76,7 @@ export function shouldUseSingleBufferParser(format: string): boolean {
 export function startStream(v: any, totalSize: number, filename?: string): void {
     v.streamFilename = filename; v.streamTotalSize = totalSize; v.streamLoadedSize = 0;
     v.streamAborted = false; v.pcdHeader = null; v.lasStream = null;
+    v.lasDirectStreaming = false; v._lastOverlayUpdateMs = 0;
     v.leftoverChunk = null; v.pointsLoaded = 0; v.posIndex = 0;
     v.posBuffer = null; v.valBuffer = null; v.fullBuffer = null;
     v.rgbBuffer = null; v.fullBufferWriteOffset = 0; v.chunkList = [];
@@ -97,18 +117,87 @@ function processLASChunkInternal(v: any, chunkData: Uint8Array): void {
         const offsetToPointData = view.getUint32(96, true);
         if (chunkData.byteLength < offsetToPointData) { v.leftoverChunk = chunkData; return; }
         const meta = parseLASMetadata(chunkData.subarray(0, offsetToPointData));
-        v.targetSampleRatio = computePointSampleRatio(meta.numberOfPoints, v.MAX_POINTS_VISUAL, v.streamTotalSize);
-        const estimated = estimateSampledPointCount(meta.numberOfPoints, v.targetSampleRatio, v.MAX_POINTS_VISUAL);
         const needsRGB = meta.hasRGB && meta.rgbOffset !== -1;
-        if (!ensureStreamedPointBudget(v, estimated, needsRGB, 'las', v.streamFilename)) return;
-        v.posBuffer = new Float32Array(estimated * 3);
-        v.valBuffer = new Float32Array(estimated);
-        v.rgbBuffer = needsRGB ? new Uint8Array(estimated * 3) : null;
-        v.lasStream = { ...meta, rawPointIndex: 0 };
-        if (v.statusElement) v.statusElement.textContent = `Streaming: ~${estimated.toLocaleString()} pts`;
+        const canDirectStream = Boolean(
+            meta.bounds &&
+            meta.numberOfPoints >= STATIC_CHUNKED_THRESHOLD &&
+            typeof v.beginStreamingCloud === 'function' &&
+            typeof v.pushStreamingCloudBatch === 'function' &&
+            typeof v.finishStreamingCloud === 'function',
+        );
+        if (canDirectStream) {
+            v.targetSampleRatio = computePointSampleRatio(meta.numberOfPoints, v.MAX_POINTS_VISUAL, 0);
+            const estimated = estimateSampledPointCount(meta.numberOfPoints, v.targetSampleRatio, v.MAX_POINTS_VISUAL);
+            const b = meta.bounds!;
+            v.lasDirectStreaming = true;
+            v.beginStreamingCloud({
+                totalPointsEstimate: estimated,
+                hasRGB: needsRGB,
+                bounds: {
+                    minX: b.minX - meta.shiftX,
+                    minY: b.minY - meta.shiftY,
+                    minZ: b.minZ,
+                    maxX: b.maxX - meta.shiftX,
+                    maxY: b.maxY - meta.shiftY,
+                    maxZ: b.maxZ,
+                },
+                valMin: 0,
+                valMax: 65535,
+            });
+            v.lasStream = { ...meta, rawPointIndex: 0 };
+            if (v.statusElement) v.statusElement.textContent = `Streaming: ~${estimated.toLocaleString()} pts`;
+        } else {
+            v.targetSampleRatio = computePointSampleRatio(meta.numberOfPoints, v.MAX_POINTS_VISUAL, v.streamTotalSize);
+            const estimated = estimateSampledPointCount(meta.numberOfPoints, v.targetSampleRatio, v.MAX_POINTS_VISUAL);
+            if (!ensureStreamedPointBudget(v, estimated, needsRGB, 'las', v.streamFilename)) return;
+            v.posBuffer = new Float32Array(estimated * 3);
+            v.valBuffer = new Float32Array(estimated);
+            v.rgbBuffer = needsRGB ? new Uint8Array(estimated * 3) : null;
+            v.lasStream = { ...meta, rawPointIndex: 0 };
+            if (v.statusElement) v.statusElement.textContent = `Streaming: ~${estimated.toLocaleString()} pts`;
+        }
         chunkData = chunkData.subarray(meta.offsetToPointData);
         if (chunkData.byteLength === 0) return;
     }
+
+    if (v.lasDirectStreaming && v.streamingBuilder && v.streamingCloudItem) {
+        const meta = v.lasStream;
+        const rowSize = meta.pointDataRecordLength;
+        const recordCount = Math.floor(chunkData.byteLength / rowSize);
+        if (recordCount === 0) {
+            v.leftoverChunk = chunkData.byteLength > 0 ? chunkData.slice() : null;
+            return;
+        }
+        const usableBytes = recordCount * rowSize;
+        const view = new DataView(chunkData.buffer, chunkData.byteOffset, usableBytes);
+        const ratio = v.targetSampleRatio > 1 ? v.targetSampleRatio : 1;
+        const startIndex = (ratio - (meta.rawPointIndex % ratio)) % ratio;
+        const res = v.streamingBuilder.pushLASRecords(
+            view,
+            recordCount,
+            startIndex,
+            ratio,
+            rowSize,
+            meta.xScale,
+            meta.yScale,
+            meta.zScale,
+            meta.xOff - meta.shiftX,
+            meta.yOff - meta.shiftY,
+            meta.zOff,
+            meta.hasRGB ? meta.rgbOffset : -1,
+            (chunk: any) => v.streamingCloudItem.addChunk(chunk, v.renderer),
+        );
+        if (res.minVal < v.streamingMinVal) v.streamingMinVal = res.minVal;
+        if (res.maxVal > v.streamingMaxVal) v.streamingMaxVal = res.maxVal;
+        if (res.hasNonZeroRGB) v.streamingHasNonZeroRGB = true;
+        meta.rawPointIndex += recordCount;
+        v.posIndex += res.emitted;
+        v.pointsLoaded = meta.rawPointIndex;
+        const leftovers = chunkData.byteLength - usableBytes;
+        v.leftoverChunk = leftovers > 0 ? chunkData.slice(usableBytes) : null;
+        return;
+    }
+
     const posIndexRef = { value: v.posIndex };
     const leftoverRef = { value: v.leftoverChunk };
     processLASRecords(chunkData, v.lasStream, v.posBuffer, v.valBuffer, v.rgbBuffer, posIndexRef, v.targetSampleRatio, leftoverRef);
@@ -154,21 +243,20 @@ export function processChunk(v: any, chunkData: Uint8Array, _offset: number): vo
         v.streamLoadedSize += chunkData.byteLength;
         if (v.streamTotalSize > 0 && v.streamLoadedSize > v.streamTotalSize) v.streamTotalSize = v.streamLoadedSize;
         const progress = v.streamTotalSize > 0 ? Math.min(100, (v.streamLoadedSize / v.streamTotalSize) * 100) : 0;
-        const pHtml = (pct: number) => `<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Loading: ${pct.toFixed(1)}%</div>`;
         if (v.currentFormat === 'las') {
             processLASChunkInternal(v, chunkData);
-            if (!v.streamAborted && v.loadingOverlay) v.loadingOverlay.innerHTML = pHtml(progress);
+            updateProgressOverlay(v, progress);
             return;
         }
         if (v.currentFormat === 'ply') {
             processPLYChunkInternal(v, chunkData);
-            if (!v.streamAborted && v.loadingOverlay) v.loadingOverlay.innerHTML = pHtml(progress);
+            updateProgressOverlay(v, progress);
             return;
         }
         if (v.currentFormat !== 'pcd') {
             const chunk = v.currentFormat === 'e57' ? chunkData : new Uint8Array(chunkData);
             v.chunkList.push(chunk); v.fullBufferWriteOffset += chunkData.byteLength;
-            if (v.loadingOverlay) v.loadingOverlay.innerHTML = pHtml(progress);
+            updateProgressOverlay(v, progress);
             return;
         }
         if (!v.pcdHeader) {
@@ -230,7 +318,7 @@ export function processChunk(v: any, chunkData: Uint8Array, _offset: number): vo
             v.fullBuffer.set(chunkData, v.fullBufferWriteOffset);
             v.fullBufferWriteOffset += chunkData.byteLength;
         }
-        if (!v.streamAborted && v.loadingOverlay) v.loadingOverlay.innerHTML = pHtml(progress);
+        updateProgressOverlay(v, progress);
     } catch (e) { console.error('Chunk processing failed', e); }
 }
 
@@ -269,7 +357,12 @@ export async function finalizeStream(v: any): Promise<void> {
     };
     try {
         if (v.streamAborted) return;
-        if (v.currentFormat === 'las' && v.lasStream && v.posBuffer && v.valBuffer) {
+        if (v.currentFormat === 'las' && v.lasStream && v.lasDirectStreaming) {
+            v.finishStreamingCloud();
+            if (v.lasStream.originLatLon && v.lasStream.bounds) addLASOverlay(v, v.lasStream.originLatLon, v.lasStream.bounds);
+            v.lasStream = null; v.lasDirectStreaming = false; v.leftoverChunk = null;
+            v.posBuffer = null; v.valBuffer = null; v.rgbBuffer = null;
+        } else if (v.currentFormat === 'las' && v.lasStream && v.posBuffer && v.valBuffer) {
             const pos = v.posBuffer.subarray(0, v.posIndex * 3);
             const val = v.valBuffer.subarray(0, v.posIndex);
             normalizeIntensity(val);
@@ -385,13 +478,18 @@ export async function loadFile(v: any, file: File, append: boolean = false): Pro
         }
         // @ts-ignore
         const reader = file.stream().getReader();
+        let lastYieldMs = performance.now();
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             if (value) {
                 processChunk(v, value, 0);
                 if (v.streamAborted) { if (typeof reader.cancel === 'function') await reader.cancel(); break; }
-                await new Promise(r => setTimeout(r, 0));
+                const now = performance.now();
+                if (now - lastYieldMs >= STREAM_YIELD_INTERVAL_MS) {
+                    lastYieldMs = now;
+                    await new Promise(r => setTimeout(r, 0));
+                }
             }
         }
         if (!v.streamAborted) await finalizeStream(v);
