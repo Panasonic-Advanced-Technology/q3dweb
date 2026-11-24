@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
+import { pwaPlugin } from './pwa/vitePwaPlugin';
 
 export default defineConfig(() => {
   return {
     base: './',
+    plugins: [pwaPlugin()],
     esbuild: {
       keepNames: true,
     },
