@@ -10,6 +10,7 @@ import {
 
 export const AUTO_SORT_DEPTH_THRESHOLD = 0.1;
 export const AUTO_SORT_ALPHA_THRESHOLD = 0.99;
+export const AUTO_POINT_SORT_MAX_POINTS = 2_000_000;
 export const DEFAULT_AUTO_SORT_IDLE_MS = 250;
 export const DEFAULT_AUTO_SORT_TIME_SLICE_MS = 6;
 
@@ -17,6 +18,7 @@ export type IncrementalSortStartResult = 'skipped' | 'chunk-only-done' | 'in-pro
 
 export interface IncrementalDepthSortableItem {
     isTransparentForDepthSort(): boolean;
+    isRefining?(): boolean;
     beginAutoSort(camera: THREE.Camera, renderer?: THREE.WebGLRenderer): IncrementalSortStartResult;
     stepAutoSort(budgetMs: number, renderer?: THREE.WebGLRenderer): boolean;
     cancelAutoSort(): void;
@@ -220,7 +222,7 @@ export class AutoDepthSortController {
     /** Run idle sort immediately (invoked by timer or tests). Returns true if any sort started or completed. */
     runIdleSort(): boolean {
         if (!this.enabled) return false;
-        if (this.host.isUserInteracting()) {
+        if (this.host.isUserInteracting() || this.hasRefiningItem()) {
             this.scheduleIdleSort();
             return false;
         }
@@ -266,7 +268,7 @@ export class AutoDepthSortController {
     /** Process one time-sliced frame of active incremental sorts. Returns true when all are done. */
     stepActiveSort(): boolean {
         this.stepRafId = null;
-        if (!this.enabled || this.host.isUserInteracting()) {
+        if (!this.enabled || this.host.isUserInteracting() || this.hasRefiningItem()) {
             this.cancelActiveIncremental();
             return true;
         }
@@ -285,6 +287,16 @@ export class AutoDepthSortController {
             return false;
         }
         return true;
+    }
+
+    private hasRefiningItem(): boolean {
+        for (const item of this.host.getSortableItems()) {
+            if (!item.visible) continue;
+            if (isIncrementalSortable(item) && typeof item.isRefining === 'function' && item.isRefining()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private hasTransparentSortableItem(): boolean {

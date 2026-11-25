@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CloudShaderMaterial, type CloudItemOptions } from './CloudItem';
 import { ChunkedCloudBackend } from '../cloud/ChunkedCloudBackend';
 import { buildSpatialChunks } from '../cloud/spatialChunker';
+import { buildSpatialChunksAsync, yieldToMain } from '../cloud/asyncChunkBuilder';
 import { AUTO_SORT_ALPHA_THRESHOLD, type IncrementalSortStartResult } from '../cloud/autoDepthSort';
 import type {
     CloudBounds,
@@ -80,6 +81,35 @@ export class ChunkedCloudItem extends THREE.Object3D {
         return item;
     }
 
+    static async fromArraysAsync(
+        positions: Float32Array,
+        values: Float32Array,
+        options: CloudItemOptions = {},
+        rgbColors?: Uint8Array,
+        renderer?: THREE.WebGLRenderer,
+        onProgress?: (stage: 'chunking' | 'uploading', fraction: number) => void,
+        sliceMs: number = 14,
+    ): Promise<ChunkedCloudItem> {
+        const built = await buildSpatialChunksAsync(positions, values, rgbColors, {
+            sliceMs,
+            onProgress: (f) => onProgress?.('chunking', f),
+        });
+        const item = new ChunkedCloudItem(options, built.valOffset, built.valScale);
+        const total = built.chunks.length;
+        let sliceStart = performance.now();
+        for (let i = 0; i < total; i++) {
+            item.addChunk(built.chunks[i], renderer);
+            if (i + 1 < total && performance.now() - sliceStart >= sliceMs) {
+                onProgress?.('uploading', (i + 1) / total);
+                await yieldToMain();
+                sliceStart = performance.now();
+            }
+        }
+        onProgress?.('uploading', 1);
+        item.setGlobalBounds(built.bounds);
+        return item;
+    }
+
     addChunk(chunk: QuantizedChunkData, renderer?: THREE.WebGLRenderer): void {
         this.backend.addChunk(chunk, renderer);
         this.expandBounds(chunk.bounds);
@@ -119,6 +149,10 @@ export class ChunkedCloudItem extends THREE.Object3D {
 
     isTransparentForDepthSort(): boolean {
         return Number(this.material.uniforms.alpha.value) < AUTO_SORT_ALPHA_THRESHOLD;
+    }
+
+    isRefining(): boolean {
+        return this.needsRefinement();
     }
 
     beginAutoSort(camera: THREE.Camera, renderer?: THREE.WebGLRenderer): IncrementalSortStartResult {

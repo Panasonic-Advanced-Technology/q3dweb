@@ -26,11 +26,17 @@ import {
     ensureStreamedPointBudget,
 } from './loadBudget';
 import { STATIC_CHUNKED_THRESHOLD } from './cloudRenderer';
+import { normalizeIntensityAsync, yieldToMain } from '../cloud/asyncChunkBuilder';
 
 const STREAM_YIELD_INTERVAL_MS = 16;
 const OVERLAY_UPDATE_INTERVAL_MS = 100;
 
-function updateProgressOverlay(v: any, progress: number, force: boolean = false): void {
+function updateProgressOverlay(
+    v: any,
+    progress: number,
+    force: boolean = false,
+    stageLabel: string = 'Loading',
+): void {
     if (!v.loadingOverlay || v.streamAborted) return;
     const now = performance.now();
     if (!force && v._lastOverlayUpdateMs && now - v._lastOverlayUpdateMs < OVERLAY_UPDATE_INTERVAL_MS) {
@@ -42,7 +48,33 @@ function updateProgressOverlay(v: any, progress: number, force: boolean = false)
         v.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;"></div>';
         label = v.loadingOverlay.firstElementChild as HTMLElement | null;
     }
-    if (label) label.textContent = `Loading: ${progress.toFixed(1)}%`;
+    if (label) label.textContent = `${stageLabel}: ${progress.toFixed(1)}%`;
+}
+
+async function normalizeCloudIntensityAsync(v: any, values: Float32Array): Promise<void> {
+    updateProgressOverlay(v, 0, true, 'Normalizing');
+    await yieldToMain();
+    await normalizeIntensityAsync(values, (fraction) => {
+        updateProgressOverlay(v, fraction * 100, false, 'Normalizing');
+    });
+}
+
+async function renderParsedCloudAsync(
+    v: any,
+    positions: Float32Array,
+    values: Float32Array,
+    rgb: Uint8Array | undefined,
+): Promise<void> {
+    updateProgressOverlay(v, 0, true, 'Building chunks');
+    await yieldToMain();
+    await v.renderPointsAsync(positions, values, rgb, (stage: 'chunking' | 'uploading', fraction: number) => {
+        updateProgressOverlay(
+            v,
+            fraction * 100,
+            false,
+            stage === 'chunking' ? 'Building chunks' : 'Uploading GPU',
+        );
+    });
 }
 
 export {
@@ -357,77 +389,149 @@ export async function finalizeStream(v: any): Promise<void> {
     };
     try {
         if (v.streamAborted) return;
+        const canAsyncRender = (len: number) => len >= STATIC_CHUNKED_THRESHOLD && typeof v.renderPointsAsync === 'function';
         if (v.currentFormat === 'las' && v.lasStream && v.lasDirectStreaming) {
-            v.finishStreamingCloud();
-            if (v.lasStream.originLatLon && v.lasStream.bounds) addLASOverlay(v, v.lasStream.originLatLon, v.lasStream.bounds);
+            const lasMeta = v.lasStream;
+            if (typeof v.finishStreamingCloudAsync === 'function') {
+                updateProgressOverlay(v, 0, true, 'Uploading GPU');
+                await yieldToMain();
+                await v.finishStreamingCloudAsync((fraction: number) => {
+                    updateProgressOverlay(v, fraction * 100, false, 'Uploading GPU');
+                });
+            } else {
+                v.finishStreamingCloud();
+            }
+            if (lasMeta.originLatLon && lasMeta.bounds) addLASOverlay(v, lasMeta.originLatLon, lasMeta.bounds);
             v.lasStream = null; v.lasDirectStreaming = false; v.leftoverChunk = null;
             v.posBuffer = null; v.valBuffer = null; v.rgbBuffer = null;
         } else if (v.currentFormat === 'las' && v.lasStream && v.posBuffer && v.valBuffer) {
+            const lasMeta = v.lasStream;
             const pos = v.posBuffer.subarray(0, v.posIndex * 3);
             const val = v.valBuffer.subarray(0, v.posIndex);
-            normalizeIntensity(val);
-            v.renderPoints(pos, val, v.rgbBuffer ? v.rgbBuffer.subarray(0, v.posIndex * 3) : undefined);
-            if (v.lasStream.originLatLon && v.lasStream.bounds) addLASOverlay(v, v.lasStream.originLatLon, v.lasStream.bounds);
-            v.lasStream = null; v.leftoverChunk = null; v.posBuffer = null; v.valBuffer = null; v.rgbBuffer = null;
+            const rgb = v.rgbBuffer ? v.rgbBuffer.subarray(0, v.posIndex * 3) : undefined;
+            v.posBuffer = null; v.valBuffer = null; v.rgbBuffer = null;
+            if (canAsyncRender(val.length)) {
+                await normalizeCloudIntensityAsync(v, val);
+                await renderParsedCloudAsync(v, pos, val, rgb);
+            } else {
+                normalizeIntensity(val);
+                v.renderPoints(pos, val, rgb);
+            }
+            if (lasMeta.originLatLon && lasMeta.bounds) addLASOverlay(v, lasMeta.originLatLon, lasMeta.bounds);
+            v.lasStream = null; v.leftoverChunk = null;
         } else if (v.currentFormat === 'ply' && v.plyStream) {
             const result = finalizePLYStreamState(v.plyStream);
-            v.pointsLoaded = result.values.length;
-            if (result.values.length > 0) normalizeIntensity(result.values as Float32Array);
-            v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
             v.plyStream = null; v.leftoverChunk = null;
+            const pos = result.positions as Float32Array;
+            const val = result.values as Float32Array;
+            const rgb = result.rgb as Uint8Array | undefined;
+            v.pointsLoaded = val.length;
+            if (canAsyncRender(val.length)) {
+                await normalizeCloudIntensityAsync(v, val);
+                await renderParsedCloudAsync(v, pos, val, rgb);
+            } else {
+                if (val.length > 0) normalizeIntensity(val);
+                v.renderPoints(pos, val, rgb);
+            }
         } else if (v.currentFormat === 'e57') {
             const chunks = v.chunkList;
             if (chunks.length === 0) throw new Error('Empty E57 stream');
             console.log(`E57 chunked bytes: ${v.streamTotalSize || v.fullBufferWriteOffset}`);
             v.chunkList = []; v.fullBuffer = null;
             try {
+                updateProgressOverlay(v, 0, true, 'Parsing E57');
+                await yieldToMain();
                 const r = await parseE57(chunks, v.MAX_POINTS_VISUAL, v.streamTotalSize || v.fullBufferWriteOffset);
-                v.pointsLoaded = r.values.length;
-                v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
+                const pos = r.positions as Float32Array;
+                const val = r.values as Float32Array;
+                const rgb = r.rgb as Uint8Array | undefined;
+                v.pointsLoaded = val.length;
+                if (canAsyncRender(val.length)) await renderParsedCloudAsync(v, pos, val, rgb);
+                else v.renderPoints(pos, val, rgb);
             } catch (e) { onErr(e); }
         } else if (v.currentFormat === 'laz' || v.currentFormat === 'ply') {
             if (v.currentFormat === 'laz' && !ensureSingleBufferInputBudget(v, v.streamTotalSize || v.fullBufferWriteOffset, 'laz', v.streamFilename)) return;
             const assembled = assembleChunkList(v);
             if (assembled.byteLength === 0) throw new Error(`Empty ${v.currentFormat.toUpperCase()} stream`);
             console.log(`${v.currentFormat.toUpperCase()} assembled bytes: ${assembled.byteLength}`);
+            v.chunkList = []; v.fullBuffer = null;
             if (v.currentFormat === 'ply') {
                 const result = parsePLY(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength);
-                v.pointsLoaded = result.values.length;
-                if (result.values.length > 0) normalizeIntensity(result.values as Float32Array);
-                v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
+                const pos = result.positions as Float32Array;
+                const val = result.values as Float32Array;
+                const rgb = result.rgb as Uint8Array | undefined;
+                v.pointsLoaded = val.length;
+                if (canAsyncRender(val.length)) {
+                    await normalizeCloudIntensityAsync(v, val);
+                    await renderParsedCloudAsync(v, pos, val, rgb);
+                } else {
+                    if (val.length > 0) normalizeIntensity(val);
+                    v.renderPoints(pos, val, rgb);
+                }
             } else if (v.currentFormat === 'laz') {
                 try {
+                    updateProgressOverlay(v, 0, true, 'Decompressing LAZ');
+                    await yieldToMain();
                     const r = await parseLAZ(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength);
-                    v.pointsLoaded = r.values.length;
-                    v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
+                    const pos = r.positions as Float32Array;
+                    const val = r.values as Float32Array;
+                    const rgb = r.rgb as Uint8Array | undefined;
+                    v.pointsLoaded = val.length;
+                    if (canAsyncRender(val.length)) await renderParsedCloudAsync(v, pos, val, rgb);
+                    else v.renderPoints(pos, val, rgb);
                     if (r.originLatLon && r.bounds) addLASOverlay(v, r.originLatLon, r.bounds);
                 } catch (e) { onErr(e); }
             } else {
                 try {
                     const r = await parseE57(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength);
-                    v.pointsLoaded = r.values.length;
-                    v.renderPoints(r.positions as Float32Array, r.values as Float32Array, r.rgb as Uint8Array | undefined);
+                    const pos = r.positions as Float32Array;
+                    const val = r.values as Float32Array;
+                    const rgb = r.rgb as Uint8Array | undefined;
+                    v.pointsLoaded = val.length;
+                    if (canAsyncRender(val.length)) await renderParsedCloudAsync(v, pos, val, rgb);
+                    else v.renderPoints(pos, val, rgb);
                 } catch (e) { onErr(e); }
             }
-            v.chunkList = []; v.fullBuffer = null;
         } else if (v.isBinary && v.posBuffer) {
             const pos = v.posBuffer.subarray(0, v.posIndex * 3);
             const val = v.valBuffer!.subarray(0, v.posIndex);
-            if (v.pcdHeader?.offset['intensity'] !== undefined) normalizeIntensity(val);
-            v.renderPoints(pos, val, v.rgbBuffer ? v.rgbBuffer.subarray(0, v.posIndex * 3) : undefined);
+            const rgb = v.rgbBuffer ? v.rgbBuffer.subarray(0, v.posIndex * 3) : undefined;
             v.posBuffer = null; v.valBuffer = null; v.rgbBuffer = null;
+            if (canAsyncRender(val.length)) {
+                if (v.pcdHeader?.offset['intensity'] !== undefined) await normalizeCloudIntensityAsync(v, val);
+                await renderParsedCloudAsync(v, pos, val, rgb);
+            } else {
+                if (v.pcdHeader?.offset['intensity'] !== undefined) normalizeIntensity(val);
+                v.renderPoints(pos, val, rgb);
+            }
         } else if (v.fullBuffer && v.pcdHeader?.data === 'ascii') {
             const result = parsePCDAscii(v.fullBuffer, v.pcdHeader, v.MAX_POINTS_VISUAL, v.streamTotalSize || v.fullBuffer.byteLength);
-            v.pointsLoaded = result.values.length;
-            if (getFieldSpec(v.pcdHeader, 'intensity')) normalizeIntensity(result.values as Float32Array);
-            v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
             v.fullBuffer = null;
+            const pos = result.positions as Float32Array;
+            const val = result.values as Float32Array;
+            const rgb = result.rgb as Uint8Array | undefined;
+            v.pointsLoaded = val.length;
+            if (canAsyncRender(val.length)) {
+                if (getFieldSpec(v.pcdHeader, 'intensity')) await normalizeCloudIntensityAsync(v, val);
+                await renderParsedCloudAsync(v, pos, val, rgb);
+            } else {
+                if (getFieldSpec(v.pcdHeader, 'intensity')) normalizeIntensity(val);
+                v.renderPoints(pos, val, rgb);
+            }
         } else if (v.pcdAsciiStream) {
             const result = finalizePCDAsciiStream(v.pcdAsciiStream);
-            v.pointsLoaded = result.values.length;
-            if (v.pcdHeader && getFieldSpec(v.pcdHeader, 'intensity')) normalizeIntensity(result.values as Float32Array);
-            v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
             v.pcdAsciiStream = null;
+            const pos = result.positions as Float32Array;
+            const val = result.values as Float32Array;
+            const rgb = result.rgb as Uint8Array | undefined;
+            v.pointsLoaded = val.length;
+            if (canAsyncRender(val.length)) {
+                if (v.pcdHeader && getFieldSpec(v.pcdHeader, 'intensity')) await normalizeCloudIntensityAsync(v, val);
+                await renderParsedCloudAsync(v, pos, val, rgb);
+            } else {
+                if (v.pcdHeader && getFieldSpec(v.pcdHeader, 'intensity')) normalizeIntensity(val);
+                v.renderPoints(pos, val, rgb);
+            }
         } else if (v.fullBuffer) {
             console.warn('binary_compressed PCD not supported in streaming mode.');
             if (v.loadingOverlay) v.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">binary_compressed PCD is not supported.</div>';
@@ -461,17 +565,32 @@ export async function loadFile(v: any, file: File, append: boolean = false): Pro
             v.streamLoadedSize = file.size;
             if (v.loadingOverlay) {
                 v.loadingOverlay.style.display = 'flex';
-                v.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Downsampling...</div>';
+                v.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Decompressing...</div>';
             }
+            await yieldToMain();
             if (fmt === 'laz') {
                 const result = await parseLAZ(content, v.MAX_POINTS_VISUAL, file.size);
-                v.pointsLoaded = result.values.length;
-                v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
+                const pos = result.positions as Float32Array;
+                const val = result.values as Float32Array;
+                const rgb = result.rgb as Uint8Array | undefined;
+                v.pointsLoaded = val.length;
+                if (val.length >= STATIC_CHUNKED_THRESHOLD && typeof v.renderPointsAsync === 'function') {
+                    await renderParsedCloudAsync(v, pos, val, rgb);
+                } else {
+                    v.renderPoints(pos, val, rgb);
+                }
                 if (result.originLatLon && result.bounds) addLASOverlay(v, result.originLatLon, result.bounds);
             } else {
                 const result = await parseE57(content, v.MAX_POINTS_VISUAL, file.size);
-                v.pointsLoaded = result.values.length;
-                v.renderPoints(result.positions as Float32Array, result.values as Float32Array, result.rgb as Uint8Array | undefined);
+                const pos = result.positions as Float32Array;
+                const val = result.values as Float32Array;
+                const rgb = result.rgb as Uint8Array | undefined;
+                v.pointsLoaded = val.length;
+                if (val.length >= STATIC_CHUNKED_THRESHOLD && typeof v.renderPointsAsync === 'function') {
+                    await renderParsedCloudAsync(v, pos, val, rgb);
+                } else {
+                    v.renderPoints(pos, val, rgb);
+                }
             }
             v.chunkList = []; v.fullBuffer = null;
             return;

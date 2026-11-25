@@ -4,11 +4,12 @@ import { CloudShaderCache, type CloudProgramLocations } from './cloudShaders';
 import {
     computeSortedLodDrawPlan,
     extractDepthCoeffs,
-    fillUniformLodIndices,
     maxDepthCoeffsDiff,
     sortChunkEntriesByDepth,
+    sortChunkOrderByDepth,
 } from './depthSort';
 import {
+    AUTO_POINT_SORT_MAX_POINTS,
     AUTO_SORT_DEPTH_THRESHOLD,
     IncrementalChunkSorter,
     type IncrementalSortStartResult,
@@ -26,6 +27,8 @@ interface GpuChunkEntry {
     data: QuantizedChunkData;
     vbo: WebGLBuffer | null;
     vao: WebGLVertexArrayObject | null;
+    lodVao: WebGLVertexArrayObject | null;
+    lodVaoStep: number;
     uploaded: boolean;
     depthSorted: boolean;
 }
@@ -84,8 +87,6 @@ export class ChunkedCloudBackend {
     // Auto depth-sort tracking
     private readonly incrementalSorter = new IncrementalChunkSorter();
     private lastSortedCoeffs: [number, number, number] | null = null;
-    private lodEbo: WebGLBuffer | null = null;
-    private lodIndexScratch = new Uint32Array(0);
 
     private lastStats: CloudRenderStats = {
         totalPoints: 0,
@@ -107,7 +108,15 @@ export class ChunkedCloudBackend {
     }
 
     addChunk(chunk: QuantizedChunkData, renderer?: THREE.WebGLRenderer): void {
-        const entry: GpuChunkEntry = { data: chunk, vbo: null, vao: null, uploaded: false, depthSorted: false };
+        const entry: GpuChunkEntry = {
+            data: chunk,
+            vbo: null,
+            vao: null,
+            lodVao: null,
+            lodVaoStep: 0,
+            uploaded: false,
+            depthSorted: false,
+        };
         this.chunks.push(entry);
         this.totalPoints += chunk.pointCount;
         this.cpuPickBytes += chunk.pickPositions.byteLength;
@@ -180,6 +189,16 @@ export class ChunkedCloudBackend {
         const depthCoeffs = extractDepthCoeffs(camera.matrixWorldInverse, modelMatrix);
         if (maxDepthCoeffsDiff(depthCoeffs, this.lastSortedCoeffs) < AUTO_SORT_DEPTH_THRESHOLD) {
             return 'skipped';
+        }
+        // For large clouds (> AUTO_POINT_SORT_MAX_POINTS), auto-sort chunk order only so VBO shuffle
+        // and full-speed VAO interactive LOD stay intact (explicit 'r' still sorts inside VBOs).
+        if (this.totalPoints > AUTO_POINT_SORT_MAX_POINTS) {
+            this.incrementalSorter.cancel();
+            sortChunkOrderByDepth(this.chunks, depthCoeffs);
+            this.lastSortedCoeffs = [depthCoeffs[0], depthCoeffs[1], depthCoeffs[2]];
+            this.cullMetaDirty = true;
+            this.invalidateCache();
+            return 'chunk-only-done';
         }
         const status = this.incrementalSorter.start(this.chunks, depthCoeffs, this.gl, this.isWebGL2);
         this.cullMetaDirty = true;
@@ -364,16 +383,16 @@ export class ChunkedCloudBackend {
             const gl2 = this.isWebGL2 ? (gl as WebGL2RenderingContext) : null;
             for (const entry of this.chunks) {
                 if (entry.vao && gl2) gl2.deleteVertexArray(entry.vao);
+                if (entry.lodVao && gl2) gl2.deleteVertexArray(entry.lodVao);
                 if (entry.vbo) gl.deleteBuffer(entry.vbo);
                 entry.vao = null;
+                entry.lodVao = null;
+                entry.lodVaoStep = 0;
                 entry.vbo = null;
                 entry.data.packedData = null;
             }
-            if (this.lodEbo) gl.deleteBuffer(this.lodEbo);
             this.shaders?.dispose();
         }
-        this.lodEbo = null;
-        this.lodIndexScratch = new Uint32Array(0);
         this.targets.dispose(this.gl);
         this.shaders = null;
         this.chunks = [];
@@ -527,10 +546,6 @@ export class ChunkedCloudBackend {
         allocateChunkDrawBudget(this.visible, this.cullMeta.pointCount, budget, this.drawCounts);
         const gl = this.gl!;
         const gl2 = this.isWebGL2 ? (gl as WebGL2RenderingContext) : null;
-        const canUseUint32Ebo = this.isWebGL2
-            && typeof gl.drawElements === 'function'
-            && gl.UNSIGNED_INT !== undefined
-            && gl.ELEMENT_ARRAY_BUFFER !== undefined;
 
         renderer.resetState();
         gl.bindFramebuffer(gl.FRAMEBUFFER, targetFbo);
@@ -544,7 +559,6 @@ export class ChunkedCloudBackend {
         let activeKey = -1;
         let lastAlpha = -1;
         let drawnTotal = 0;
-        let usedEbo = false;
 
         for (let vi = 0; vi < this.visible.length; vi++) {
             const targetCount = this.drawCounts[vi];
@@ -564,7 +578,7 @@ export class ChunkedCloudBackend {
             if (!activeProg) continue;
 
             const plan = entry.depthSorted && targetCount < c.pointCount
-                ? computeSortedLodDrawPlan(c.pointCount, targetCount, c.strideBytes, canUseUint32Ebo)
+                ? computeSortedLodDrawPlan(c.pointCount, targetCount, c.strideBytes)
                 : null;
             const drawCount = plan ? plan.drawCount : targetCount;
             if (drawCount <= 0) continue;
@@ -588,31 +602,25 @@ export class ChunkedCloudBackend {
             }
 
             if (plan?.mode === 'strided') {
-                if (gl2) gl2.bindVertexArray(null);
-                gl.bindBuffer(gl.ARRAY_BUFFER, entry.vbo);
-                this.configureVertexAttributes(gl, c, plan.strideStep * c.strideBytes);
-                gl.drawArrays(gl.POINTS, 0, drawCount);
-            } else if (plan?.mode === 'indexed') {
-                if (gl2) gl2.bindVertexArray(null);
-                if (!this.lodEbo) this.lodEbo = gl.createBuffer();
-                if (this.lodEbo) {
-                    if (this.lodIndexScratch.length < drawCount) {
-                        this.lodIndexScratch = new Uint32Array(drawCount);
+                if (gl2) {
+                    if (!entry.lodVao) entry.lodVao = gl2.createVertexArray();
+                    if (entry.lodVao) {
+                        gl2.bindVertexArray(entry.lodVao);
+                        if (entry.lodVaoStep !== plan.strideStep) {
+                            gl.bindBuffer(gl.ARRAY_BUFFER, entry.vbo);
+                            this.configureVertexAttributes(gl, c, plan.strideStep * c.strideBytes);
+                            entry.lodVaoStep = plan.strideStep;
+                        }
+                        gl.drawArrays(gl.POINTS, 0, drawCount);
+                    } else {
+                        gl2.bindVertexArray(null);
+                        gl.bindBuffer(gl.ARRAY_BUFFER, entry.vbo);
+                        this.configureVertexAttributes(gl, c, plan.strideStep * c.strideBytes);
+                        gl.drawArrays(gl.POINTS, 0, drawCount);
                     }
-                    fillUniformLodIndices(this.lodIndexScratch, c.pointCount, drawCount);
-                    gl.bindBuffer(gl.ARRAY_BUFFER, entry.vbo);
-                    this.configureVertexAttributes(gl, c);
-                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.lodEbo);
-                    gl.bufferData(
-                        gl.ELEMENT_ARRAY_BUFFER,
-                        this.lodIndexScratch.subarray(0, drawCount),
-                        gl.STREAM_DRAW ?? gl.DYNAMIC_DRAW ?? gl.STATIC_DRAW,
-                    );
-                    gl.drawElements(gl.POINTS, drawCount, gl.UNSIGNED_INT, 0);
-                    usedEbo = true;
                 } else {
                     gl.bindBuffer(gl.ARRAY_BUFFER, entry.vbo);
-                    this.configureVertexAttributes(gl, c);
+                    this.configureVertexAttributes(gl, c, plan.strideStep * c.strideBytes);
                     gl.drawArrays(gl.POINTS, 0, drawCount);
                 }
             } else if (entry.vao && gl2) {
@@ -627,7 +635,6 @@ export class ChunkedCloudBackend {
         }
 
         if (gl2) gl2.bindVertexArray(null);
-        if (usedEbo) gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.useProgram(null);
         gl.depthMask(true);

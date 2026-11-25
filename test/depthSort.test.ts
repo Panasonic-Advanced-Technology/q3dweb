@@ -26,7 +26,6 @@ import * as THREE from 'three';
 import {
     computeSortedLodDrawPlan,
     extractDepthCoeffs,
-    fillUniformLodIndices,
     maxDepthCoeffsDiff,
     radixSortOrderByDepths,
     RadixSortWorkspace,
@@ -36,6 +35,7 @@ import {
     type SortableGpuChunkEntry,
 } from '../src/cloud/depthSort';
 import {
+    AUTO_POINT_SORT_MAX_POINTS,
     AutoDepthSortController,
     IncrementalChunkSorter,
 } from '../src/cloud/autoDepthSort';
@@ -667,37 +667,28 @@ describe('AutoDepthSortController & IncrementalChunkSorter', () => {
         }
     });
 
-    it('computeSortedLodDrawPlan & fillUniformLodIndices choose safe strided/indexed uniform sampling', () => {
-        expect(computeSortedLodDrawPlan(0, 100, 12, true)).toEqual({ mode: 'full', strideStep: 1, drawCount: 0 });
-        expect(computeSortedLodDrawPlan(1000, 1000, 12, true)).toEqual({ mode: 'full', strideStep: 1, drawCount: 1000 });
+    it('computeSortedLodDrawPlan uses rounded step, keeps near-full chunks full-VAO, and clamps stride <= 255B', () => {
+        expect(computeSortedLodDrawPlan(0, 100, 12)).toEqual({ mode: 'full', strideStep: 1, drawCount: 0 });
+        expect(computeSortedLodDrawPlan(1000, 1000, 12)).toEqual({ mode: 'full', strideStep: 1, drawCount: 1000 });
 
-        // Normal interactive LOD -> strided drawArrays within WebGL <=255B stride limit
-        const plan2 = computeSortedLodDrawPlan(65536, 40000, 12, true);
+        // Near-full ratio (>67%) stays full-VAO to prevent sudden 100%->50% chunk-boundary bands
+        expect(computeSortedLodDrawPlan(65536, 50000, 12)).toEqual({ mode: 'full', strideStep: 1, drawCount: 65536 });
+
+        // Half ratio -> strideStep = 2
+        const plan2 = computeSortedLodDrawPlan(65536, 32768, 12);
         expect(plan2).toEqual({ mode: 'strided', strideStep: 2, drawCount: 32768 });
         expect((plan2.drawCount - 1) * plan2.strideStep).toBeLessThan(65536);
         expect(plan2.strideStep * 12).toBeLessThanOrEqual(255);
 
-        // Heavy decimation (step > floor(255/12)=21) -> WebGL2 indexed EBO
-        const planIdx = computeSortedLodDrawPlan(100000, 1000, 12, true);
-        expect(planIdx).toEqual({ mode: 'indexed', strideStep: 1, drawCount: 1000 });
-        const idx = new Uint32Array(1000);
-        fillUniformLodIndices(idx, 100000, 1000);
-        expect(idx[0]).toBe(0);
-        expect(idx[999]).toBe(99900);
-        for (let i = 1; i < idx.length; i++) {
-            expect(idx[i]).toBeGreaterThan(idx[i - 1]);
-            expect(idx[i]).toBeLessThan(100000);
-        }
-
-        // Heavy decimation without Uint32 EBO (WebGL1) -> clamped maxStep strided draw
-        const planFallback = computeSortedLodDrawPlan(100000, 1000, 12, false);
-        expect(planFallback.mode).toBe('strided');
-        expect(planFallback.strideStep).toBe(21);
-        expect(planFallback.strideStep * 12).toBeLessThanOrEqual(255);
-        expect((planFallback.drawCount - 1) * planFallback.strideStep).toBeLessThan(100000);
+        // Heavy decimation -> clamped to floor(255/12)=21 with zero per-frame EBO allocation
+        const planClamped = computeSortedLodDrawPlan(100000, 1000, 12);
+        expect(planClamped.mode).toBe('strided');
+        expect(planClamped.strideStep).toBe(21);
+        expect(planClamped.strideStep * 12).toBeLessThanOrEqual(255);
+        expect((planClamped.drawCount - 1) * planClamped.strideStep).toBeLessThan(100000);
     });
 
-    it('ChunkedCloudBackend draws depth-sorted chunks with strided or indexed uniform LOD during interactive movement', () => {
+    it('ChunkedCloudBackend caches strided lodVao on sorted chunks and keeps large-cloud auto-sort chunk-only', () => {
         const { gl, renderer } = createStatefulWebGL2Mock();
         const n = 200_000;
         const positions = new Float32Array(n * 3);
@@ -714,29 +705,59 @@ describe('AutoDepthSortController & IncrementalChunkSorter', () => {
 
         // Force sort all chunks, then trigger interactive LOD (budget < totalPoints)
         expect(item.forceSort(cam, renderer)).toBe(true);
-        item.setInteractivePointBudget(100_000); // ~50% -> strideStep = 2 (16B <= 255B)
+        item.setInteractivePointBudget(80_000); // ~40% -> strideStep >= 2
 
         gl.vertexAttribPointer.mockClear();
         gl.drawArrays.mockClear();
-        gl.drawElements.mockClear();
+        gl.createVertexArray.mockClear();
 
+        // First interactive frame builds and caches lodVao per strided chunk
         item.renderWithBackend(renderer, cam, () => {});
-        const strides = gl.vertexAttribPointer.mock.calls.map((args: any[]) => args[4]);
-        expect(strides.some((s: number) => s >= 16 && s <= 255)).toBe(true);
+        const firstCreateVaoCalls = gl.createVertexArray.mock.calls.length;
+        const firstAttribCalls = gl.vertexAttribPointer.mock.calls.length;
+        expect(firstCreateVaoCalls).toBeGreaterThan(0);
+        expect(firstAttribCalls).toBeGreaterThan(0);
         expect(gl.drawArrays).toHaveBeenCalled();
 
-        // Extremely tight budget (step > floor(255/8)=31) -> exercises indexed EBO drawElements path
-        const backend = (item as any).backend;
-        backend.interactivePointBudget = 2000;
-        backend.invalidateCache();
-        gl.drawElements.mockClear();
-        gl.bindBuffer.mockClear();
+        // Second interactive frame with same strideStep reuses cached lodVao with zero attribute reconfiguration
+        const camSlightlyMoved = createCameraLookingAt([21, -20, 20], [0, 0, 0]);
+        camSlightlyMoved.updateProjectionMatrix();
+        gl.vertexAttribPointer.mockClear();
+        gl.createVertexArray.mockClear();
+        item.renderWithBackend(renderer, camSlightlyMoved, () => {});
+        expect(gl.createVertexArray).not.toHaveBeenCalled();
+        expect(gl.vertexAttribPointer).not.toHaveBeenCalled();
 
-        item.renderWithBackend(renderer, cam, () => {});
-        expect(gl.drawElements).toHaveBeenCalled();
-        expect(gl.bindBuffer).toHaveBeenCalledWith(gl.ELEMENT_ARRAY_BUFFER, null);
+        // Large clouds (> AUTO_POINT_SORT_MAX_POINTS) auto-sort chunk order ONLY without GPU VBO readback
+        const backend = (item as any).backend;
+        backend.totalPoints = AUTO_POINT_SORT_MAX_POINTS + 1;
+        backend.lastSortedCoeffs = null;
+        gl.getBufferSubData.mockClear();
+        const camOpposite = createCameraLookingAt([-20, 20, 20], [0, 0, 0]);
+        expect(item.beginAutoSort(camOpposite, renderer)).toBe('chunk-only-done');
+        expect(gl.getBufferSubData).not.toHaveBeenCalled();
+
+        // AutoDepthSortController defers while an item is refining accumulation
+        const refiningItem: any = new THREE.Object3D();
+        refiningItem.visible = true;
+        refiningItem.isTransparentForDepthSort = () => true;
+        refiningItem.isRefining = () => true;
+        refiningItem.beginAutoSort = vi.fn(() => 'chunk-only-done');
+        refiningItem.stepAutoSort = vi.fn(() => true);
+        refiningItem.cancelAutoSort = vi.fn();
+        const ctrl = new AutoDepthSortController({
+            getSortableItems: () => [refiningItem],
+            getCamera: () => cam,
+            getRenderer: () => renderer,
+            isUserInteracting: () => false,
+            requestRender: vi.fn(),
+        });
+        expect(ctrl.runIdleSort()).toBe(false);
+        expect(refiningItem.beginAutoSort).not.toHaveBeenCalled();
+        ctrl.cancelPendingAndActive();
 
         item.dispose();
+        expect(gl.deleteVertexArray).toHaveBeenCalled();
         expect(gl.deleteBuffer).toHaveBeenCalled();
     });
 });
