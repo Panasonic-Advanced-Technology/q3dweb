@@ -1,7 +1,14 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const __wbg_e57streamparser_free: (a: number, b: number) => void;
 export const __wbg_points_free: (a: number, b: number) => void;
+export const e57streamparser_fromChunks: (a: any, b: number, c: number, d: number) => [number, number, number];
+export const e57streamparser_fromUint8Array: (a: any, b: number, c: number, d: number) => [number, number, number];
+export const e57streamparser_processedRecords: (a: number) => number;
+export const e57streamparser_step: (a: number, b: number) => [number, number, number];
+export const e57streamparser_takePoints: (a: number) => number;
+export const e57streamparser_totalRecords: (a: number) => number;
 export const parsePointChunksSampled: (a: any, b: number, c: number, d: number) => [number, number, number];
 export const parsePoints: (a: any) => [number, number, number];
 export const parsePointsSampled: (a: any, b: number, c: number, d: number) => [number, number, number];

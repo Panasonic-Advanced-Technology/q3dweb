@@ -441,7 +441,12 @@ export async function finalizeStream(v: any): Promise<void> {
             try {
                 updateProgressOverlay(v, 0, true, 'Parsing E57');
                 await yieldToMain();
-                const r = await parseE57(chunks, v.MAX_POINTS_VISUAL, v.streamTotalSize || v.fullBufferWriteOffset);
+                const r = await parseE57(
+                    chunks,
+                    v.MAX_POINTS_VISUAL,
+                    v.streamTotalSize || v.fullBufferWriteOffset,
+                    (fraction) => updateProgressOverlay(v, fraction * 100, false, 'Parsing E57'),
+                );
                 const pos = r.positions as Float32Array;
                 const val = r.values as Float32Array;
                 const rgb = r.rgb as Uint8Array | undefined;
@@ -472,7 +477,12 @@ export async function finalizeStream(v: any): Promise<void> {
                 try {
                     updateProgressOverlay(v, 0, true, 'Decompressing LAZ');
                     await yieldToMain();
-                    const r = await parseLAZ(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength);
+                    const r = await parseLAZ(
+                        assembled,
+                        v.MAX_POINTS_VISUAL,
+                        v.streamTotalSize || assembled.byteLength,
+                        (fraction) => updateProgressOverlay(v, fraction * 100, false, 'Decompressing LAZ'),
+                    );
                     const pos = r.positions as Float32Array;
                     const val = r.values as Float32Array;
                     const rgb = r.rgb as Uint8Array | undefined;
@@ -483,7 +493,12 @@ export async function finalizeStream(v: any): Promise<void> {
                 } catch (e) { onErr(e); }
             } else {
                 try {
-                    const r = await parseE57(assembled, v.MAX_POINTS_VISUAL, v.streamTotalSize || assembled.byteLength);
+                    const r = await parseE57(
+                        assembled,
+                        v.MAX_POINTS_VISUAL,
+                        v.streamTotalSize || assembled.byteLength,
+                        (fraction) => updateProgressOverlay(v, fraction * 100, false, 'Parsing E57'),
+                    );
                     const pos = r.positions as Float32Array;
                     const val = r.values as Float32Array;
                     const rgb = r.rgb as Uint8Array | undefined;
@@ -569,7 +584,14 @@ export async function loadFile(v: any, file: File, append: boolean = false): Pro
             }
             await yieldToMain();
             if (fmt === 'laz') {
-                const result = await parseLAZ(content, v.MAX_POINTS_VISUAL, file.size);
+                updateProgressOverlay(v, 0, true, 'Decompressing LAZ');
+                await yieldToMain();
+                const result = await parseLAZ(
+                    content,
+                    v.MAX_POINTS_VISUAL,
+                    file.size,
+                    (fraction) => updateProgressOverlay(v, fraction * 100, false, 'Decompressing LAZ'),
+                );
                 const pos = result.positions as Float32Array;
                 const val = result.values as Float32Array;
                 const rgb = result.rgb as Uint8Array | undefined;
@@ -581,7 +603,14 @@ export async function loadFile(v: any, file: File, append: boolean = false): Pro
                 }
                 if (result.originLatLon && result.bounds) addLASOverlay(v, result.originLatLon, result.bounds);
             } else {
-                const result = await parseE57(content, v.MAX_POINTS_VISUAL, file.size);
+                updateProgressOverlay(v, 0, true, 'Parsing E57');
+                await yieldToMain();
+                const result = await parseE57(
+                    content,
+                    v.MAX_POINTS_VISUAL,
+                    file.size,
+                    (fraction) => updateProgressOverlay(v, fraction * 100, false, 'Parsing E57'),
+                );
                 const pos = result.positions as Float32Array;
                 const val = result.values as Float32Array;
                 const rgb = result.rgb as Uint8Array | undefined;

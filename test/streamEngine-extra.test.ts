@@ -112,7 +112,7 @@ describe('streamEngine extra paths', () => {
 
     await streamEngine.finalizeStream(viewer);
 
-    expect(parserMocks.parseE57).toHaveBeenCalledWith(expect.any(Array), 100, 2);
+    expect(parserMocks.parseE57).toHaveBeenCalledWith(expect.any(Array), 100, 2, expect.any(Function));
     expect(viewer.renderPoints).toHaveBeenCalledWith(expect.any(Float32Array), expect.any(Float32Array), expect.any(Uint8Array));
     expect(viewer.pointsLoaded).toBe(1);
   });
@@ -142,7 +142,7 @@ describe('streamEngine extra paths', () => {
     await streamEngine.loadFile(viewer, new File([data], 'sample.laz'));
 
     expect(viewer.removeItem).toHaveBeenCalledWith('cloud');
-    expect(parserMocks.parseLAZ).toHaveBeenCalledWith(expect.any(Uint8Array), 100, data.byteLength);
+    expect(parserMocks.parseLAZ).toHaveBeenCalledWith(expect.any(Uint8Array), 100, data.byteLength, expect.any(Function));
     expect(viewer.renderPoints).toHaveBeenCalledWith(expect.any(Float32Array), expect.any(Float32Array), undefined);
     expect(viewer.chunkList).toEqual([]);
   });
