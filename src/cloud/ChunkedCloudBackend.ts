@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { AccumulationTarget } from './accumulationTarget';
 import { CloudShaderCache, type CloudProgramLocations } from './cloudShaders';
+import { extractDepthCoeffs, maxDepthCoeffsDiff, sortChunkEntriesByDepth } from './depthSort';
+import {
+    AUTO_SORT_DEPTH_THRESHOLD,
+    IncrementalChunkSorter,
+    type IncrementalSortStartResult,
+} from './autoDepthSort';
 import {
     allocateChunkDrawBudget,
     computeEquivalentAlpha,
@@ -68,6 +74,10 @@ export class ChunkedCloudBackend {
     private accumTotalPoints = 0;
     private needsRefineNextFrame = false;
 
+    // Auto depth-sort tracking
+    private readonly incrementalSorter = new IncrementalChunkSorter();
+    private lastSortedCoeffs: [number, number, number] | null = null;
+
     private lastStats: CloudRenderStats = {
         totalPoints: 0,
         chunkCount: 0,
@@ -92,6 +102,8 @@ export class ChunkedCloudBackend {
         this.chunks.push(entry);
         this.totalPoints += chunk.pointCount;
         this.cpuPickBytes += chunk.pickPositions.byteLength;
+        this.incrementalSorter.cancel();
+        this.lastSortedCoeffs = null;
         this.cullMetaDirty = true;
         this.invalidateCache();
 
@@ -123,6 +135,73 @@ export class ChunkedCloudBackend {
     invalidateCache(): void {
         this.hasPrevSignature = false;
         this.resetAccumulation();
+    }
+
+    forceSort(
+        camera: THREE.Camera,
+        modelMatrix?: THREE.Matrix4,
+        renderer?: THREE.WebGLRenderer,
+    ): boolean {
+        if (this.chunks.length === 0) return false;
+        this.incrementalSorter.cancel();
+        if (renderer) this.ensureGl(renderer);
+        camera.updateMatrixWorld();
+        const depthCoeffs = extractDepthCoeffs(camera.matrixWorldInverse, modelMatrix);
+        if (renderer && typeof renderer.resetState === 'function') {
+            renderer.resetState();
+        }
+        sortChunkEntriesByDepth(this.chunks, depthCoeffs, this.gl, this.isWebGL2);
+        if (renderer && typeof renderer.resetState === 'function') {
+            renderer.resetState();
+        }
+        this.lastSortedCoeffs = [depthCoeffs[0], depthCoeffs[1], depthCoeffs[2]];
+        this.cullMetaDirty = true;
+        this.invalidateCache();
+        return true;
+    }
+
+    beginAutoSort(
+        camera: THREE.Camera,
+        modelMatrix?: THREE.Matrix4,
+        renderer?: THREE.WebGLRenderer,
+    ): IncrementalSortStartResult {
+        if (this.chunks.length === 0) return 'skipped';
+        if (renderer) this.ensureGl(renderer);
+        camera.updateMatrixWorld();
+        const depthCoeffs = extractDepthCoeffs(camera.matrixWorldInverse, modelMatrix);
+        if (maxDepthCoeffsDiff(depthCoeffs, this.lastSortedCoeffs) < AUTO_SORT_DEPTH_THRESHOLD) {
+            return 'skipped';
+        }
+        const status = this.incrementalSorter.start(this.chunks, depthCoeffs, this.gl, this.isWebGL2);
+        this.cullMetaDirty = true;
+        this.invalidateCache();
+        if (status === 'chunk-only-done') {
+            this.lastSortedCoeffs = [depthCoeffs[0], depthCoeffs[1], depthCoeffs[2]];
+        }
+        return status;
+    }
+
+    stepAutoSort(budgetMs: number, renderer?: THREE.WebGLRenderer): boolean {
+        if (!this.incrementalSorter.isActive()) return true;
+        const targetCoeffs = this.incrementalSorter.getTargetCoeffs();
+        if (renderer && typeof renderer.resetState === 'function') {
+            renderer.resetState();
+        }
+        const res = this.incrementalSorter.step(budgetMs);
+        if (renderer && typeof renderer.resetState === 'function') {
+            renderer.resetState();
+        }
+        if (res.done) {
+            if (!res.failed && targetCoeffs) {
+                this.lastSortedCoeffs = targetCoeffs;
+            }
+            this.invalidateCache();
+        }
+        return res.done;
+    }
+
+    cancelAutoSort(): void {
+        this.incrementalSorter.cancel();
     }
 
     setInteractiveBudgetLocked(budget: number): void {
@@ -269,6 +348,8 @@ export class ChunkedCloudBackend {
     }
 
     dispose(): void {
+        this.incrementalSorter.cancel();
+        this.lastSortedCoeffs = null;
         if (this.gl) {
             const gl = this.gl;
             const gl2 = this.isWebGL2 ? (gl as WebGL2RenderingContext) : null;

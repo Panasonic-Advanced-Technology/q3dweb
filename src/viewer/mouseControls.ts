@@ -30,6 +30,7 @@ export interface InputContext {
     removeMeasurementPoint(): void;
     addKeyFrameFromCamera?(): void;
     deleteCurrentKeyFrame?(): void;
+    forceSortCloud?(): boolean;
     requestRender(): void;
 }
 
@@ -389,6 +390,10 @@ export function setupKeyboardControls(ctx: InputContext): void {
             if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement | null)?.isContentEditable === true) return;
             if (tag === 'SELECT') { e.preventDefault(); (e.target as HTMLSelectElement).blur(); }
             ctx.toggleSettingsPanel();
+        }
+        if (e.key.toLowerCase() === 'r' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !isEditable(e.target)) {
+            e.preventDefault();
+            ctx.forceSortCloud?.();
         }
         if (ctx.filmMakerTabActive && !isEditable(e.target)) {
             if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); ctx.addKeyFrameFromCamera?.(); }
