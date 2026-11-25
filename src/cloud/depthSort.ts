@@ -11,6 +11,66 @@ export interface SortableGpuChunkEntry {
     data: QuantizedChunkData;
     vbo: WebGLBuffer | null;
     uploaded: boolean;
+    depthSorted?: boolean;
+}
+
+export const MAX_WEBGL_VERTEX_STRIDE = 255;
+
+export interface SortedLodDrawPlan {
+    mode: 'full' | 'strided' | 'indexed';
+    strideStep: number;
+    drawCount: number;
+}
+
+/**
+ * Choose a uniform draw plan for a depth-sorted chunk VBO during partial interactive LOD.
+ * Prefix drawing (`drawArrays(0, drawCount)`) on a depth-sorted chunk clips away a diagonal
+ * half-space (visible as triangular cutouts); strided or indexed sampling spans the full chunk.
+ */
+export function computeSortedLodDrawPlan(
+    pointCount: number,
+    targetDrawCount: number,
+    strideBytes: number,
+    canUseUint32Ebo: boolean,
+): SortedLodDrawPlan {
+    if (pointCount <= 0 || targetDrawCount <= 0) {
+        return { mode: 'full', strideStep: 1, drawCount: 0 };
+    }
+    if (targetDrawCount >= pointCount) {
+        return { mode: 'full', strideStep: 1, drawCount: pointCount };
+    }
+    const maxStep = Math.max(1, Math.floor(MAX_WEBGL_VERTEX_STRIDE / Math.max(strideBytes, 1)));
+    const step = Math.ceil(pointCount / targetDrawCount);
+    if (step <= maxStep) {
+        return {
+            mode: 'strided',
+            strideStep: step,
+            drawCount: Math.ceil(pointCount / step),
+        };
+    }
+    if (canUseUint32Ebo) {
+        return {
+            mode: 'indexed',
+            strideStep: 1,
+            drawCount: targetDrawCount,
+        };
+    }
+    return {
+        mode: 'strided',
+        strideStep: maxStep,
+        drawCount: Math.ceil(pointCount / maxStep),
+    };
+}
+
+/** Fill ascending evenly-spaced indices across [0, pointCount) to preserve far-to-near order. */
+export function fillUniformLodIndices(
+    out: Uint32Array,
+    pointCount: number,
+    drawCount: number,
+): void {
+    for (let i = 0; i < drawCount; i++) {
+        out[i] = Math.floor((i * pointCount) / drawCount);
+    }
 }
 
 const _combinedMatrix = new THREE.Matrix4();
@@ -71,6 +131,7 @@ export function sortSingleChunkEntry(
         const dstView = dstBuf.subarray(0, byteLen);
         sortInterleavedChunkBuffer(data.packedData.subarray(0, byteLen), dstView, data, depthCoeffs, ws);
         data.packedData.set(dstView, 0);
+        entry.depthSorted = true;
         return 'sorted';
     }
 
@@ -82,6 +143,7 @@ export function sortSingleChunkEntry(
             gl2.getBufferSubData(gl2.ARRAY_BUFFER, 0, srcView);
             sortInterleavedChunkBuffer(srcView, dstView, data, depthCoeffs, ws);
             gl2.bufferSubData(gl2.ARRAY_BUFFER, 0, dstView);
+            entry.depthSorted = true;
             return 'sorted';
         } catch (err) {
             console.warn('[depthSort] GPU chunk sort skipped due to WebGL error:', err);

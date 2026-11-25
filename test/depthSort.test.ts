@@ -24,7 +24,9 @@ vi.mock('three', async () => {
 
 import * as THREE from 'three';
 import {
+    computeSortedLodDrawPlan,
     extractDepthCoeffs,
+    fillUniformLodIndices,
     maxDepthCoeffsDiff,
     radixSortOrderByDepths,
     RadixSortWorkspace,
@@ -57,16 +59,20 @@ function createStatefulWebGL2Mock(options: { withGetBufferSubData?: boolean; thr
     const buffers = new Map<number, Uint8Array>();
     let nextId = 1;
     let boundVbo: { id: number } | null = null;
+    let boundEbo: { id: number } | null = null;
     const gl: any = {
         ARRAY_BUFFER: 0x8892,
+        ELEMENT_ARRAY_BUFFER: 0x8893,
         STATIC_DRAW: 0x88e4,
         DYNAMIC_DRAW: 0x88e8,
+        STREAM_DRAW: 0x88e0,
         VERTEX_SHADER: 0x8b31,
         FRAGMENT_SHADER: 0x8b30,
         COMPILE_STATUS: 0x8b81,
         LINK_STATUS: 0x8b82,
         UNSIGNED_SHORT: 0x1403,
         UNSIGNED_BYTE: 0x1401,
+        UNSIGNED_INT: 0x1405,
         FLOAT: 0x1406,
         POINTS: 0x0000,
         DEPTH_TEST: 0x0b71,
@@ -94,16 +100,20 @@ function createStatefulWebGL2Mock(options: { withGetBufferSubData?: boolean; thr
         getAttribLocation: vi.fn((_p: any, name: string) => (name === 'aPosition' || name === 'aPos' ? 0 : name === 'aValue' || name === 'aVal' ? 1 : 2)),
         getUniformLocation: vi.fn((_p: any, name: string) => ({ name })),
         createBuffer: vi.fn(() => ({ id: nextId++ })),
-        bindBuffer: vi.fn((_target: number, buf: { id: number } | null) => { boundVbo = buf; }),
-        bufferData: vi.fn((_target: number, data: ArrayBufferView | number) => {
-            if (!boundVbo) return;
+        bindBuffer: vi.fn((target: number, buf: { id: number } | null) => {
+            if (target === 0x8893) boundEbo = buf;
+            else boundVbo = buf;
+        }),
+        bufferData: vi.fn((target: number, data: ArrayBufferView | number) => {
+            const active = target === 0x8893 ? boundEbo : boundVbo;
+            if (!active) return;
             if (typeof data === 'number') {
-                buffers.set(boundVbo.id, new Uint8Array(data));
+                buffers.set(active.id, new Uint8Array(data));
             } else {
                 const src = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
                 const copy = new Uint8Array(src.byteLength);
                 copy.set(src);
-                buffers.set(boundVbo.id, copy);
+                buffers.set(active.id, copy);
             }
         }),
         bufferSubData: vi.fn((_target: number, offset: number, data: ArrayBufferView) => {
@@ -130,6 +140,7 @@ function createStatefulWebGL2Mock(options: { withGetBufferSubData?: boolean; thr
         uniform1f: vi.fn(),
         uniform3f: vi.fn(),
         drawArrays: vi.fn(),
+        drawElements: vi.fn(),
         bindFramebuffer: vi.fn(),
         viewport: vi.fn(),
     };
@@ -654,5 +665,78 @@ describe('AutoDepthSortController & IncrementalChunkSorter', () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it('computeSortedLodDrawPlan & fillUniformLodIndices choose safe strided/indexed uniform sampling', () => {
+        expect(computeSortedLodDrawPlan(0, 100, 12, true)).toEqual({ mode: 'full', strideStep: 1, drawCount: 0 });
+        expect(computeSortedLodDrawPlan(1000, 1000, 12, true)).toEqual({ mode: 'full', strideStep: 1, drawCount: 1000 });
+
+        // Normal interactive LOD -> strided drawArrays within WebGL <=255B stride limit
+        const plan2 = computeSortedLodDrawPlan(65536, 40000, 12, true);
+        expect(plan2).toEqual({ mode: 'strided', strideStep: 2, drawCount: 32768 });
+        expect((plan2.drawCount - 1) * plan2.strideStep).toBeLessThan(65536);
+        expect(plan2.strideStep * 12).toBeLessThanOrEqual(255);
+
+        // Heavy decimation (step > floor(255/12)=21) -> WebGL2 indexed EBO
+        const planIdx = computeSortedLodDrawPlan(100000, 1000, 12, true);
+        expect(planIdx).toEqual({ mode: 'indexed', strideStep: 1, drawCount: 1000 });
+        const idx = new Uint32Array(1000);
+        fillUniformLodIndices(idx, 100000, 1000);
+        expect(idx[0]).toBe(0);
+        expect(idx[999]).toBe(99900);
+        for (let i = 1; i < idx.length; i++) {
+            expect(idx[i]).toBeGreaterThan(idx[i - 1]);
+            expect(idx[i]).toBeLessThan(100000);
+        }
+
+        // Heavy decimation without Uint32 EBO (WebGL1) -> clamped maxStep strided draw
+        const planFallback = computeSortedLodDrawPlan(100000, 1000, 12, false);
+        expect(planFallback.mode).toBe('strided');
+        expect(planFallback.strideStep).toBe(21);
+        expect(planFallback.strideStep * 12).toBeLessThanOrEqual(255);
+        expect((planFallback.drawCount - 1) * planFallback.strideStep).toBeLessThan(100000);
+    });
+
+    it('ChunkedCloudBackend draws depth-sorted chunks with strided or indexed uniform LOD during interactive movement', () => {
+        const { gl, renderer } = createStatefulWebGL2Mock();
+        const n = 200_000;
+        const positions = new Float32Array(n * 3);
+        const values = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            positions[i * 3] = ((i % 400) - 200) * 0.05;
+            positions[i * 3 + 1] = ((Math.floor(i / 400) % 500) - 250) * 0.05;
+            positions[i * 3 + 2] = 0;
+            values[i] = i & 255;
+        }
+        const item = ChunkedCloudItem.fromArrays(positions, values, { alpha: 0.2 }, undefined, renderer);
+        const cam = createCameraLookingAt([20, -20, 20], [0, 0, 0]);
+        cam.updateProjectionMatrix();
+
+        // Force sort all chunks, then trigger interactive LOD (budget < totalPoints)
+        expect(item.forceSort(cam, renderer)).toBe(true);
+        item.setInteractivePointBudget(100_000); // ~50% -> strideStep = 2 (16B <= 255B)
+
+        gl.vertexAttribPointer.mockClear();
+        gl.drawArrays.mockClear();
+        gl.drawElements.mockClear();
+
+        item.renderWithBackend(renderer, cam, () => {});
+        const strides = gl.vertexAttribPointer.mock.calls.map((args: any[]) => args[4]);
+        expect(strides.some((s: number) => s >= 16 && s <= 255)).toBe(true);
+        expect(gl.drawArrays).toHaveBeenCalled();
+
+        // Extremely tight budget (step > floor(255/8)=31) -> exercises indexed EBO drawElements path
+        const backend = (item as any).backend;
+        backend.interactivePointBudget = 2000;
+        backend.invalidateCache();
+        gl.drawElements.mockClear();
+        gl.bindBuffer.mockClear();
+
+        item.renderWithBackend(renderer, cam, () => {});
+        expect(gl.drawElements).toHaveBeenCalled();
+        expect(gl.bindBuffer).toHaveBeenCalledWith(gl.ELEMENT_ARRAY_BUFFER, null);
+
+        item.dispose();
+        expect(gl.deleteBuffer).toHaveBeenCalled();
     });
 });
