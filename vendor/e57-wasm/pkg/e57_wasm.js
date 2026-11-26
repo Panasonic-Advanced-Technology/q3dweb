@@ -1,5 +1,90 @@
 /* @ts-self-types="./e57_wasm.d.ts" */
 
+/**
+ * Incremental E57 parser that decodes bounded batches per call so JavaScript can yield
+ * to the browser event loop and report accurate progress without freezing the UI.
+ */
+export class E57StreamParser {
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(E57StreamParser.prototype);
+        obj.__wbg_ptr = ptr;
+        E57StreamParserFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        E57StreamParserFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_e57streamparser_free(ptr, 0);
+    }
+    /**
+     * @param {Array<any>} chunks
+     * @param {number} max_points
+     * @param {number} source_bytes
+     * @param {number} sampling_threshold_bytes
+     * @returns {E57StreamParser}
+     */
+    static fromChunks(chunks, max_points, source_bytes, sampling_threshold_bytes) {
+        const ret = wasm.e57streamparser_fromChunks(chunks, max_points, source_bytes, sampling_threshold_bytes);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return E57StreamParser.__wrap(ret[0]);
+    }
+    /**
+     * @param {Uint8Array} data
+     * @param {number} max_points
+     * @param {number} source_bytes
+     * @param {number} sampling_threshold_bytes
+     * @returns {E57StreamParser}
+     */
+    static fromUint8Array(data, max_points, source_bytes, sampling_threshold_bytes) {
+        const ret = wasm.e57streamparser_fromUint8Array(data, max_points, source_bytes, sampling_threshold_bytes);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return E57StreamParser.__wrap(ret[0]);
+    }
+    /**
+     * @returns {number}
+     */
+    get processedRecords() {
+        const ret = wasm.e57streamparser_processedRecords(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * @param {number} max_records
+     * @returns {boolean}
+     */
+    step(max_records) {
+        const ret = wasm.e57streamparser_step(this.__wbg_ptr, max_records);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
+    }
+    /**
+     * @returns {Points}
+     */
+    takePoints() {
+        const ret = wasm.e57streamparser_takePoints(this.__wbg_ptr);
+        return Points.__wrap(ret);
+    }
+    /**
+     * @returns {number}
+     */
+    get totalRecords() {
+        const ret = wasm.e57streamparser_totalRecords(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+}
+if (Symbol.dispose) E57StreamParser.prototype[Symbol.dispose] = E57StreamParser.prototype.free;
+
 export class Points {
     static __wrap(ptr) {
         ptr = ptr >>> 0;
@@ -172,6 +257,9 @@ function __wbg_get_imports() {
     };
 }
 
+const E57StreamParserFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_e57streamparser_free(ptr >>> 0, 1));
 const PointsFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_points_free(ptr >>> 0, 1));

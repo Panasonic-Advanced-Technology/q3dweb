@@ -369,11 +369,14 @@ describe('CloudShaderCache, AccumulationTarget, ChunkedCloudBackend & ChunkedClo
     item.updateViewport(720);
     expect(item.material.uniforms.viewportHeight.value).toBe(720);
 
-    // Direct mode (budget >= n)
+    // Direct mode (budget >= n) keeps depth write enabled even when alpha < 1.0
     const renderBase = vi.fn();
+    gl.depthMask.mockClear();
     expect(item.renderWithBackend(renderer, camera, renderBase)).toBe(true);
     expect(item.getStats().mode).toBe('direct');
     expect(item.needsRefinement()).toBe(false);
+    expect(gl.depthMask).toHaveBeenCalledWith(true);
+    expect(gl.depthMask).not.toHaveBeenCalledWith(false);
 
     // Interactive -> Refining -> Cached transition when budget < n
     const backend = new ChunkedCloudBackend();

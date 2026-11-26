@@ -139,6 +139,8 @@ describe('WebGLCloudBackend', () => {
     expect(fakeGl.calls.drawArrays).toHaveBeenCalledWith(fakeGl.POINTS, 0, 2);
     expect(fakeGl.calls.enable).toHaveBeenCalledWith(fakeGl.BLEND);
     expect(fakeGl.calls.disable).toHaveBeenCalledWith(fakeGl.BLEND);
+    expect(fakeGl.calls.depthMask).toHaveBeenCalledWith(true);
+    expect(fakeGl.calls.depthMask).not.toHaveBeenCalledWith(false);
     expect(fakeGl.calls.uniform1f).toHaveBeenCalledWith(expect.anything(), 2);
   });
 

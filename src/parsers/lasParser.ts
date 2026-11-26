@@ -7,6 +7,7 @@ import { parseLASGeoInfo, readLASBounds } from '../utils/lasGeo';
 import { projToLatLon, registerWKT, convertByKey } from '../utils/projConvert';
 import type { ParsedCloud } from './pcdParser';
 import { computePointSampleRatio, estimateSampledPointCount } from './sampling';
+import { normalizeIntensityAsync, yieldToMain } from '../cloud/asyncChunkBuilder';
 
 export interface LASBounds {
     minX: number; maxX: number;
@@ -200,7 +201,12 @@ export function parseLAS(data: Uint8Array, maxPoints: number, sourceBytes: numbe
 }
 
 /** Decompress a LAZ file via laz-perf WASM while storing only sampled points. */
-export async function parseLAZ(data: Uint8Array, maxPoints: number, sourceBytes: number = data.byteLength): Promise<ParsedLAS> {
+export async function parseLAZ(
+    data: Uint8Array,
+    maxPoints: number,
+    sourceBytes: number = data.byteLength,
+    onProgress?: (fraction: number) => void,
+): Promise<ParsedLAS> {
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
     if (magic !== 'LASF') throw new Error('Not a valid LAZ/LAS file');
@@ -239,19 +245,31 @@ export async function parseLAZ(data: Uint8Array, maxPoints: number, sourceBytes:
             let pointBuffer = LazPerf.HEAPU8.buffer;
             let pointView = new DataView(pointBuffer, pointPtr, pointLen);
             let parsedPoints = 0;
-            for (let rawPointIndex = 0; rawPointIndex < count; rawPointIndex++) {
-                laszip.getPoint(pointPtr);
-                if (pointBuffer !== LazPerf.HEAPU8.buffer) {
-                    pointBuffer = LazPerf.HEAPU8.buffer;
-                    pointView = new DataView(pointBuffer, pointPtr, pointLen);
+            let sliceStart = performance.now();
+            for (let rawPointIndex = 0; rawPointIndex < count; ) {
+                const batchEnd = Math.min(count, rawPointIndex + 65536);
+                let reachedLimit = false;
+                for (; rawPointIndex < batchEnd; rawPointIndex++) {
+                    laszip.getPoint(pointPtr);
+                    if (pointBuffer !== LazPerf.HEAPU8.buffer) {
+                        pointBuffer = LazPerf.HEAPU8.buffer;
+                        pointView = new DataView(pointBuffer, pointPtr, pointLen);
+                    }
+                    if (rawPointIndex % sampleRatio !== 0) continue;
+                    if (parsedPoints >= estimatedVisPoints) { reachedLimit = true; break; }
+                    appendLASPointRecord(pointView, 0, meta, positions, intensities, rgbColors, parsedPoints);
+                    parsedPoints++;
                 }
-                if (rawPointIndex % sampleRatio !== 0) continue;
-                if (parsedPoints >= estimatedVisPoints) break;
-                appendLASPointRecord(pointView, 0, meta, positions, intensities, rgbColors, parsedPoints);
-                parsedPoints++;
+                if (reachedLimit) break;
+                if (rawPointIndex < count && performance.now() - sliceStart >= 14) {
+                    onProgress?.(rawPointIndex / count);
+                    await yieldToMain();
+                    sliceStart = performance.now();
+                }
             }
 
-            normalizeIntensity(intensities.subarray(0, parsedPoints));
+            await normalizeIntensityAsync(intensities.subarray(0, parsedPoints));
+            onProgress?.(1);
             console.log(`LAZ: loaded ${parsedPoints}/${count} pts (ratio 1:${sampleRatio})`);
             return {
                 positions: positions.subarray(0, parsedPoints * 3),

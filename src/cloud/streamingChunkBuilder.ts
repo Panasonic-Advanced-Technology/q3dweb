@@ -278,6 +278,28 @@ export class StreamingChunkBuilder {
         }
     }
 
+    async finishAsync(
+        onChunkReady: (chunk: QuantizedChunkData) => void,
+        onProgress?: (fraction: number) => void,
+        sliceMs: number = 14,
+    ): Promise<void> {
+        const total = this.cells.length;
+        let sliceStart = performance.now();
+        for (let i = 0; i < total; i++) {
+            const cell = this.cells[i];
+            if (cell && cell.count > 0) {
+                onChunkReady(this.flushPartialCell(cell));
+            }
+            this.cells[i] = null;
+            if (i + 1 < total && performance.now() - sliceStart >= sliceMs) {
+                onProgress?.((i + 1) / total);
+                await new Promise<void>((r) => setTimeout(r, 0));
+                sliceStart = performance.now();
+            }
+        }
+        onProgress?.(1);
+    }
+
     private writePointToCell(
         cell: ActiveCellBuffer,
         x: number,

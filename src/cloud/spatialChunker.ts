@@ -64,7 +64,7 @@ export function computeGridDimensions(
     return [nx, ny, nz];
 }
 
-function makeChunkDescriptor(
+export function makeChunkDescriptor(
     bounds: CloudBounds,
     pointCount: number,
     isQuantized: boolean,

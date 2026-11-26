@@ -51,7 +51,7 @@ function applyCloudMaterialSettings(
     material.uniforms.vmin.value = effectiveMin;
     material.uniforms.vmax.value = effectiveMax;
     material.transparent = alpha < 0.99 || pointType === 'SPHERE';
-    material.depthWrite = alpha >= 0.99 && pointType !== 'SPHERE';
+    material.depthWrite = true;
 }
 
 function fitCameraToBox(v: any, box: THREE.Box3 | null): void {
@@ -66,7 +66,22 @@ function fitCameraToBox(v: any, box: THREE.Box3 | null): void {
     v.updateCamera();
 }
 
-export function renderPoints(v: any, positions: Float32Array, values: Float32Array, rgbColors?: Uint8Array): void {
+export type CloudBuildProgressCallback = (stage: 'chunking' | 'uploading', fraction: number) => void;
+
+function prepareCloudMetadata(
+    v: any,
+    values: Float32Array,
+    rgbColors?: Uint8Array,
+): {
+    count: number;
+    effectiveMin: number;
+    effectiveMax: number;
+    hasUsableRGB: boolean;
+    colorMode: 'I' | 'RGB' | 'FLAT';
+    pointType: 'PIXEL' | 'SQUARE' | 'SPHERE';
+    pointSize: number;
+    alpha: number;
+} {
     const count = values.length;
     let minVal = Infinity, maxVal = -Infinity;
     const step = Math.max(1, Math.min(1000, Math.floor(count / 4096) || 1));
@@ -97,34 +112,86 @@ export function renderPoints(v: any, positions: Float32Array, values: Float32Arr
     const pointType = renderOptions.pointType ?? 'PIXEL';
     const pointSize = resolvePointSize(v, renderOptions, pointType);
     const alpha = renderOptions.alpha ?? 0.1;
+    return { count, effectiveMin, effectiveMax, hasUsableRGB, colorMode, pointType, pointSize, alpha };
+}
 
-    const useChunked = count >= STATIC_CHUNKED_THRESHOLD;
-    const cloud = useChunked
-        ? ChunkedCloudItem.fromArrays(
-            positions,
-            values,
-            { size: pointSize, alpha, colorMode, pointType },
-            (hasUsableRGB || colorMode === 'RGB') ? rgbColors : undefined,
-            v.renderer,
-        )
-        : new CloudItem(
-            positions,
-            values,
-            { size: pointSize, alpha, colorMode, pointType },
-            colorMode === 'RGB' ? rgbColors : undefined,
-        );
-
+function finalizeRenderedCloud(
+    v: any,
+    cloud: CloudItem | ChunkedCloudItem,
+    meta: ReturnType<typeof prepareCloudMetadata>,
+): void {
     const material = cloud.material as CloudShaderMaterial;
-    applyCloudMaterialSettings(material, pointSize, pointType, alpha, colorMode, effectiveMin, effectiveMax);
+    applyCloudMaterialSettings(
+        material,
+        meta.pointSize,
+        meta.pointType,
+        meta.alpha,
+        meta.colorMode,
+        meta.effectiveMin,
+        meta.effectiveMax,
+    );
     cloud.name = 'cloud';
     cloud.frustumCulled = false;
     cloud.geometry.computeBoundingBox();
     fitCameraToBox(v, cloud.geometry.boundingBox);
 
     v.addItem('cloud', cloud);
-    if (v.statusElement) v.statusElement.textContent = `${count.toLocaleString()} points`;
+    if (v.statusElement) v.statusElement.textContent = `${meta.count.toLocaleString()} points`;
     if (v.loadingOverlay) v.loadingOverlay.style.display = 'none';
     v.requestRender();
+}
+
+export function renderPoints(v: any, positions: Float32Array, values: Float32Array, rgbColors?: Uint8Array): void {
+    const meta = prepareCloudMetadata(v, values, rgbColors);
+    const useChunked = meta.count >= STATIC_CHUNKED_THRESHOLD;
+    const cloud = useChunked
+        ? ChunkedCloudItem.fromArrays(
+            positions,
+            values,
+            { size: meta.pointSize, alpha: meta.alpha, colorMode: meta.colorMode, pointType: meta.pointType },
+            (meta.hasUsableRGB || meta.colorMode === 'RGB') ? rgbColors : undefined,
+            v.renderer,
+        )
+        : new CloudItem(
+            positions,
+            values,
+            { size: meta.pointSize, alpha: meta.alpha, colorMode: meta.colorMode, pointType: meta.pointType },
+            meta.colorMode === 'RGB' ? rgbColors : undefined,
+        );
+
+    finalizeRenderedCloud(v, cloud, meta);
+}
+
+/**
+ * Time-sliced async version of renderPoints() for large clouds.
+ * Yields between ~14ms slices during spatial chunking and GPU VBO upload so the UI never freezes.
+ */
+export async function renderPointsAsync(
+    v: any,
+    positions: Float32Array,
+    values: Float32Array,
+    rgbColors?: Uint8Array,
+    onProgress?: CloudBuildProgressCallback,
+): Promise<void> {
+    if (values.length < STATIC_CHUNKED_THRESHOLD) {
+        renderPoints(v, positions, values, rgbColors);
+        onProgress?.('uploading', 1);
+        return;
+    }
+    const meta = prepareCloudMetadata(v, values, rgbColors);
+    const cloud = await ChunkedCloudItem.fromArraysAsync(
+        positions,
+        values,
+        { size: meta.pointSize, alpha: meta.alpha, colorMode: meta.colorMode, pointType: meta.pointType },
+        (meta.hasUsableRGB || meta.colorMode === 'RGB') ? rgbColors : undefined,
+        v.renderer,
+        onProgress,
+    );
+    if (v.streamAborted) {
+        cloud.dispose();
+        return;
+    }
+    finalizeRenderedCloud(v, cloud, meta);
 }
 
 export function beginStreamingCloud(v: any, options: StreamingCloudInitOptions): void {
@@ -191,17 +258,11 @@ export function pushStreamingCloudBatch(
     });
 }
 
-export function finishStreamingCloud(v: any): void {
-    const builder = v.streamingBuilder as StreamingChunkBuilder | null;
-    const cloud = v.streamingCloudItem as ChunkedCloudItem | null;
-    v.streamingBuilder = null;
-    v.streamingCloudItem = null;
-    if (!builder || !cloud) return;
-
-    builder.finish((chunk) => {
-        cloud.addChunk(chunk, v.renderer);
-    });
-
+function finalizeStreamingCloudCommon(
+    v: any,
+    builder: StreamingChunkBuilder,
+    cloud: ChunkedCloudItem,
+): void {
     const count = cloud.getPointCount();
     const renderOptions = (v.cloudRenderOptions ?? {}) as CloudRenderOptions;
     let minVal = v.streamingMinVal;
@@ -227,6 +288,39 @@ export function finishStreamingCloud(v: any): void {
     if (v.statusElement) v.statusElement.textContent = `${count.toLocaleString()} points`;
     if (v.loadingOverlay) v.loadingOverlay.style.display = 'none';
     v.requestRender();
+}
+
+export function finishStreamingCloud(v: any): void {
+    const builder = v.streamingBuilder as StreamingChunkBuilder | null;
+    const cloud = v.streamingCloudItem as ChunkedCloudItem | null;
+    v.streamingBuilder = null;
+    v.streamingCloudItem = null;
+    if (!builder || !cloud) return;
+
+    builder.finish((chunk) => {
+        cloud.addChunk(chunk, v.renderer);
+    });
+    finalizeStreamingCloudCommon(v, builder, cloud);
+}
+
+export async function finishStreamingCloudAsync(
+    v: any,
+    onProgress?: (fraction: number) => void,
+): Promise<void> {
+    const builder = v.streamingBuilder as StreamingChunkBuilder | null;
+    const cloud = v.streamingCloudItem as ChunkedCloudItem | null;
+    v.streamingBuilder = null;
+    v.streamingCloudItem = null;
+    if (!builder || !cloud) return;
+
+    await builder.finishAsync((chunk) => {
+        cloud.addChunk(chunk, v.renderer);
+    }, onProgress);
+    if (v.streamAborted) {
+        cloud.dispose();
+        return;
+    }
+    finalizeStreamingCloudCommon(v, builder, cloud);
 }
 
 export function resetRealtimeCloud(v: any): void {

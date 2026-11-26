@@ -149,7 +149,7 @@ export function buildCloudItemSettings(
         const alpha = mat.uniforms.alpha?.value ?? 1;
         const pointType = pointTypeUniform?.value ?? 0;
         const nextTransparent = alpha < 0.99 || pointType > 1.5;
-        const nextDepthWrite = alpha >= 0.99 && pointType <= 1.5;
+        const nextDepthWrite = true;
         if (mat.transparent !== nextTransparent || mat.depthWrite !== nextDepthWrite) {
             mat.transparent = nextTransparent;
             mat.depthWrite = nextDepthWrite;

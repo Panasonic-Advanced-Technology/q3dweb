@@ -456,7 +456,7 @@ export class CloudShaderMaterial extends THREE.ShaderMaterial {
             fragmentShader: fragmentShader,
             transparent: alpha < 0.99 || pointType > 1.5,
             depthTest: true,
-            depthWrite: alpha >= 0.99 && pointType <= 1.5,
+            depthWrite: true,
         });
     }
 }

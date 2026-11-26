@@ -130,13 +130,12 @@ export class WebGLCloudBackend {
         renderer.resetState();
 
         gl.enable(gl.DEPTH_TEST);
+        gl.depthMask(true);
         if (alpha < 0.99) {
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.depthMask(false);
         } else {
             gl.disable(gl.BLEND);
-            gl.depthMask(true);
         }
 
         gl.useProgram(this.program);

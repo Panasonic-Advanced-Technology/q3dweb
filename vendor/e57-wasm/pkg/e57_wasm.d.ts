@@ -1,6 +1,22 @@
 /* tslint:disable */
 /* eslint-disable */
 
+/**
+ * Incremental E57 parser that decodes bounded batches per call so JavaScript can yield
+ * to the browser event loop and report accurate progress without freezing the UI.
+ */
+export class E57StreamParser {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    static fromChunks(chunks: Array<any>, max_points: number, source_bytes: number, sampling_threshold_bytes: number): E57StreamParser;
+    static fromUint8Array(data: Uint8Array, max_points: number, source_bytes: number, sampling_threshold_bytes: number): E57StreamParser;
+    step(max_records: number): boolean;
+    takePoints(): Points;
+    readonly processedRecords: number;
+    readonly totalRecords: number;
+}
+
 export class Points {
     private constructor();
     free(): void;
@@ -34,7 +50,14 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly __wbg_e57streamparser_free: (a: number, b: number) => void;
     readonly __wbg_points_free: (a: number, b: number) => void;
+    readonly e57streamparser_fromChunks: (a: any, b: number, c: number, d: number) => [number, number, number];
+    readonly e57streamparser_fromUint8Array: (a: any, b: number, c: number, d: number) => [number, number, number];
+    readonly e57streamparser_processedRecords: (a: number) => number;
+    readonly e57streamparser_step: (a: number, b: number) => [number, number, number];
+    readonly e57streamparser_takePoints: (a: number) => number;
+    readonly e57streamparser_totalRecords: (a: number) => number;
     readonly parsePointChunksSampled: (a: any, b: number, c: number, d: number) => [number, number, number];
     readonly parsePoints: (a: any) => [number, number, number];
     readonly parsePointsSampled: (a: any, b: number, c: number, d: number) => [number, number, number];

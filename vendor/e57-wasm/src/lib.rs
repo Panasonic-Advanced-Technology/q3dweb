@@ -1,12 +1,14 @@
 use e57::{CartesianCoordinate, E57Reader};
 mod reader;
+mod stream_parser;
 use reader::{JsChunkedReader, JsUint8ArrayReader};
+pub use stream_parser::E57StreamParser;
 use std::io::{Read, Seek};
 use wasm_bindgen::prelude::*;
 
 const DEFAULT_SAMPLING_THRESHOLD_BYTES: f64 = 2.0 * 1024.0 * 1024.0 * 1024.0;
 
-fn safe_sampling_threshold_bytes(value: f64) -> f64 {
+pub(crate) fn safe_sampling_threshold_bytes(value: f64) -> f64 {
     if value.is_finite() && value > 0.0 {
         value
     } else {
@@ -14,7 +16,7 @@ fn safe_sampling_threshold_bytes(value: f64) -> f64 {
     }
 }
 
-fn color_to_u8(value: f32) -> u8 {
+pub(crate) fn color_to_u8(value: f32) -> u8 {
     let scaled = (value * 255.0).round();
     if !scaled.is_finite() || scaled <= 0.0 {
         0
@@ -32,6 +34,24 @@ pub struct Points {
     intensities: Vec<f32>,
     has_color: bool,
     has_intensity: bool,
+}
+
+impl Points {
+    pub(crate) fn new(
+        positions: Vec<f32>,
+        colors: Vec<u8>,
+        intensities: Vec<f32>,
+        has_color: bool,
+        has_intensity: bool,
+    ) -> Self {
+        Self {
+            positions,
+            colors,
+            intensities,
+            has_color,
+            has_intensity,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -254,5 +274,47 @@ mod tests {
         assert_eq!(parsed.positions[0], first_position.0);
         assert_eq!(parsed.positions[1], first_position.1);
         assert_eq!(parsed.positions[2], first_position.2);
+    }
+
+    #[test]
+    fn stream_parser_matches_batch_parser() {
+        let sample_path = sample_e57_path();
+        if !sample_path.exists() {
+            return;
+        }
+        let batch = parse_points_inner(
+            File::open(&sample_path).expect("open sample E57"),
+            Some(50_000),
+            0.0,
+            DEFAULT_SAMPLING_THRESHOLD_BYTES,
+        )
+        .expect("batch parse sample E57");
+
+        let mut streamer = stream_parser::StreamParserCore::new(
+            File::open(&sample_path).expect("open sample E57 for streaming"),
+            Some(50_000),
+            0.0,
+            DEFAULT_SAMPLING_THRESHOLD_BYTES,
+        )
+        .expect("create stream parser");
+        assert!(streamer.total_records() > 0);
+
+        let mut steps = 0usize;
+        let mut prev_processed = 0usize;
+        while !streamer.step(200_000).expect("step E57 stream parser") {
+            steps += 1;
+            let processed = streamer.processed_records();
+            assert!(processed > prev_processed);
+            prev_processed = processed;
+        }
+        assert!(steps > 0);
+        assert!(streamer.processed_records() >= streamer.total_records().min(1));
+
+        let streamed = streamer.take_points();
+        assert_eq!(streamed.positions, batch.positions);
+        assert_eq!(streamed.colors, batch.colors);
+        assert_eq!(streamed.intensities, batch.intensities);
+        assert_eq!(streamed.has_color, batch.has_color);
+        assert_eq!(streamed.has_intensity, batch.has_intensity);
     }
 }

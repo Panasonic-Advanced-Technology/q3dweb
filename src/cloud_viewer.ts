@@ -16,11 +16,15 @@ import {
 } from './viewer/streamEngine';
 import { loadUrl as _loadUrl } from './viewer/remoteCloudLoader';
 import {
-    renderPoints as _renderPoints, resetRealtimeCloud as _resetRealtime,
+    renderPoints as _renderPoints,
+    renderPointsAsync as _renderPointsAsync,
+    resetRealtimeCloud as _resetRealtime,
     appendRealtimePoints as _appendRealtime,
     beginStreamingCloud as _beginStreamingCloud,
     pushStreamingCloudBatch as _pushStreamingCloudBatch,
     finishStreamingCloud as _finishStreamingCloud,
+    finishStreamingCloudAsync as _finishStreamingCloudAsync,
+    type CloudBuildProgressCallback,
 } from './viewer/cloudRenderer';
 import type { StreamingCloudInitOptions } from './cloud/types';
 import type { StreamingChunkBuilder } from './cloud/spatialChunker';
@@ -161,11 +165,22 @@ export class CloudViewer extends Viewer {
         _pushStreamingCloudBatch(this, positions, values, rgbColors, pointCount);
     }
     finishStreamingCloud(): void { _finishStreamingCloud(this); }
+    async finishStreamingCloudAsync(onProgress?: (fraction: number) => void): Promise<void> {
+        return _finishStreamingCloudAsync(this, onProgress);
+    }
     detectFormat(filename?: string) { return detectFormat(filename); }
     checkMemoryBudget(fileSize: number, format: string, filename?: string): boolean { return _checkMemoryBudget(this, fileSize, format, filename); }
     assembleChunkList() { return _assembleChunkList(this); }
 
     renderPoints(positions: Float32Array, values: Float32Array, rgbColors?: Uint8Array): void { _renderPoints(this, positions, values, rgbColors); }
+    async renderPointsAsync(
+        positions: Float32Array,
+        values: Float32Array,
+        rgbColors?: Uint8Array,
+        onProgress?: CloudBuildProgressCallback,
+    ): Promise<void> {
+        return _renderPointsAsync(this, positions, values, rgbColors, onProgress);
+    }
     resetRealtimeCloud(): void { _resetRealtime(this); }
     appendRealtimePoints(positions: Float32Array, values: Float32Array, rgbColors?: Uint8Array, maxPoints?: number, autoFitOnFirstChunk: boolean = false): void {
         _appendRealtime(this, positions, values, rgbColors, maxPoints, autoFitOnFirstChunk);
