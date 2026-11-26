@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-import { extractDepthCoeffs, maxDepthCoeffsDiff, sortSeparatePointArrays } from '../cloud/depthSort';
-import { AUTO_SORT_ALPHA_THRESHOLD, AUTO_SORT_DEPTH_THRESHOLD } from '../cloud/autoDepthSort';
 
 function colorModeToUniformValue(colorMode?: 'FLAT' | 'I' | 'RGB'): number {
     switch (colorMode) {
@@ -37,7 +35,6 @@ export interface CloudItemOptions {
 export class CloudItem extends THREE.Points {
     private static readonly GROWTH_STEP_POINTS = 1_000_000;
     private pointCount: number;
-    private lastSortedCoeffs: [number, number, number] | null = null;
     private lastAppendMeta: {
         appendRequested: number;
         appendActual: number;
@@ -107,7 +104,6 @@ export class CloudItem extends THREE.Points {
             colorArray.fill(0, 0, nextCount * 3);
         }
 
-        this.lastSortedCoeffs = null;
         this.pointCount = nextCount;
         this.markAttributesDirtyRange(0, nextCount);
     }
@@ -187,7 +183,6 @@ export class CloudItem extends THREE.Points {
         }
 
         this.pointCount = currentCount + appendActualCount;
-        this.lastSortedCoeffs = null;
 
         // Fast path: when we only append, upload only the appended tail.
         // Slow path: when downsample/reset happened, upload the whole active range.
@@ -237,39 +232,6 @@ export class CloudItem extends THREE.Points {
     updateViewport(height: number) {
         const material = this.material as CloudShaderMaterial;
         material.uniforms.viewportHeight.value = Math.max(height, 1);
-    }
-
-    forceSort(camera: THREE.Camera): boolean {
-        if (this.pointCount <= 1) return false;
-        camera.updateMatrixWorld();
-        this.updateMatrixWorld();
-        const depthCoeffs = extractDepthCoeffs(camera.matrixWorldInverse, this.matrixWorld);
-        sortSeparatePointArrays(
-            this.getPositionArray(),
-            this.getValueArray(),
-            this.getColorArray(),
-            this.pointCount,
-            depthCoeffs,
-        );
-        this.lastSortedCoeffs = [depthCoeffs[0], depthCoeffs[1], depthCoeffs[2]];
-        this.markAttributesDirtyRange(0, this.pointCount);
-        return true;
-    }
-
-    isTransparentForDepthSort(): boolean {
-        const material = this.material as CloudShaderMaterial;
-        return Number(material.uniforms.alpha.value) < AUTO_SORT_ALPHA_THRESHOLD;
-    }
-
-    autoSortIfNeeded(camera: THREE.Camera): boolean {
-        if (this.pointCount <= 1 || !this.isTransparentForDepthSort()) return false;
-        camera.updateMatrixWorld();
-        this.updateMatrixWorld();
-        const depthCoeffs = extractDepthCoeffs(camera.matrixWorldInverse, this.matrixWorld);
-        if (maxDepthCoeffsDiff(depthCoeffs, this.lastSortedCoeffs) < AUTO_SORT_DEPTH_THRESHOLD) {
-            return false;
-        }
-        return this.forceSort(camera);
     }
 
     private ensureCapacity(requiredPoints: number): void {
@@ -494,7 +456,7 @@ export class CloudShaderMaterial extends THREE.ShaderMaterial {
             fragmentShader: fragmentShader,
             transparent: alpha < 0.99 || pointType > 1.5,
             depthTest: true,
-            depthWrite: alpha >= 0.99 && pointType <= 1.5,
+            depthWrite: true,
         });
     }
 }

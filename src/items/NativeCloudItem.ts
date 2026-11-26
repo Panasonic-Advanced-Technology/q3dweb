@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import { WebGLCloudBackend } from '../utils/WebGLCloudBackend';
 import type { ColorMode } from '../utils/realtimeTypes';
-import { extractDepthCoeffs, maxDepthCoeffsDiff } from '../cloud/depthSort';
-import { AUTO_SORT_ALPHA_THRESHOLD, AUTO_SORT_DEPTH_THRESHOLD } from '../cloud/autoDepthSort';
 
 export interface NativeCloudItemOptions {
     colorMode?: ColorMode;
@@ -19,7 +17,6 @@ export class NativeCloudItem extends THREE.Object3D {
     private alpha: number;
     private vmin: number;
     private vmax: number;
-    private lastSortedCoeffs: [number, number, number] | null = null;
 
     constructor(options: NativeCloudItemOptions = {}) {
         super();
@@ -54,7 +51,6 @@ export class NativeCloudItem extends THREE.Object3D {
     getVmax(): number { return this.vmax; }
 
     reset(maxPoints: number): void {
-        this.lastSortedCoeffs = null;
         this.backend.reset(maxPoints);
     }
 
@@ -67,7 +63,6 @@ export class NativeCloudItem extends THREE.Object3D {
         if (positions.length !== values.length * 3) return;
         if (values.length === 0) return;
 
-        this.lastSortedCoeffs = null;
         this.backend.append(renderer, positions, values, maxPoints);
     }
 
@@ -85,30 +80,5 @@ export class NativeCloudItem extends THREE.Object3D {
 
     getPointCount(): number {
         return this.backend.getPointCount();
-    }
-
-    forceSort(camera: THREE.Camera, renderer?: THREE.WebGLRenderer): boolean {
-        this.updateMatrixWorld();
-        const sorted = this.backend.sortByDepth(renderer, camera, this.matrixWorld);
-        if (sorted) {
-            const coeffs = extractDepthCoeffs(camera.matrixWorldInverse, this.matrixWorld);
-            this.lastSortedCoeffs = [coeffs[0], coeffs[1], coeffs[2]];
-        }
-        return sorted;
-    }
-
-    isTransparentForDepthSort(): boolean {
-        return this.alpha < AUTO_SORT_ALPHA_THRESHOLD;
-    }
-
-    autoSortIfNeeded(camera: THREE.Camera, renderer?: THREE.WebGLRenderer): boolean {
-        if (this.getPointCount() <= 1 || !this.isTransparentForDepthSort()) return false;
-        camera.updateMatrixWorld();
-        this.updateMatrixWorld();
-        const coeffs = extractDepthCoeffs(camera.matrixWorldInverse, this.matrixWorld);
-        if (maxDepthCoeffsDiff(coeffs, this.lastSortedCoeffs) < AUTO_SORT_DEPTH_THRESHOLD) {
-            return false;
-        }
-        return this.forceSort(camera, renderer);
     }
 }

@@ -88,14 +88,14 @@ describe('CloudItem geometry & uniforms', () => {
     expect(() => new CloudItem(new Float32Array(4), new Float32Array(1))).toThrow('positions length');
   });
 
-  it('sets alpha-dependent transparency and depth write flags', () => {
+  it('keeps depth write enabled for both opaque and transparent clouds', () => {
     const opaqueCloud = new CloudItem(new Float32Array(3), new Float32Array(1), { alpha: 1 });
     const transparentCloud = new CloudItem(new Float32Array(3), new Float32Array(1), { alpha: 0.5 });
 
     expect((opaqueCloud.material as THREE.ShaderMaterial).transparent).toBe(false);
     expect((opaqueCloud.material as THREE.ShaderMaterial).depthWrite).toBe(true);
     expect((transparentCloud.material as THREE.ShaderMaterial).transparent).toBe(true);
-    expect((transparentCloud.material as THREE.ShaderMaterial).depthWrite).toBe(false);
+    expect((transparentCloud.material as THREE.ShaderMaterial).depthWrite).toBe(true);
   });
 
   it('replaces points, grows attributes, converts float colors, and updates draw range', () => {

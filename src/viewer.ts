@@ -18,7 +18,6 @@ import {
 } from './viewer/measurement';
 import { CloudItem } from './items/CloudItem';
 import { ChunkedCloudItem } from './items/ChunkedCloudItem';
-import { AutoDepthSortController } from './cloud/autoDepthSort';
 
 const wrapAngle = (a: number): number =>
     ((a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
@@ -71,20 +70,12 @@ export class Viewer {
     private readonly _camTemp = new THREE.Vector3();
     private readonly boundRender = () => this.render();
     private centerHideTimer: ReturnType<typeof setTimeout> | null = null;
-    readonly autoDepthSortController: AutoDepthSortController;
 
     constructor(containerId: string) {
         const container = document.getElementById(containerId);
         if (!container) throw new Error(`Container ${containerId} not found`);
         this.container = container;
         this.isTouchPrimaryDevice = this.detectTouchPrimaryDevice();
-        this.autoDepthSortController = new AutoDepthSortController({
-            getSortableItems: () => Object.values(this.items),
-            getCamera: () => this.camera,
-            getRenderer: () => this.renderer,
-            isUserInteracting: () => this.mousePos !== null || this.activeKeys.size > 0 || Boolean((this as any).isPlayingFilm),
-            requestRender: () => this.requestRender(),
-        });
         this.loadingOverlay = document.createElement('div');
         this.loadingOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:none;justify-content:center;align-items:center;z-index:1001;';
         this.loadingOverlay.innerHTML = '<div style="color:white;font-size:24px;font-family:sans-serif;background:rgba(0,0,0,0.8);padding:20px;border-radius:8px;">Loading...</div>';
@@ -144,7 +135,6 @@ export class Viewer {
         this.camera.up.copy(this._camUp);
         this.camera.lookAt(this.cameraCenter);
         this.updateProjection();
-        this.autoDepthSortController.notifyActivity();
         this.requestRender();
     }
 
@@ -319,35 +309,7 @@ export class Viewer {
             (item as any as SettingBuilder).addSetting(this.settingsContent); return;
         }
         const mat = (item as any).material;
-        const canSort = typeof (item as any).forceSort === 'function';
-        const onForceSort = canSort ? () => { this.forceSortCloud(); } : undefined;
-        const autoDepthSort = canSort ? {
-            enabled: this.autoDepthSortEnabled,
-            onToggle: (enabled: boolean) => { this.setAutoDepthSortEnabled(enabled); },
-            onAlphaChange: () => { this.autoDepthSortController.notifyActivity(); },
-        } : undefined;
-        if (mat?.uniforms) buildCloudItemSettings(item, mat, this.settingsContent, this.getBaseRendererPixelRatio(), () => this.requestRender(), onForceSort, autoDepthSort);
-    }
-
-    get autoDepthSortEnabled(): boolean {
-        return this.autoDepthSortController.isEnabled();
-    }
-
-    setAutoDepthSortEnabled(enabled: boolean): void {
-        this.autoDepthSortController.setEnabled(enabled);
-    }
-
-    forceSortCloud(): boolean {
-        this.autoDepthSortController.cancelPendingAndActive();
-        this.camera.updateMatrixWorld();
-        let sorted = false;
-        for (const item of Object.values(this.items)) {
-            if (typeof (item as any).forceSort === 'function' && (item as any).forceSort(this.camera, this.renderer)) {
-                sorted = true;
-            }
-        }
-        if (sorted) this.requestRender();
-        return sorted;
+        if (mat?.uniforms) buildCloudItemSettings(item, mat, this.settingsContent, this.getBaseRendererPixelRatio(), () => this.requestRender());
     }
 
     getBaseRendererPixelRatio(): number { return Math.max(window.devicePixelRatio || 1, 1); }
@@ -403,13 +365,11 @@ export class Viewer {
         this.scene.add(object);
         this.syncCloudItemViewport(object);
         this.refreshSettingsItemList(name === 'cloud' ? 'cloud' : this.settingsItemSelect?.value);
-        this.autoDepthSortController.notifyActivity();
     }
 
     removeItem(name: string) {
         const item = this.items[name];
         if (item) {
-            this.autoDepthSortController.cancelPendingAndActive();
             const sel = this.settingsItemSelect?.value;
             this.scene.remove(item);
             if (typeof (item as any).dispose === 'function') {

@@ -140,12 +140,6 @@ export function buildCloudItemSettings(
     container: HTMLElement,
     pixelRatio: number,
     onRender: () => void,
-    onForceSort?: () => void,
-    autoDepthSort?: {
-        enabled: boolean;
-        onToggle: (enabled: boolean) => void;
-        onAlphaChange?: () => void;
-    },
 ): void {
     const geometry   = (item as any).geometry as THREE.BufferGeometry | undefined;
     const pointCount = geometry?.getAttribute('position')?.count;
@@ -155,7 +149,7 @@ export function buildCloudItemSettings(
         const alpha = mat.uniforms.alpha?.value ?? 1;
         const pointType = pointTypeUniform?.value ?? 0;
         const nextTransparent = alpha < 0.99 || pointType > 1.5;
-        const nextDepthWrite = alpha >= 0.99 && pointType <= 1.5;
+        const nextDepthWrite = true;
         if (mat.transparent !== nextTransparent || mat.depthWrite !== nextDepthWrite) {
             mat.transparent = nextTransparent;
             mat.depthWrite = nextDepthWrite;
@@ -219,10 +213,8 @@ export function buildCloudItemSettings(
     if (mat.uniforms.alpha) {
         container.appendChild(makeLabel('Alpha:'));
         container.appendChild(makeRangeInput(mat.uniforms.alpha.value, 0, 1, 0.01, (v) => {
-            const changed = Math.abs(Number(mat.uniforms.alpha.value) - v) > 1e-6;
             mat.uniforms.alpha.value = v;
             syncPointTransparency();
-            if (changed) autoDepthSort?.onAlphaChange?.();
             onRender();
         }));
     }
@@ -245,20 +237,6 @@ export function buildCloudItemSettings(
         container.appendChild(makeNumberInput(mat.uniforms.vmax.value, -100000, 100000, 1, (v) => {
             mat.uniforms.vmax.value = v; onRender();
         }));
-    }
-
-    if (autoDepthSort) {
-        const autoRow = makeCheckbox('Auto Depth Sort', autoDepthSort.enabled, autoDepthSort.onToggle);
-        autoRow.setAttribute('data-role', 'cloud-auto-sort-row');
-        const autoInput = autoRow.querySelector('input[type=checkbox]');
-        autoInput?.setAttribute('data-role', 'cloud-auto-sort-checkbox');
-        container.appendChild(autoRow);
-    }
-
-    if (onForceSort) {
-        const sortBtn = makeButton('Force Sort (R)', onForceSort);
-        sortBtn.setAttribute('data-role', 'cloud-force-sort-button');
-        container.appendChild(sortBtn);
     }
 }
 

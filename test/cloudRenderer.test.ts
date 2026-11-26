@@ -81,7 +81,7 @@ describe('cloudRenderer', () => {
     expect(material.uniforms.vmin.value).toBe(-10);
     expect(material.uniforms.vmax.value).toBe(42);
     expect(material.transparent).toBe(true);
-    expect(material.depthWrite).toBe(false);
+    expect(material.depthWrite).toBe(true);
   });
 
   it('resets realtime cloud state', () => {

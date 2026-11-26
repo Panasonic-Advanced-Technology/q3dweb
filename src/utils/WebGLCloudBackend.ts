@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import type { ColorMode } from './realtimeTypes';
-import { extractDepthCoeffs, radixSortOrderByDepths, RadixSortWorkspace } from '../cloud/depthSort';
 
 export class WebGLCloudBackend {
     private static readonly CAPACITY_STEP = 1_000_000;
@@ -29,43 +28,6 @@ export class WebGLCloudBackend {
 
     getPointCount(): number {
         return this.pointCount;
-    }
-
-    sortByDepth(
-        renderer: THREE.WebGLRenderer | undefined,
-        camera: THREE.Camera,
-        modelMatrix?: THREE.Matrix4,
-    ): boolean {
-        if (this.pointCount <= 1) return false;
-        camera.updateMatrixWorld();
-        const [a, b, c] = extractDepthCoeffs(camera.matrixWorldInverse, modelMatrix);
-        const count = this.pointCount;
-        const ws = new RadixSortWorkspace();
-        ws.ensureCapacity(count);
-        const depths = ws.depthsF32;
-        const buf = this.cpuBuffer;
-        for (let i = 0, o = 0; i < count; i++, o += 4) {
-            const d = a * buf[o] + b * buf[o + 1] + c * buf[o + 2];
-            depths[i] = Number.isFinite(d) ? d : -3.4e38;
-        }
-        const order = radixSortOrderByDepths(count, ws);
-        const sorted = new Float32Array(count * 4);
-        for (let i = 0; i < count; i++) {
-            const s = order[i] * 4;
-            const d = i * 4;
-            sorted[d] = buf[s];
-            sorted[d + 1] = buf[s + 1];
-            sorted[d + 2] = buf[s + 2];
-            sorted[d + 3] = buf[s + 3];
-        }
-        buf.set(sorted, 0);
-        if (renderer) this.ensureInitialized(renderer);
-        if (this.gl && this.vbo) {
-            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vbo);
-            this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, sorted);
-            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
-        }
-        return true;
     }
 
     append(
@@ -168,13 +130,12 @@ export class WebGLCloudBackend {
         renderer.resetState();
 
         gl.enable(gl.DEPTH_TEST);
+        gl.depthMask(true);
         if (alpha < 0.99) {
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            gl.depthMask(false);
         } else {
             gl.disable(gl.BLEND);
-            gl.depthMask(true);
         }
 
         gl.useProgram(this.program);

@@ -147,6 +147,77 @@ describe('streamEngine extra paths', () => {
     expect(viewer.chunkList).toEqual([]);
   });
 
+  it('uses async normalization, chunk building, and streaming finalization for large clouds', async () => {
+    const bigCount = 100_000;
+    const viewer = Object.assign(makeViewer(), {
+      renderPointsAsync: vi.fn(async (_p: any, _v: any, _r: any, onProgress?: (stage: 'chunking' | 'uploading', fraction: number) => void) => {
+        onProgress?.('chunking', 0.5);
+        onProgress?.('uploading', 1);
+      }),
+      finishStreamingCloudAsync: vi.fn(async (onProgress?: (fraction: number) => void) => {
+        onProgress?.(0.5);
+        onProgress?.(1);
+      }),
+    });
+
+    // 1) LAS direct streaming async finish path
+    streamEngine.startStream(viewer, 100, 'big.las');
+    viewer.lasStream = { originLatLon: null, bounds: null };
+    viewer.lasDirectStreaming = true;
+    await streamEngine.finalizeStream(viewer);
+    expect(viewer.finishStreamingCloudAsync).toHaveBeenCalledTimes(1);
+
+    // 2) Binary PCD large cloud async normalize + async render path
+    streamEngine.startStream(viewer, 100, 'big.pcd');
+    viewer.isBinary = true;
+    viewer.pcdHeader = { offset: { intensity: 12 } };
+    viewer.posBuffer = new Float32Array(bigCount * 3);
+    viewer.valBuffer = new Float32Array(bigCount);
+    viewer.posIndex = bigCount;
+    await streamEngine.finalizeStream(viewer);
+    expect(viewer.renderPointsAsync).toHaveBeenCalledTimes(1);
+
+    // 3) E57 large cloud async render path
+    streamEngine.startStream(viewer, 100, 'big.e57');
+    viewer.chunkList = [new Uint8Array([1, 2])];
+    parserMocks.parseE57.mockImplementation(async (_d: any, _m: any, _s: any, onProgress?: (f: number) => void) => {
+      onProgress?.(0.5);
+      return { positions: new Float32Array(bigCount * 3), values: new Float32Array(bigCount), rgb: undefined };
+    });
+    await streamEngine.finalizeStream(viewer);
+    expect(viewer.renderPointsAsync).toHaveBeenCalledTimes(2);
+
+    // 4) LAS buffered large cloud async normalize + async render path
+    streamEngine.startStream(viewer, 100, 'big_buf.las');
+    viewer.lasStream = { originLatLon: null, bounds: null };
+    viewer.lasDirectStreaming = false;
+    viewer.posBuffer = new Float32Array(bigCount * 3);
+    viewer.valBuffer = new Float32Array(bigCount);
+    viewer.posIndex = bigCount;
+    await streamEngine.finalizeStream(viewer);
+    expect(viewer.renderPointsAsync).toHaveBeenCalledTimes(3);
+
+    // 5) LAZ large cloud async render path via loadFile
+    parserMocks.parseLAZ.mockImplementation(async (_d: any, _m: any, _s: any, onProgress?: (f: number) => void) => {
+      onProgress?.(0.5);
+      return {
+        positions: new Float32Array(bigCount * 3),
+        values: new Float32Array(bigCount),
+        rgb: undefined,
+        originLatLon: null,
+        bounds: null,
+      };
+    });
+    await streamEngine.loadFile(viewer, new File([new Uint8Array([0x4c, 0x41, 0x53, 0x46])], 'big.laz'));
+    expect(viewer.renderPointsAsync).toHaveBeenCalledTimes(4);
+
+    // 6) LAZ large cloud finalizeStream path (chunked input)
+    streamEngine.startStream(viewer, 4, 'big_stream.laz');
+    viewer.chunkList = [new Uint8Array([0x4c, 0x41, 0x53, 0x46])];
+    await streamEngine.finalizeStream(viewer);
+    expect(viewer.renderPointsAsync).toHaveBeenCalledTimes(5);
+  });
+
   it('ignores unsupported files and catches loadFile reader errors', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});

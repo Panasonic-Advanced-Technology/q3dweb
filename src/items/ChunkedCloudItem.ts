@@ -3,7 +3,6 @@ import { CloudShaderMaterial, type CloudItemOptions } from './CloudItem';
 import { ChunkedCloudBackend } from '../cloud/ChunkedCloudBackend';
 import { buildSpatialChunks } from '../cloud/spatialChunker';
 import { buildSpatialChunksAsync, yieldToMain } from '../cloud/asyncChunkBuilder';
-import { AUTO_SORT_ALPHA_THRESHOLD, type IncrementalSortStartResult } from '../cloud/autoDepthSort';
 import type {
     CloudBounds,
     CloudRenderStats,
@@ -139,34 +138,6 @@ export class ChunkedCloudItem extends THREE.Object3D {
 
     invalidateCache(): void {
         this.backend.invalidateCache();
-    }
-
-    forceSort(camera: THREE.Camera, renderer?: THREE.WebGLRenderer): boolean {
-        if (this.backend.getTotalPoints() === 0) return false;
-        this.updateMatrixWorld();
-        return this.backend.forceSort(camera, this.matrixWorld, renderer);
-    }
-
-    isTransparentForDepthSort(): boolean {
-        return Number(this.material.uniforms.alpha.value) < AUTO_SORT_ALPHA_THRESHOLD;
-    }
-
-    isRefining(): boolean {
-        return this.needsRefinement();
-    }
-
-    beginAutoSort(camera: THREE.Camera, renderer?: THREE.WebGLRenderer): IncrementalSortStartResult {
-        if (this.backend.getTotalPoints() === 0) return 'skipped';
-        this.updateMatrixWorld();
-        return this.backend.beginAutoSort(camera, this.matrixWorld, renderer);
-    }
-
-    stepAutoSort(budgetMs: number, renderer?: THREE.WebGLRenderer): boolean {
-        return this.backend.stepAutoSort(budgetMs, renderer);
-    }
-
-    cancelAutoSort(): void {
-        this.backend.cancelAutoSort();
     }
 
     getStats(): CloudRenderStats {

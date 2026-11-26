@@ -51,7 +51,7 @@ function applyCloudMaterialSettings(
     material.uniforms.vmin.value = effectiveMin;
     material.uniforms.vmax.value = effectiveMax;
     material.transparent = alpha < 0.99 || pointType === 'SPHERE';
-    material.depthWrite = alpha >= 0.99 && pointType !== 'SPHERE';
+    material.depthWrite = true;
 }
 
 function fitCameraToBox(v: any, box: THREE.Box3 | null): void {
